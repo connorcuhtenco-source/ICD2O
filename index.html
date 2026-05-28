@@ -3,32 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fast Eagle</title>
+    <title>Arcade Arena</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="menu">
+        <div class="menu-card">
+            <h1>Arcade Arena</h1>
+            <p class="subtitle">Select a game to begin</p>
 
-<div id="menu">
-    <h1 id="title">
-        <span>F</span><span>A</span><span>S</span><span>T</span>
-        <span>&nbsp;</span>
-        <span>E</span><span>A</span><span>G</span><span>L</span><span>E</span>
-    </h1>
-    <button id="playBtn">Play Game</button>
-    <p id="highScore">High Score: 0</p>
-</div>
+            <div id="gameButtons">
+                <button id="tagZoneBtn" class="menuBtn">Tag Zone</button>
+                <button id="platformerBtn" class="menuBtn">Space Runner</button>
+                <button id="playBtn" class="menuBtn">Fast Eagle</button>
+            </div>
 
-<div id="gameContainer">
-    <canvas id="gameCanvas" width="400" height="600"></canvas>
-
-    <div id="gameOver">
-        <h2>Game Over</h2>
-        <p id="finalScore"></p>
-        <p id="bestScore"></p>
-        <button id="restartBtn">Restart</button>
+            <p id="highScore">Fast Eagle High Score: 0</p>
+        </div>
     </div>
-</div>
 
-<script src="script.js"></script>
+    <div id="gameContainer" class="hidden">
+        <div class="game-card">
+            <h2 id="gameTitle">Game</h2>
+
+            <div class="canvas-wrapper">
+                <canvas id="gameCanvas" width="480" height="720" class="hidden"></canvas>
+
+                <div id="tagHud" class="tag-hud hidden">
+                    <div class="hud-box">
+                        <span>Time</span>
+                        <strong id="tagTimer">0</strong>
+                    </div>
+
+                    <div class="hud-box">
+                        <span>Level</span>
+                        <strong id="tagLevel">1</strong>
+                    </div>
+
+                    <div id="inventoryHud">
+                        <div class="inventory-slot"></div>
+                        <div class="inventory-slot"></div>
+                        <div class="inventory-slot"></div>
+                    </div>
+                </div>
+
+                <button id="restartBtn" class="menuBtn hidden canvas-restart-btn">Restart</button>
+            </div>
+
+            <p id="gameMessage">This game is coming soon.</p>
+
+            <div class="game-controls">
+                <button id="backBtn" class="menuBtn">Back to Hub</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
