@@ -7,8 +7,12 @@ const playBtn = document.getElementById("playBtn");
 const gameOverScreen = document.getElementById("gameOver");
 const restartBtn = document.getElementById("restartBtn");
 const finalScore = document.getElementById("finalScore");
+const highScoreText = document.getElementById("highScore");
+const bestScore = document.getElementById("bestScore");
 
 let gameRunning = false;
+let audioCtx;
+let highScore = 0;
 
 let bird, pipes, score, gravity, lift, clouds;
 
@@ -18,7 +22,9 @@ function initGame() {
         y: 250,
         width: 26,
         height: 24,
-        velocity: 0
+        velocity: 0,
+        rotation: 0,
+        wingAngle: 0
     };
 
     pipes = [];
@@ -35,6 +41,39 @@ function initGame() {
     lift = -6.5;
 
     gameOverScreen.style.display = "none";
+}
+
+function loadHighScore() {
+    highScore = 0;
+    if (highScoreText) {
+        highScoreText.textContent = "High Score: " + highScore;
+    }
+}
+
+function saveHighScore() {
+    // High score persistence disabled; score resets whenever the game is opened.
+}
+
+function playDeathSound() {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    if (!audioCtx) {
+        audioCtx = new AudioCtx();
+    }
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = "triangle";
+    osc.frequency.value = 180;
+    gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.35);
 }
 
 function startGame() {
@@ -60,6 +99,8 @@ function spawnPipe() {
 function update() {
     bird.velocity += gravity;
     bird.y += bird.velocity;
+    bird.wingAngle += 0.25;
+    bird.rotation = Math.max(Math.min(bird.velocity * 0.08, 0.6), -0.6);
 
     clouds.forEach(cloud => {
         cloud.x -= cloud.speed;
@@ -152,6 +193,9 @@ function drawPipes() {
 function drawBird() {
     ctx.save();
     ctx.translate(bird.x, bird.y);
+    ctx.rotate(bird.rotation);
+
+    const wingFlap = Math.sin(bird.wingAngle) * 4;
 
     // body
     ctx.fillStyle = "#f2c94c";
@@ -163,8 +207,8 @@ function drawBird() {
     ctx.fillStyle = "#d8a52d";
     ctx.beginPath();
     ctx.moveTo(6, 10);
-    ctx.lineTo(-2, 3);
-    ctx.lineTo(5, -3);
+    ctx.lineTo(-2, 3 + wingFlap);
+    ctx.lineTo(5, -3 + wingFlap);
     ctx.closePath();
     ctx.fill();
 
@@ -201,9 +245,22 @@ function draw() {
     drawPipes();
     drawBird();
 
-    ctx.fillStyle = "#1d3557";
-    ctx.font = "20px Arial";
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    gradient.addColorStop(0, "#ff5f6d");
+    gradient.addColorStop(0.25, "#ffbe4c");
+    gradient.addColorStop(0.5, "#6fd1ff");
+    gradient.addColorStop(0.75, "#c576ff");
+    gradient.addColorStop(1, "#ff5f6d");
+
+    ctx.fillStyle = gradient;
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+    ctx.lineWidth = 2;
+    ctx.font = "22px Arial";
+    ctx.textBaseline = "top";
+    ctx.strokeText("Score: " + score, 10, 30);
     ctx.fillText("Score: " + score, 10, 30);
+    ctx.strokeText("High: " + highScore, canvas.width - 128, 30);
+    ctx.fillText("High: " + highScore, canvas.width - 128, 30);
 }
 
 function loop() {
@@ -219,6 +276,17 @@ function flap() {
 
 function gameOver() {
     gameRunning = false;
+    if (score > highScore) {
+        highScore = score;
+        saveHighScore();
+    }
+    if (highScoreText) {
+        highScoreText.textContent = "High Score: " + highScore;
+    }
+    if (bestScore) {
+        bestScore.textContent = "Best: " + highScore;
+    }
+    playDeathSound();
     gameOverScreen.style.display = "flex";
     finalScore.textContent = "Score: " + score;
 }
@@ -238,5 +306,6 @@ restartBtn.addEventListener("click", startGame);
 
 // show menu initially
 menu.style.display = "flex";
+loadHighScore();
 initGame();
 draw();

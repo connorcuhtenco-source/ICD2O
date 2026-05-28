@@ -33,9 +33,84 @@ canvas {
 }
 
 #menu h1 {
-    font-size: 42px;
+    font-size: 46px;
     margin-bottom: 20px;
     letter-spacing: 3px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #ff5f6d, #ffc371, #76e2f8, #9150dd, #ff5f6d);
+    background-size: 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: rainbowShift 4s linear infinite;
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+}
+
+#menu h1 span {
+    display: inline-block;
+    animation: floatLetter 1.4s ease-in-out infinite;
+}
+
+#menu h1 span:nth-child(1) { color: #ff4d6d; }
+#menu h1 span:nth-child(2) { color: #ff9c5f; }
+#menu h1 span:nth-child(3) { color: #fff275; }
+#menu h1 span:nth-child(4) { color: #7ee8fa; }
+#menu h1 span:nth-child(5) { color: transparent; }
+#menu h1 span:nth-child(6) { color: #a56cff; }
+#menu h1 span:nth-child(7) { color: #4be2a2; }
+#menu h1 span:nth-child(8) { color: #ff5aa7; }
+#menu h1 span:nth-child(9) { color: #6fd1ff; }
+#menu h1 span:nth-child(10) { color: #fff07a; }
+
+#menu h1 span:nth-child(1) { animation-delay: 0s; }
+#menu h1 span:nth-child(2) { animation-delay: 0.08s; }
+#menu h1 span:nth-child(3) { animation-delay: 0.16s; }
+#menu h1 span:nth-child(4) { animation-delay: 0.24s; }
+#menu h1 span:nth-child(6) { animation-delay: 0.32s; }
+#menu h1 span:nth-child(7) { animation-delay: 0.40s; }
+#menu h1 span:nth-child(8) { animation-delay: 0.48s; }
+#menu h1 span:nth-child(9) { animation-delay: 0.56s; }
+#menu h1 span:nth-child(10) { animation-delay: 0.64s; }
+
+.rainbowText {
+    font-weight: 700;
+    background: linear-gradient(90deg, #ff6b6b, #ffd166, #6bc1ff, #b76cff, #ff6b6b);
+    background-size: 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: rainbowShift 3.5s linear infinite;
+    text-shadow: 0 0 16px rgba(255,255,255,0.25);
+}
+
+@keyframes rainbowShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes floatLetter {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+#highScore,
+#bestScore,
+#finalScore {
+    margin: 12px 0 0;
+    font-size: 18px;
+}
+
+#highScore,
+#bestScore,
+#finalScore {
+    color: transparent;
+    background: linear-gradient(90deg, #f8f9fa, #a0f0ff, #ffd1a8);
+    background-size: 300%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: rainbowShift 3.5s linear infinite;
+    text-shadow: 0 0 10px rgba(255,255,255,0.15);
 }
 
 button {
