@@ -18,6 +18,12 @@ const tagTimerText = document.getElementById('tagTimer');
 const tagLevelText = document.getElementById('tagLevel');
 const inventorySlots = document.querySelectorAll('.inventory-slot');
 
+const tagPlayerIdleSprite = new Image();
+tagPlayerIdleSprite.src = 'sprites/owlet-idle.png';
+
+const tagPlayerRunSprite = new Image();
+tagPlayerRunSprite.src = 'sprites/owlet-run.png';
+
 let highScore = 0;
 let currentGame = null;
 let gameRunning = false;
@@ -35,12 +41,12 @@ let starPowerTimer = 0;
 
 const gravity = 0.3;
 const lift = -6.5;
-const PIPE_SPEED = 2.4;
+const PIPE_SPEED = 3.2;
 const PIPE_WIDTH = 50;
 const PIPE_GAP = 140;
 const STAR_CHANCE = 0.25;
 const STAR_POWER_TIME = 10;
-const STAR_SPEED_MULTIPLIER = 1.75;
+const STAR_SPEED_MULTIPLIER = 1.9;
 
 const WORLD_WIDTH = 1800;
 const WORLD_HEIGHT = 1800;
@@ -60,6 +66,15 @@ let countdown = 3;
 let countdownActive = false;
 let camX = 0;
 let camY = 0;
+
+let tagPlayerFrame = 0;
+let tagPlayerFrameTimer = 0;
+let tagPlayerFacing = 1;
+
+const TAG_PLAYER_FRAME_SIZE = 32;
+const TAG_PLAYER_IDLE_FRAMES = 4;
+const TAG_PLAYER_RUN_FRAMES = 6;
+const TAG_PLAYER_ANIMATION_SPEED = 0.1;
 
 const itemTypes = [
     { name: 'Boost', className: 'boost', color: '#ffe66d' },
@@ -82,10 +97,8 @@ function showMenu() {
 function showGameScreen(name, message, useCanvas = false, showRestart = false) {
     menu.classList.add('hidden');
     gameContainer.classList.remove('hidden');
-
     gameTitle.textContent = name;
     gameMessage.textContent = message;
-
     canvas.classList.toggle('hidden', !useCanvas);
     restartBtn.classList.toggle('hidden', !showRestart);
 }
@@ -117,7 +130,7 @@ function loop(timestamp) {
     lastTime = timestamp;
 
     if (currentGame === 'fastEagle') {
-        updateFastEagle();
+        updateFastEagle(delta);
         drawFastEagle();
     }
 
@@ -181,20 +194,21 @@ function flap() {
     bird.velocity = lift;
 }
 
-function updateFastEagle() {
-    const currentPipeSpeed = getFastEagleSpeed();
+function updateFastEagle(delta) {
+    const frameScale = delta * 60;
+    const currentPipeSpeed = getFastEagleSpeed() * frameScale;
 
     if (starPowerTimer > 0) {
-        starPowerTimer = Math.max(0, starPowerTimer - 1 / 60);
+        starPowerTimer = Math.max(0, starPowerTimer - delta);
     }
 
-    bird.velocity += gravity;
-    bird.y += bird.velocity;
-    bird.wingAngle += 0.25;
+    bird.velocity += gravity * frameScale;
+    bird.y += bird.velocity * frameScale;
+    bird.wingAngle += 0.25 * frameScale;
     bird.rotation = Math.max(Math.min(bird.velocity * 0.08, 0.6), -0.6);
 
     clouds.forEach(cloud => {
-        cloud.x -= cloud.speed * (starPowerTimer > 0 ? 2 : 1);
+        cloud.x -= cloud.speed * frameScale * (starPowerTimer > 0 ? 2 : 1);
 
         if (cloud.x + cloud.size * 3 < 0) {
             cloud.x = canvas.width + 20;
@@ -248,7 +262,7 @@ function updateFastEagle() {
 
     pipes = pipes.filter(pipe => pipe.x + PIPE_WIDTH > 0);
 
-    if (pipes.length === 0 || pipes[pipes.length - 1].x < 220) {
+    if (pipes.length === 0 || pipes[pipes.length - 1].x < 260) {
         spawnPipe();
     }
 }
@@ -303,7 +317,6 @@ function drawSky() {
     sky.addColorStop(0, '#0b2f66');
     sky.addColorStop(0.5, '#1e4a8d');
     sky.addColorStop(1, '#071122');
-
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
@@ -313,13 +326,11 @@ function drawClouds() {
         ctx.save();
         ctx.globalAlpha = cloud.alpha;
         ctx.fillStyle = '#ffffff';
-
         ctx.beginPath();
         ctx.arc(cloud.x, cloud.y, cloud.size, 0, Math.PI * 2);
         ctx.arc(cloud.x + cloud.size * 1.1, cloud.y - cloud.size * 0.35, cloud.size * 0.75, 0, Math.PI * 2);
         ctx.arc(cloud.x + cloud.size * 2.1, cloud.y, cloud.size * 0.9, 0, Math.PI * 2);
         ctx.fill();
-
         ctx.restore();
     });
 }
@@ -489,13 +500,16 @@ function setupTagLevel() {
     countdown = 3;
     countdownActive = true;
     tagInventory = [];
+    tagPlayerFrame = 0;
+    tagPlayerFrameTimer = 0;
 
     tagPlayer = {
         x: WORLD_WIDTH / 2,
         y: WORLD_HEIGHT / 2,
-        width: 30,
-        height: 30,
-        speed: 275
+        width: 48,
+        height: 48,
+        speed: 275,
+        isMoving: false
     };
 
     const taggerCount = Math.min(2 + tagLevel, 7);
@@ -550,6 +564,7 @@ function updateTagZone(delta) {
     tagBoostTimer = Math.max(0, tagBoostTimer - delta);
 
     moveTagPlayer(delta);
+    updateTagPlayerAnimation(delta);
     moveTaggers(delta);
     collectTagItems();
     checkTaggerCollisions();
@@ -575,6 +590,11 @@ function moveTagPlayer(delta) {
     if (keys.ArrowLeft || keys.KeyA) dx -= 1;
     if (keys.ArrowRight || keys.KeyD) dx += 1;
 
+    tagPlayer.isMoving = dx !== 0 || dy !== 0;
+
+    if (dx < 0) tagPlayerFacing = -1;
+    if (dx > 0) tagPlayerFacing = 1;
+
     if (dx !== 0 || dy !== 0) {
         const length = Math.hypot(dx, dy);
         dx /= length;
@@ -585,6 +605,17 @@ function moveTagPlayer(delta) {
 
     tagPlayer.x = clamp(tagPlayer.x + dx * speed * delta, 0, WORLD_WIDTH - tagPlayer.width);
     tagPlayer.y = clamp(tagPlayer.y + dy * speed * delta, 0, WORLD_HEIGHT - tagPlayer.height);
+}
+
+function updateTagPlayerAnimation(delta) {
+    const frameCount = tagPlayer.isMoving ? TAG_PLAYER_RUN_FRAMES : TAG_PLAYER_IDLE_FRAMES;
+
+    tagPlayerFrameTimer += delta;
+
+    if (tagPlayerFrameTimer >= TAG_PLAYER_ANIMATION_SPEED) {
+        tagPlayerFrameTimer = 0;
+        tagPlayerFrame = (tagPlayerFrame + 1) % frameCount;
+    }
 }
 
 function moveTaggers(delta) {
@@ -747,18 +778,52 @@ function drawTaggers() {
 }
 
 function drawTagPlayer() {
-    ctx.fillStyle = tagShieldTimer > 0 ? '#ff5fa2' : '#00ffcc';
-    ctx.fillRect(tagPlayer.x, tagPlayer.y, tagPlayer.width, tagPlayer.height);
+    const sprite = tagPlayer.isMoving ? tagPlayerRunSprite : tagPlayerIdleSprite;
+    const frameCount = tagPlayer.isMoving ? TAG_PLAYER_RUN_FRAMES : TAG_PLAYER_IDLE_FRAMES;
+    const frame = tagPlayerFrame % frameCount;
 
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(tagPlayer.x, tagPlayer.y, tagPlayer.width, tagPlayer.height);
+    if (sprite.complete) {
+        ctx.save();
+
+        if (tagPlayerFacing === -1) {
+            ctx.translate(tagPlayer.x + tagPlayer.width, tagPlayer.y);
+            ctx.scale(-1, 1);
+            ctx.drawImage(
+                sprite,
+                frame * TAG_PLAYER_FRAME_SIZE,
+                0,
+                TAG_PLAYER_FRAME_SIZE,
+                TAG_PLAYER_FRAME_SIZE,
+                0,
+                0,
+                tagPlayer.width,
+                tagPlayer.height
+            );
+        } else {
+            ctx.drawImage(
+                sprite,
+                frame * TAG_PLAYER_FRAME_SIZE,
+                0,
+                TAG_PLAYER_FRAME_SIZE,
+                TAG_PLAYER_FRAME_SIZE,
+                tagPlayer.x,
+                tagPlayer.y,
+                tagPlayer.width,
+                tagPlayer.height
+            );
+        }
+
+        ctx.restore();
+    } else {
+        ctx.fillStyle = '#00ffcc';
+        ctx.fillRect(tagPlayer.x, tagPlayer.y, tagPlayer.width, tagPlayer.height);
+    }
 
     if (tagShieldTimer > 0) {
         ctx.strokeStyle = 'rgba(255, 95, 162, 0.8)';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(tagPlayer.x + tagPlayer.width / 2, tagPlayer.y + tagPlayer.height / 2, 28, 0, Math.PI * 2);
+        ctx.arc(tagPlayer.x + tagPlayer.width / 2, tagPlayer.y + tagPlayer.height / 2, 32, 0, Math.PI * 2);
         ctx.stroke();
     }
 }
