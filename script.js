@@ -19,10 +19,18 @@ const tagLevelText = document.getElementById('tagLevel');
 const inventorySlots = document.querySelectorAll('.inventory-slot');
 
 const tagPlayerIdleSprite = new Image();
-tagPlayerIdleSprite.src = 'sprites/owlet-idle.png';
+tagPlayerIdleSprite.src = 'sprites/characters/owlet-idle.png';
 
 const tagPlayerRunSprite = new Image();
-tagPlayerRunSprite.src = 'sprites/owlet-run.png';
+tagPlayerRunSprite.src = 'sprites/characters/owlet-run.png';
+
+const taggerRunSprites = [];
+
+for (let i = 0; i < 6; i++) {
+    const img = new Image();
+    img.src = `sprites/characters/3_enemies_1_run_00${i}.png`;
+    taggerRunSprites.push(img);
+}
 
 let highScore = 0;
 let currentGame = null;
@@ -52,11 +60,19 @@ const WORLD_WIDTH = 1800;
 const WORLD_HEIGHT = 1800;
 const TAG_LEVEL_TIME = 25;
 const TAG_MAX_INVENTORY = 3;
+const TAG_MAP_TILE_SIZE = 100;
+const TAG_MAP_TILE_SOURCES = [
+    'sprites/map/Map_tile_52.png'
+];
 
 let tagPlayer = null;
 let taggers = [];
 let tagItems = [];
 let tagInventory = [];
+let tagMapTiles = [];
+let tagMapTrees = [];
+let tagMapRocks = [];
+let tagHouse = null;
 let tagLevel = 1;
 let tagSurvivalTime = 0;
 let tagFreezeTimer = 0;
@@ -71,16 +87,26 @@ let tagPlayerFrame = 0;
 let tagPlayerFrameTimer = 0;
 let tagPlayerFacing = 1;
 
+let taggerFrame = 0;
+let taggerFrameTimer = 0;
+
 const TAG_PLAYER_FRAME_SIZE = 32;
 const TAG_PLAYER_IDLE_FRAMES = 4;
 const TAG_PLAYER_RUN_FRAMES = 6;
 const TAG_PLAYER_ANIMATION_SPEED = 0.1;
+const TAGGER_ANIMATION_SPEED = 0.1;
 
 const itemTypes = [
     { name: 'Boost', className: 'boost', color: '#ffe66d' },
     { name: 'Freeze', className: 'freeze', color: '#74d2ff' },
     { name: 'Shield', className: 'shield', color: '#ff5fa2' }
 ];
+
+const tagMapTileImages = TAG_MAP_TILE_SOURCES.map(src => {
+    const img = new Image();
+    img.src = src;
+    return img;
+});
 
 function getFastEagleSpeed() {
     return starPowerTimer > 0 ? PIPE_SPEED * STAR_SPEED_MULTIPLIER : PIPE_SPEED;
@@ -366,11 +392,8 @@ function drawFastStar() {
         const x = Math.cos(angle) * radius;
         const y = Math.sin(angle) * radius;
 
-        if (i === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
     }
 
     ctx.closePath();
@@ -502,32 +525,102 @@ function setupTagLevel() {
     tagInventory = [];
     tagPlayerFrame = 0;
     tagPlayerFrameTimer = 0;
+    taggerFrame = 0;
+    taggerFrameTimer = 0;
 
     tagPlayer = {
         x: WORLD_WIDTH / 2,
         y: WORLD_HEIGHT / 2,
-        width: 48,
-        height: 48,
+        width: 64,
+        height: 64,
         speed: 275,
         isMoving: false
     };
 
     const taggerCount = Math.min(2 + tagLevel, 7);
-
-    taggers = Array.from({ length: taggerCount }, () => ({
-        x: Math.random() * WORLD_WIDTH,
-        y: Math.random() * WORLD_HEIGHT,
-        width: 32,
-        height: 32,
-        speed: 120 + tagLevel * 18
-    }));
+    taggers = Array.from({ length: taggerCount }, () => createTagger());
 
     const itemCount = Math.max(18 - tagLevel * 2, 8);
     tagItems = Array.from({ length: itemCount }, createTagItem);
+    tagMapTiles = createTagTiles();
 
     gameMessage.textContent = 'Get ready...';
     updateInventoryHud();
     updateTagHud();
+}
+
+function createTagTiles() {
+    const columns = Math.ceil(WORLD_WIDTH / TAG_MAP_TILE_SIZE);
+    const rows = Math.ceil(WORLD_HEIGHT / TAG_MAP_TILE_SIZE);
+    return Array.from({ length: rows }, () =>
+        Array.from({ length: columns }, () => 0)
+    );
+}
+
+function createTagHouse() {
+    return {
+        x: WORLD_WIDTH * 0.34,
+        y: WORLD_HEIGHT * 0.30,
+        width: 140,
+        height: 90
+    };
+}
+
+function createTagMapTrees(count = 3) {
+    const trees = [];
+
+    while (trees.length < count) {
+        const tree = {
+            x: 60 + Math.random() * (WORLD_WIDTH - 120),
+            y: 60 + Math.random() * (WORLD_HEIGHT - 120),
+            width: 28 + Math.random() * 18,
+            height: 42 + Math.random() * 18
+        };
+
+        const houseBounds = {
+            x: tagHouse.x - 100,
+            y: tagHouse.y - 100,
+            width: tagHouse.width + 200,
+            height: tagHouse.height + 200
+        };
+
+        if (rectsOverlap(tree, houseBounds)) continue;
+        if (Math.hypot(tree.x - WORLD_WIDTH / 2, tree.y - WORLD_HEIGHT / 2) < 160) continue;
+
+        trees.push(tree);
+    }
+
+    return trees;
+}
+
+function createTagger() {
+    let x;
+    let y;
+    const width = 72;
+    const height = 72;
+    const minDistanceFromPlayer = 450;
+
+    do {
+        x = Math.random() * (WORLD_WIDTH - width);
+        y = Math.random() * (WORLD_HEIGHT - height);
+    } while (
+        Math.hypot(
+            x + width / 2 - (tagPlayer.x + tagPlayer.width / 2),
+            y + height / 2 - (tagPlayer.y + tagPlayer.height / 2)
+        ) < minDistanceFromPlayer
+    );
+
+    return {
+        x,
+        y,
+        width,
+        height,
+        hitboxOffsetX: 18,
+        hitboxOffsetY: 16,
+        hitboxWidth: 36,
+        hitboxHeight: 46,
+        speed: 120 + tagLevel * 18
+    };
 }
 
 function createTagItem() {
@@ -539,6 +632,35 @@ function createTagItem() {
         radius: 13,
         type
     };
+}
+
+function createTagMapRocks(count = 90, avoid = null) {
+    const rocks = [];
+
+    while (rocks.length < count) {
+        const rock = {
+            x: 40 + Math.random() * (WORLD_WIDTH - 80),
+            y: 40 + Math.random() * (WORLD_HEIGHT - 80),
+            width: 18 + Math.random() * 24,
+            height: 10 + Math.random() * 12,
+            rotation: Math.random() * Math.PI * 2,
+            color: Math.random() < 0.45 ? '#635142' : '#8b7b62',
+            highlight: Math.random() * 0.14 + 0.08
+        };
+
+        if (avoid && rectsOverlap(rock, {
+            x: avoid.x - 80,
+            y: avoid.y - 80,
+            width: avoid.width + 160,
+            height: avoid.height + 160
+        })) {
+            continue;
+        }
+
+        rocks.push(rock);
+    }
+
+    return rocks;
 }
 
 function updateTagZone(delta) {
@@ -566,6 +688,7 @@ function updateTagZone(delta) {
     moveTagPlayer(delta);
     updateTagPlayerAnimation(delta);
     moveTaggers(delta);
+    updateTaggerAnimation(delta);
     collectTagItems();
     checkTaggerCollisions();
 
@@ -632,6 +755,46 @@ function moveTaggers(delta) {
         tagger.x = clamp(tagger.x, 0, WORLD_WIDTH - tagger.width);
         tagger.y = clamp(tagger.y, 0, WORLD_HEIGHT - tagger.height);
     });
+
+    // Handle enemy-to-enemy collisions
+    for (let i = 0; i < taggers.length; i++) {
+        for (let j = i + 1; j < taggers.length; j++) {
+            const t1 = taggers[i];
+            const t2 = taggers[j];
+
+            const dx = t2.x - t1.x;
+            const dy = t2.y - t1.y;
+            const dist = Math.hypot(dx, dy);
+            const minDist = Math.max(t1.width, t1.height) / 2 + Math.max(t2.width, t2.height) / 2;
+
+            if (dist < minDist && dist > 0) {
+                // Push enemies apart
+                const overlap = minDist - dist;
+                const pushX = (dx / dist) * overlap * 0.5;
+                const pushY = (dy / dist) * overlap * 0.5;
+
+                t1.x -= pushX;
+                t1.y -= pushY;
+                t2.x += pushX;
+                t2.y += pushY;
+
+                // Keep within bounds
+                t1.x = clamp(t1.x, 0, WORLD_WIDTH - t1.width);
+                t1.y = clamp(t1.y, 0, WORLD_HEIGHT - t1.height);
+                t2.x = clamp(t2.x, 0, WORLD_WIDTH - t2.width);
+                t2.y = clamp(t2.y, 0, WORLD_HEIGHT - t2.height);
+            }
+        }
+    }
+}
+
+function updateTaggerAnimation(delta) {
+    taggerFrameTimer += delta;
+
+    if (taggerFrameTimer >= TAGGER_ANIMATION_SPEED) {
+        taggerFrameTimer = 0;
+        taggerFrame = (taggerFrame + 1) % taggerRunSprites.length;
+    }
 }
 
 function collectTagItems() {
@@ -654,11 +817,16 @@ function collectTagItems() {
 }
 
 function checkTaggerCollisions() {
+    const playerHitbox = getPlayerHitbox();
+
     for (const tagger of taggers) {
-        if (rectsOverlap(tagPlayer, tagger)) {
+        const taggerHitbox = getTaggerHitbox(tagger);
+
+        if (rectsOverlap(playerHitbox, taggerHitbox)) {
             if (tagShieldTimer > 0) {
-                tagger.x = Math.random() * WORLD_WIDTH;
-                tagger.y = Math.random() * WORLD_HEIGHT;
+                const newTagger = createTagger();
+                tagger.x = newTagger.x;
+                tagger.y = newTagger.y;
                 tagShieldTimer = 0;
                 gameMessage.textContent = 'Shield saved you';
                 return;
@@ -668,6 +836,24 @@ function checkTaggerCollisions() {
             return;
         }
     }
+}
+
+function getPlayerHitbox() {
+    return {
+        x: tagPlayer.x + 18,
+        y: tagPlayer.y + 16,
+        width: tagPlayer.width - 36,
+        height: tagPlayer.height - 26
+    };
+}
+
+function getTaggerHitbox(tagger) {
+    return {
+        x: tagger.x + tagger.hitboxOffsetX,
+        y: tagger.y + tagger.hitboxOffsetY,
+        width: tagger.hitboxWidth,
+        height: tagger.hitboxHeight
+    };
 }
 
 function useTagItem() {
@@ -728,29 +914,84 @@ function drawTagZone() {
 }
 
 function drawTagMap() {
-    ctx.fillStyle = '#122018';
-    ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    const columns = tagMapTiles[0]?.length || Math.ceil(WORLD_WIDTH / TAG_MAP_TILE_SIZE);
+    const rows = tagMapTiles.length || Math.ceil(WORLD_HEIGHT / TAG_MAP_TILE_SIZE);
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.lineWidth = 1;
+    for (let row = 0; row < rows; row++) {
+        for (let column = 0; column < columns; column++) {
+            const tileIndex = tagMapTiles[row]?.[column] ?? 0;
+            const tile = tagMapTileImages[tileIndex];
+            const x = column * TAG_MAP_TILE_SIZE;
+            const y = row * TAG_MAP_TILE_SIZE;
 
-    for (let x = 0; x <= WORLD_WIDTH; x += 100) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, WORLD_HEIGHT);
-        ctx.stroke();
+            if (tile && tile.complete && tile.naturalWidth > 0) {
+                ctx.drawImage(tile, x, y, TAG_MAP_TILE_SIZE, TAG_MAP_TILE_SIZE);
+            } else {
+                ctx.fillStyle = '#2a6a28';
+                ctx.fillRect(x, y, TAG_MAP_TILE_SIZE, TAG_MAP_TILE_SIZE);
+            }
+        }
     }
 
-    for (let y = 0; y <= WORLD_HEIGHT; y += 100) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(WORLD_WIDTH, y);
-        ctx.stroke();
+    // add a lightweight grass pattern overlay so tiles read better
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    for (let y = 0; y < WORLD_HEIGHT; y += 80) {
+        for (let x = 0; x < WORLD_WIDTH; x += 80) {
+            ctx.fillRect(x + 8, y + 30, 52, 6);
+        }
     }
 
     ctx.strokeStyle = '#00ffcc';
     ctx.lineWidth = 8;
     ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+}
+
+function drawTagHouse() {
+    if (!tagHouse) return;
+
+    ctx.save();
+    ctx.translate(tagHouse.x, tagHouse.y);
+
+    ctx.fillStyle = '#7c4d24';
+    ctx.fillRect(0, 0, tagHouse.width, tagHouse.height);
+
+    ctx.fillStyle = '#a56d32';
+    ctx.beginPath();
+    ctx.moveTo(-16, 0);
+    ctx.lineTo(tagHouse.width + 16, 0);
+    ctx.lineTo(tagHouse.width / 2, -84);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#3d2a1a';
+    ctx.fillRect(tagHouse.width * 0.08, tagHouse.height * 0.28, 44, 48);
+    ctx.fillStyle = '#f5e9c9';
+    ctx.fillRect(tagHouse.width * 0.12, tagHouse.height * 0.34, 24, 24);
+    ctx.fillRect(tagHouse.width * 0.65, tagHouse.height * 0.34, 24, 24);
+
+    ctx.fillStyle = '#d7b17a';
+    ctx.fillRect(tagHouse.width * 0.42, tagHouse.height * 0.5, tagHouse.width * 0.18, tagHouse.height * 0.34);
+
+    ctx.restore();
+}
+
+function drawTagTrees() {
+    tagMapTrees.forEach(tree => {
+        ctx.save();
+        ctx.translate(tree.x, tree.y);
+
+        ctx.fillStyle = '#5a3d1e';
+        ctx.fillRect(-tree.width * 0.08, 0, tree.width * 0.16, tree.height * 0.42);
+
+        ctx.fillStyle = '#2a6d28';
+        ctx.beginPath();
+        ctx.moveTo(0, -tree.height * 0.08);
+        ctx.bezierCurveTo(tree.width * 0.75, tree.height * 0.15, tree.width * 0.75, tree.height * 0.65, 0, tree.height * 0.98);
+        ctx.bezierCurveTo(-tree.width * 0.75, tree.height * 0.65, -tree.width * 0.75, tree.height * 0.15, 0, -tree.height * 0.08);
+        ctx.fill();
+
+        ctx.restore();
+    });
 }
 
 function drawTagItems() {
@@ -767,13 +1008,15 @@ function drawTagItems() {
 }
 
 function drawTaggers() {
-    taggers.forEach(tagger => {
-        ctx.fillStyle = tagFreezeTimer > 0 ? '#8be9ff' : '#ff4d4d';
-        ctx.fillRect(tagger.x, tagger.y, tagger.width, tagger.height);
+    const sprite = taggerRunSprites[taggerFrame];
 
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(tagger.x, tagger.y, tagger.width, tagger.height);
+    taggers.forEach(tagger => {
+        if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+            ctx.drawImage(sprite, tagger.x, tagger.y, tagger.width, tagger.height);
+        } else {
+            ctx.fillStyle = tagFreezeTimer > 0 ? '#8be9ff' : '#ff4d4d';
+            ctx.fillRect(tagger.x, tagger.y, tagger.width, tagger.height);
+        }
     });
 }
 
@@ -782,7 +1025,7 @@ function drawTagPlayer() {
     const frameCount = tagPlayer.isMoving ? TAG_PLAYER_RUN_FRAMES : TAG_PLAYER_IDLE_FRAMES;
     const frame = tagPlayerFrame % frameCount;
 
-    if (sprite.complete) {
+    if (sprite.complete && sprite.naturalWidth > 0) {
         ctx.save();
 
         if (tagPlayerFacing === -1) {
@@ -823,7 +1066,13 @@ function drawTagPlayer() {
         ctx.strokeStyle = 'rgba(255, 95, 162, 0.8)';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(tagPlayer.x + tagPlayer.width / 2, tagPlayer.y + tagPlayer.height / 2, 32, 0, Math.PI * 2);
+        ctx.arc(
+            tagPlayer.x + tagPlayer.width / 2,
+            tagPlayer.y + tagPlayer.height / 2,
+            tagPlayer.width * 0.7,
+            0,
+            Math.PI * 2
+        );
         ctx.stroke();
     }
 }
@@ -867,11 +1116,8 @@ document.addEventListener('keydown', e => {
         e.preventDefault();
 
         if (currentGame === 'fastEagle') {
-            if (gameRunning) {
-                flap();
-            } else {
-                restartFastEagle();
-            }
+            if (gameRunning) flap();
+            else restartFastEagle();
         }
 
         if (currentGame === 'tagZone') {
@@ -893,22 +1139,14 @@ canvas.addEventListener('click', () => {
 tagZoneBtn.addEventListener('click', startTagZone);
 
 platformerBtn.addEventListener('click', () => {
-    tagHud.classList.add('hidden');
-    currentGame = 'spaceRunner';
-    stopGame();
-    showGameScreen('Space Runner', 'Space Runner is under construction. Stay tuned.', false, false);
+    window.location.href = 'space-runner.html';
 });
 
 playBtn.addEventListener('click', startFastEagle);
 
 restartBtn.addEventListener('click', () => {
-    if (currentGame === 'fastEagle') {
-        restartFastEagle();
-    }
-
-    if (currentGame === 'tagZone') {
-        restartTagZone();
-    }
+    if (currentGame === 'fastEagle') restartFastEagle();
+    if (currentGame === 'tagZone') restartTagZone();
 });
 
 backBtn.addEventListener('click', showMenu);
