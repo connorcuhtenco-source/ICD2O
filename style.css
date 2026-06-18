@@ -40,6 +40,7 @@ body {
     justify-content: center;
     align-items: center;
     padding: 24px;
+    overflow-y: auto;
 }
 
 h1,
@@ -56,6 +57,130 @@ h2 {
     color: #9aa6b8;
     font-size: 14px;
     letter-spacing: 0.12em;
+}
+
+#brightnessOverlay {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9999;
+    transition: opacity 0.2s ease;
+}
+
+.hub-section {
+    width: min(90vw, 420px);
+    margin-bottom: 16px;
+}
+
+.hub-toggle {
+    margin-bottom: 0;
+}
+
+.hub-toggle[aria-expanded="true"] {
+    background: rgba(0, 255, 204, 0.2);
+    box-shadow: 0 0 16px rgba(0, 255, 204, 0.25);
+}
+
+.hub-subpanel {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid rgba(0, 255, 204, 0.25);
+    border-radius: 16px;
+    background: rgba(2, 8, 18, 0.72);
+}
+
+.menuBtn-secondary {
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    padding: 14px 18px;
+}
+
+.setting-row {
+    display: grid;
+    grid-template-columns: 88px 1fr 48px;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+}
+
+.setting-label {
+    color: #9aa6b8;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.setting-value {
+    color: #95ffe0;
+    font-size: 12px;
+    text-align: right;
+}
+
+input[type="range"] {
+    width: 100%;
+    accent-color: #00ffcc;
+    cursor: pointer;
+}
+
+.keybinds-panel {
+    width: min(90vw, 420px);
+    margin: 8px 0 24px;
+    padding: 18px;
+    border: 1px solid rgba(0, 255, 204, 0.22);
+    border-radius: 16px;
+    background: rgba(2, 8, 18, 0.55);
+    text-align: left;
+}
+
+.keybinds-panel h3 {
+    margin: 0 0 14px;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #95ffe0;
+    text-align: center;
+}
+
+.keybind-group + .keybind-group {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.keybind-group h4 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #b2ebf2;
+}
+
+.keybind-group ul {
+    margin: 0;
+    padding-left: 18px;
+    color: #cbd6ef;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.keybind-group li {
+    margin-bottom: 2px;
+}
+
+kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    border: 1px solid rgba(0, 255, 204, 0.45);
+    border-radius: 6px;
+    background: rgba(0, 255, 204, 0.1);
+    color: #f8fff7;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.06em;
 }
 
 #gameButtons,
@@ -182,30 +307,52 @@ canvas {
 }
 
 .inventory-slot {
-    width: 54px;
-    height: 54px;
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    background: rgba(2, 8, 18, 0.78);
+    position: relative;
+    width: 58px;
+    height: 58px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    background: rgba(2, 8, 18, 0.85);
     display: grid;
     place-items: center;
     color: #ffffff;
-    font-size: 10px;
+    font-size: 9px;
     text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.inventory-slot::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.35;
+    background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.45), transparent 55%);
+    pointer-events: none;
+}
+
+.inventory-slot .power-icon {
+    font-size: 22px;
+    line-height: 1;
+    margin-bottom: 2px;
 }
 
 .inventory-slot.boost {
     border-color: #ffe66d;
-    background: rgba(255, 230, 109, 0.25);
+    background: linear-gradient(160deg, rgba(255, 230, 109, 0.35), rgba(2, 8, 18, 0.9));
+    box-shadow: 0 0 14px rgba(255, 230, 109, 0.35);
 }
 
 .inventory-slot.freeze {
     border-color: #74d2ff;
-    background: rgba(116, 210, 255, 0.25);
+    background: linear-gradient(160deg, rgba(116, 210, 255, 0.35), rgba(2, 8, 18, 0.9));
+    box-shadow: 0 0 14px rgba(116, 210, 255, 0.35);
 }
 
 .inventory-slot.shield {
     border-color: #ff5fa2;
-    background: rgba(255, 95, 162, 0.25);
+    background: linear-gradient(160deg, rgba(255, 95, 162, 0.35), rgba(2, 8, 18, 0.9));
+    box-shadow: 0 0 14px rgba(255, 95, 162, 0.35);
 }
 
 .hidden {

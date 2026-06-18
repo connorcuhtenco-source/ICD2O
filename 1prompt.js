@@ -329,6 +329,7 @@ const SpaceRunner = (() => {
                 player.immune = true;
                 immunityEnd = Date.now() + IMMUNITY_DURATION;
                 stars.splice(i, 1);
+                window.ArcadeSettings?.playSound('collect');
                 break;
             }
         }

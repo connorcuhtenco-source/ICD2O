@@ -7,16 +7,72 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="brightnessOverlay" aria-hidden="true"></div>
+
     <div id="menu">
         <div class="menu-card">
             <h1>Arcade Arena</h1>
-            <p class="subtitle">Select a game to begin</p>
+            <p class="subtitle">Your pocket arcade hub</p>
 
-            <div id="gameButtons">
-                <button id="tagZoneBtn" class="menuBtn">Tag Zone</button>
-                <button id="platformerBtn" class="menuBtn">Space Runner</button>
-                <button id="playBtn" class="menuBtn">Fast Eagle</button>
+            <div class="hub-section">
+                <button id="ourGamesBtn" class="menuBtn hub-toggle" aria-expanded="false" aria-controls="gameButtons">
+                    Our Games
+                </button>
+
+                <div id="gameButtons" class="hub-subpanel hidden">
+                    <button id="tagZoneBtn" class="menuBtn menuBtn-secondary">Tag Zone</button>
+                    <button id="platformerBtn" class="menuBtn menuBtn-secondary">Space Runner</button>
+                    <button id="playBtn" class="menuBtn menuBtn-secondary">Fast Eagle</button>
+                </div>
             </div>
+
+            <div class="hub-section">
+                <button id="settingsBtn" class="menuBtn hub-toggle" aria-expanded="false" aria-controls="settingsPanel">
+                    Settings
+                </button>
+
+                <div id="settingsPanel" class="hub-subpanel hidden">
+                    <label class="setting-row" for="brightnessSlider">
+                        <span class="setting-label">Brightness</span>
+                        <input type="range" id="brightnessSlider" min="30" max="100" value="100">
+                        <span id="brightnessValue" class="setting-value">100%</span>
+                    </label>
+
+                    <label class="setting-row" for="soundSlider">
+                        <span class="setting-label">Sound</span>
+                        <input type="range" id="soundSlider" min="0" max="100" value="80">
+                        <span id="soundValue" class="setting-value">80%</span>
+                    </label>
+                </div>
+            </div>
+
+            <section id="keybindsPanel" class="keybinds-panel">
+                <h3>Keybinds</h3>
+
+                <div class="keybind-group">
+                    <h4>Tag Zone</h4>
+                    <ul>
+                        <li><kbd>W A S D</kbd> or <kbd>↑ ↓ ← →</kbd> — Move</li>
+                        <li><kbd>Space</kbd> — Use collected power-up</li>
+                    </ul>
+                </div>
+
+                <div class="keybind-group">
+                    <h4>Space Runner</h4>
+                    <ul>
+                        <li><kbd>A</kbd> / <kbd>D</kbd> — Switch lanes</li>
+                        <li><kbd>Space</kbd> — Jump</li>
+                        <li><kbd>S</kbd> — Roll</li>
+                    </ul>
+                </div>
+
+                <div class="keybind-group">
+                    <h4>Fast Eagle</h4>
+                    <ul>
+                        <li><kbd>Space</kbd> or <kbd>Click</kbd> — Flap / restart</li>
+                    </ul>
+                </div>
+            </section>
 
             <p id="highScore">Fast Eagle High Score: 0</p>
         </div>
