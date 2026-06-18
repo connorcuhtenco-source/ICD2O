@@ -27,7 +27,7 @@
     <div id="menu">
         <div class="menu-card landing-card">
             <p class="landing-kicker landing-reveal" data-reveal-order="0">Welcome to</p>
-            <h1 class="landing-title" id="landingTitle" aria-label="Arcade Arena"></h1>
+            <h1 class="landing-title" id="landingTitle" aria-label="Arcade Arena">ARCADE ARENA</h1>
             <p class="subtitle landing-reveal" data-reveal-order="1">Neon classics. One hub. Endless runs.</p>
 
             <div class="landing-actions">
@@ -184,6 +184,23 @@
         </div>
     </div>
 
+    <script>
+        // Safety net: always dismiss boot overlay and show UI even if other scripts fail
+        window.setTimeout(function () {
+            var overlay = document.getElementById('bootOverlay');
+            if (overlay && !overlay.classList.contains('boot-done')) {
+                overlay.classList.remove('active', 'boot-sweeping');
+                overlay.classList.add('boot-done');
+            }
+            document.body.classList.remove('boot-sequence-active');
+            document.querySelectorAll('.landing-reveal').forEach(function (el) {
+                el.classList.add('revealed');
+            });
+            document.querySelectorAll('.title-letter').forEach(function (el) {
+                el.classList.add('powered-on');
+            });
+        }, 4500);
+    </script>
     <script src="1prompt.js"></script>
     <script src="landing-effects.js"></script>
     <script src="script.js"></script>

@@ -83,12 +83,14 @@ body {
     z-index: 10002;
     background: #000;
     pointer-events: none;
-    opacity: 1;
-    transition: opacity 0.9s ease 0.2s;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.9s ease 0.2s, visibility 0.9s ease 0.2s;
 }
 
 .boot-overlay.active {
     opacity: 1;
+    visibility: visible;
 }
 
 .boot-overlay.boot-done {
@@ -162,9 +164,16 @@ body {
 
 .title-letter {
     display: inline-block;
+    color: #95ffe0;
+    text-shadow:
+        0 0 8px rgba(0, 255, 204, 0.9),
+        0 0 18px rgba(0, 255, 204, 0.55),
+        0 0 36px rgba(255, 77, 141, 0.35);
+}
+
+body.boot-sequence-active .title-letter {
     opacity: 0;
     transform: translateY(28px) scale(0.7);
-    color: #95ffe0;
 }
 
 .title-letter.title-space {
@@ -223,6 +232,11 @@ body {
 }
 
 .landing-reveal {
+    opacity: 1;
+    transform: none;
+}
+
+body.boot-sequence-active .landing-reveal {
     opacity: 0;
     transform: translateY(18px);
 }

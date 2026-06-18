@@ -73,7 +73,7 @@ const LandingEffects = (() => {
     function buildTitleLetters() {
         landingTitle.innerHTML = '';
 
-        [...TITLE_TEXT].forEach((char, index) => {
+        [...TITLE_TEXT].forEach((char) => {
             const span = document.createElement('span');
             span.className = char === ' ' ? 'title-letter title-space' : 'title-letter';
             span.textContent = char === ' ' ? '\u00a0' : char;
@@ -91,6 +91,8 @@ const LandingEffects = (() => {
             bootOverlay.classList.remove('boot-sweeping', 'active');
             bootOverlay.classList.add('boot-done');
         }
+
+        document.body.classList.remove('boot-sequence-active');
 
         if (landingTitle) {
             landingTitle.querySelectorAll('.title-letter').forEach(letter => letter.classList.add('powered-on'));
@@ -123,6 +125,7 @@ const LandingEffects = (() => {
 
         bootOverlay.classList.add('active');
         bootOverlay.classList.remove('boot-done');
+        document.body.classList.add('boot-sequence-active');
 
         window.setTimeout(() => {
             bootOverlay.classList.add('boot-sweeping');
