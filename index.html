@@ -185,7 +185,6 @@
     </div>
 
     <script>
-        // Safety net: always dismiss boot overlay and show UI even if other scripts fail
         window.setTimeout(function () {
             var overlay = document.getElementById('bootOverlay');
             if (overlay && !overlay.classList.contains('boot-done')) {
@@ -202,7 +201,6 @@
         }, 4500);
     </script>
     <script src="1prompt.js"></script>
-    <script src="landing-effects.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
