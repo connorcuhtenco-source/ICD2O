@@ -2,6 +2,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const menu = document.getElementById('menu');
+const gamesPage = document.getElementById('gamesPage');
 const gameContainer = document.getElementById('gameContainer');
 const gameTitle = document.getElementById('gameTitle');
 const gameMessage = document.getElementById('gameMessage');
@@ -14,8 +15,13 @@ const backBtn = document.getElementById('backBtn');
 const restartBtn = document.getElementById('restartBtn');
 const ourGamesBtn = document.getElementById('ourGamesBtn');
 const settingsBtn = document.getElementById('settingsBtn');
-const gameButtonsPanel = document.getElementById('gameButtons');
-const settingsPanel = document.getElementById('settingsPanel');
+const keybindsBtn = document.getElementById('keybindsBtn');
+const backToMenuBtn = document.getElementById('backToMenuBtn');
+const drawerBackdrop = document.getElementById('drawerBackdrop');
+const sideDrawer = document.getElementById('sideDrawer');
+const closeDrawerBtn = document.getElementById('closeDrawerBtn');
+const settingsDrawerContent = document.getElementById('settingsDrawerContent');
+const keybindsDrawerContent = document.getElementById('keybindsDrawerContent');
 const brightnessSlider = document.getElementById('brightnessSlider');
 const soundSlider = document.getElementById('soundSlider');
 const brightnessValue = document.getElementById('brightnessValue');
@@ -26,6 +32,7 @@ const tagHud = document.getElementById('tagHud');
 const spaceRunnerUi = document.getElementById('spaceRunnerUi');
 const tagTimerText = document.getElementById('tagTimer');
 const tagLevelText = document.getElementById('tagLevel');
+const tagHeartsText = document.getElementById('tagHearts');
 const inventorySlots = document.querySelectorAll('.inventory-slot');
 
 const tagPlayerIdleSprite = new Image();
@@ -70,7 +77,12 @@ const WORLD_WIDTH = 1800;
 const WORLD_HEIGHT = 1800;
 const TAG_LEVEL_TIME = 25;
 const TAG_MAX_INVENTORY = 3;
-const TAG_MAP_TILE_SIZE = 100;
+const TAG_MAX_HEARTS = 3;
+const TAG_HIT_IMMUNITY_TIME = 3;
+const TAG_HIT_BOOST_TIME = 1.5;
+const TAG_HIT_BOOST_MULTIPLIER = 1.35;
+const TAG_MAP_TILE_SIZE = 32;
+const TAG_BARRIER_DEPTH = 96;
 const TAG_MAP_TILE_SOURCES = [
     'sprites/map/Map_tile_52.png'
 ];
@@ -88,6 +100,9 @@ let tagSurvivalTime = 0;
 let tagFreezeTimer = 0;
 let tagShieldTimer = 0;
 let tagBoostTimer = 0;
+let tagHearts = TAG_MAX_HEARTS;
+let tagHitImmunityTimer = 0;
+let tagHitBoostTimer = 0;
 let countdown = 3;
 let countdownActive = false;
 let camX = 0;
@@ -206,18 +221,48 @@ function playUiSound(type = 'click') {
         oscillator.start(now);
         oscillator.stop(now + 0.4);
     }
+
+    if (type === 'hit') {
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(180, now);
+        oscillator.frequency.exponentialRampToValueAtTime(120, now + 0.12);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.09 * volume, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+        oscillator.start(now);
+        oscillator.stop(now + 0.15);
+    }
 }
 
-function toggleHubPanel(button, panel) {
-    const isOpen = !panel.classList.contains('hidden');
-    panel.classList.toggle('hidden', isOpen);
-    button.setAttribute('aria-expanded', String(!isOpen));
+function openDrawer(type) {
+    settingsDrawerContent.classList.toggle('hidden', type !== 'settings');
+    keybindsDrawerContent.classList.toggle('hidden', type !== 'keybinds');
+    drawerBackdrop.classList.remove('drawer-closed');
+    sideDrawer.classList.remove('drawer-closed');
+    sideDrawer.setAttribute('aria-hidden', 'false');
+    playUiSound('click');
+}
+
+function closeDrawer() {
+    drawerBackdrop.classList.add('drawer-closed');
+    sideDrawer.classList.add('drawer-closed');
+    sideDrawer.setAttribute('aria-hidden', 'true');
+}
+
+function showGamesPage() {
+    menu.classList.add('hidden');
+    gamesPage.classList.remove('hidden');
+    gameContainer.classList.add('hidden');
     playUiSound('click');
 }
 
 function setupHubControls() {
-    ourGamesBtn.addEventListener('click', () => toggleHubPanel(ourGamesBtn, gameButtonsPanel));
-    settingsBtn.addEventListener('click', () => toggleHubPanel(settingsBtn, settingsPanel));
+    ourGamesBtn.addEventListener('click', showGamesPage);
+    settingsBtn.addEventListener('click', () => openDrawer('settings'));
+    keybindsBtn.addEventListener('click', () => openDrawer('keybinds'));
+    closeDrawerBtn.addEventListener('click', closeDrawer);
+    drawerBackdrop.addEventListener('click', closeDrawer);
+    backToMenuBtn.addEventListener('click', showMenu);
 
     brightnessSlider.addEventListener('input', () => {
         settings.brightness = Number(brightnessSlider.value);
@@ -238,7 +283,9 @@ function showMenu() {
     stopGame();
     SpaceRunner.stop();
     currentGame = null;
+    closeDrawer();
     menu.classList.remove('hidden');
+    gamesPage.classList.add('hidden');
     gameContainer.classList.add('hidden');
     tagHud.classList.add('hidden');
     spaceRunnerUi.classList.add('hidden');
@@ -247,6 +294,7 @@ function showMenu() {
 
 function showGameScreen(name, message, useCanvas = false, showRestart = false) {
     menu.classList.add('hidden');
+    gamesPage.classList.add('hidden');
     gameContainer.classList.remove('hidden');
     gameTitle.textContent = name;
     gameMessage.textContent = message;
@@ -756,6 +804,9 @@ function startTagZone() {
     canvas.height = 620;
 
     tagLevel = 1;
+    tagHearts = TAG_MAX_HEARTS;
+    tagHitImmunityTimer = 0;
+    tagHitBoostTimer = 0;
     setupTagLevel();
 
     tagHud.classList.remove('hidden');
@@ -796,9 +847,9 @@ function setupTagLevel() {
     const itemCount = Math.max(18 - tagLevel * 2, 8);
     tagItems = Array.from({ length: itemCount }, createTagItem);
     tagMapTiles = createTagTiles();
-    tagHouse = createTagHouse();
-    tagMapTrees = createTagMapTrees(10 + tagLevel * 2);
-    tagMapRocks = createTagMapRocks(90, tagHouse);
+    tagMapTrees = createTagBarrierTrees();
+    tagMapRocks = [];
+    tagHouse = null;
     tagAnimTime = 0;
 
     gameMessage.textContent = 'Get ready...';
@@ -821,6 +872,40 @@ function createTagHouse() {
         width: 140,
         height: 90
     };
+}
+
+function createTagBarrierTrees() {
+    const trees = [];
+    const spacing = 44;
+    const treeW = 40;
+    const treeH = 56;
+
+    for (let x = 0; x < WORLD_WIDTH; x += spacing) {
+        trees.push({ x, y: 0, width: treeW, height: treeH, barrier: true });
+        trees.push({ x, y: WORLD_HEIGHT - treeH, width: treeW, height: treeH, barrier: true });
+    }
+
+    for (let y = TAG_BARRIER_DEPTH; y < WORLD_HEIGHT - TAG_BARRIER_DEPTH; y += spacing) {
+        trees.push({ x: 0, y, width: treeW, height: treeH, barrier: true });
+        trees.push({ x: WORLD_WIDTH - treeW, y, width: treeW, height: treeH, barrier: true });
+    }
+
+    return trees;
+}
+
+function getTagPlayableBounds() {
+    return {
+        minX: TAG_BARRIER_DEPTH,
+        minY: TAG_BARRIER_DEPTH,
+        maxX: WORLD_WIDTH - TAG_BARRIER_DEPTH - tagPlayer.width,
+        maxY: WORLD_HEIGHT - TAG_BARRIER_DEPTH - tagPlayer.height
+    };
+}
+
+function isTagPositionBlocked(x, y, width, height) {
+    const testRect = { x, y, width, height };
+
+    return tagMapTrees.some(tree => rectsOverlap(testRect, tree));
 }
 
 function createTagMapTrees(count = 3) {
@@ -858,8 +943,8 @@ function createTagger() {
     const minDistanceFromPlayer = 450;
 
     do {
-        x = Math.random() * (WORLD_WIDTH - width);
-        y = Math.random() * (WORLD_HEIGHT - height);
+        x = TAG_BARRIER_DEPTH + Math.random() * (WORLD_WIDTH - TAG_BARRIER_DEPTH * 2 - width);
+        y = TAG_BARRIER_DEPTH + Math.random() * (WORLD_HEIGHT - TAG_BARRIER_DEPTH * 2 - height);
     } while (
         Math.hypot(
             x + width / 2 - (tagPlayer.x + tagPlayer.width / 2),
@@ -884,8 +969,8 @@ function createTagItem() {
     const type = itemTypes[Math.floor(Math.random() * itemTypes.length)];
 
     return {
-        x: 80 + Math.random() * (WORLD_WIDTH - 160),
-        y: 80 + Math.random() * (WORLD_HEIGHT - 160),
+        x: TAG_BARRIER_DEPTH + 80 + Math.random() * (WORLD_WIDTH - TAG_BARRIER_DEPTH * 2 - 160),
+        y: TAG_BARRIER_DEPTH + 80 + Math.random() * (WORLD_HEIGHT - TAG_BARRIER_DEPTH * 2 - 160),
         radius: 16,
         bobOffset: Math.random() * Math.PI * 2,
         type
@@ -943,6 +1028,8 @@ function updateTagZone(delta) {
     tagFreezeTimer = Math.max(0, tagFreezeTimer - delta);
     tagShieldTimer = Math.max(0, tagShieldTimer - delta);
     tagBoostTimer = Math.max(0, tagBoostTimer - delta);
+    tagHitImmunityTimer = Math.max(0, tagHitImmunityTimer - delta);
+    tagHitBoostTimer = Math.max(0, tagHitBoostTimer - delta);
 
     moveTagPlayer(delta);
     updateTagPlayerAnimation(delta);
@@ -983,10 +1070,19 @@ function moveTagPlayer(delta) {
         dy /= length;
     }
 
-    const speed = tagBoostTimer > 0 ? tagPlayer.speed * 1.65 : tagPlayer.speed;
+    const speedMultiplier = (tagBoostTimer > 0 ? 1.65 : 1) * (tagHitBoostTimer > 0 ? TAG_HIT_BOOST_MULTIPLIER : 1);
+    const speed = tagPlayer.speed * speedMultiplier;
+    const bounds = getTagPlayableBounds();
+    const nextX = clamp(tagPlayer.x + dx * speed * delta, bounds.minX, bounds.maxX);
+    const nextY = clamp(tagPlayer.y + dy * speed * delta, bounds.minY, bounds.maxY);
 
-    tagPlayer.x = clamp(tagPlayer.x + dx * speed * delta, 0, WORLD_WIDTH - tagPlayer.width);
-    tagPlayer.y = clamp(tagPlayer.y + dy * speed * delta, 0, WORLD_HEIGHT - tagPlayer.height);
+    if (!isTagPositionBlocked(nextX, tagPlayer.y, tagPlayer.width, tagPlayer.height)) {
+        tagPlayer.x = nextX;
+    }
+
+    if (!isTagPositionBlocked(tagPlayer.x, nextY, tagPlayer.width, tagPlayer.height)) {
+        tagPlayer.y = nextY;
+    }
 }
 
 function updateTagPlayerAnimation(delta) {
@@ -1011,8 +1107,8 @@ function moveTaggers(delta) {
         tagger.x += (targetX / distance) * tagger.speed * delta;
         tagger.y += (targetY / distance) * tagger.speed * delta;
 
-        tagger.x = clamp(tagger.x, 0, WORLD_WIDTH - tagger.width);
-        tagger.y = clamp(tagger.y, 0, WORLD_HEIGHT - tagger.height);
+        tagger.x = clamp(tagger.x, TAG_BARRIER_DEPTH, WORLD_WIDTH - TAG_BARRIER_DEPTH - tagger.width);
+        tagger.y = clamp(tagger.y, TAG_BARRIER_DEPTH, WORLD_HEIGHT - TAG_BARRIER_DEPTH - tagger.height);
     });
 
     // Handle enemy-to-enemy collisions
@@ -1038,10 +1134,10 @@ function moveTaggers(delta) {
                 t2.y += pushY;
 
                 // Keep within bounds
-                t1.x = clamp(t1.x, 0, WORLD_WIDTH - t1.width);
-                t1.y = clamp(t1.y, 0, WORLD_HEIGHT - t1.height);
-                t2.x = clamp(t2.x, 0, WORLD_WIDTH - t2.width);
-                t2.y = clamp(t2.y, 0, WORLD_HEIGHT - t2.height);
+                t1.x = clamp(t1.x, TAG_BARRIER_DEPTH, WORLD_WIDTH - TAG_BARRIER_DEPTH - t1.width);
+                t1.y = clamp(t1.y, TAG_BARRIER_DEPTH, WORLD_HEIGHT - TAG_BARRIER_DEPTH - t1.height);
+                t2.x = clamp(t2.x, TAG_BARRIER_DEPTH, WORLD_WIDTH - TAG_BARRIER_DEPTH - t2.width);
+                t2.y = clamp(t2.y, TAG_BARRIER_DEPTH, WORLD_HEIGHT - TAG_BARRIER_DEPTH - t2.height);
             }
         }
     }
@@ -1077,6 +1173,8 @@ function collectTagItems() {
 }
 
 function checkTaggerCollisions() {
+    if (tagHitImmunityTimer > 0) return;
+
     const playerHitbox = getPlayerHitbox();
 
     for (const tagger of taggers) {
@@ -1092,7 +1190,33 @@ function checkTaggerCollisions() {
                 return;
             }
 
-            endTagZone();
+            tagHearts -= 1;
+            tagHitImmunityTimer = TAG_HIT_IMMUNITY_TIME;
+            tagHitBoostTimer = TAG_HIT_BOOST_TIME;
+            updateTagHud();
+            playUiSound('hit');
+
+            const pushAngle = Math.atan2(
+                tagger.y - tagPlayer.y,
+                tagger.x - tagPlayer.x
+            );
+            tagger.x = clamp(
+                tagger.x + Math.cos(pushAngle) * 120,
+                TAG_BARRIER_DEPTH,
+                WORLD_WIDTH - TAG_BARRIER_DEPTH - tagger.width
+            );
+            tagger.y = clamp(
+                tagger.y + Math.sin(pushAngle) * 120,
+                TAG_BARRIER_DEPTH,
+                WORLD_HEIGHT - TAG_BARRIER_DEPTH - tagger.height
+            );
+
+            if (tagHearts <= 0) {
+                endTagZone();
+                return;
+            }
+
+            gameMessage.textContent = `${tagHearts} heart${tagHearts === 1 ? '' : 's'} left`;
             return;
         }
     }
@@ -1142,7 +1266,7 @@ function useTagItem() {
 
 function endTagZone() {
     gameRunning = false;
-    gameMessage.textContent = `Tagged on Level ${tagLevel}`;
+    gameMessage.textContent = `Out of hearts on Level ${tagLevel}`;
     restartBtn.classList.remove('hidden');
     playUiSound('gameOver');
 }
@@ -1193,46 +1317,49 @@ function drawTagVignette() {
 }
 
 function drawTagMap() {
-    const columns = tagMapTiles[0]?.length || Math.ceil(WORLD_WIDTH / TAG_MAP_TILE_SIZE);
-    const rows = tagMapTiles.length || Math.ceil(WORLD_HEIGHT / TAG_MAP_TILE_SIZE);
+    draw8BitGrasslands();
+    drawTagTrees();
 
-    for (let row = 0; row < rows; row++) {
-        for (let column = 0; column < columns; column++) {
-            const tileIndex = tagMapTiles[row]?.[column] ?? 0;
-            const tile = tagMapTileImages[tileIndex];
-            const x = column * TAG_MAP_TILE_SIZE;
-            const y = row * TAG_MAP_TILE_SIZE;
-            const shade = ((row + column) % 2) * 0.04;
+    ctx.strokeStyle = '#2d5a2d';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(
+        TAG_BARRIER_DEPTH,
+        TAG_BARRIER_DEPTH,
+        WORLD_WIDTH - TAG_BARRIER_DEPTH * 2,
+        WORLD_HEIGHT - TAG_BARRIER_DEPTH * 2
+    );
+}
 
-            if (tile && tile.complete && tile.naturalWidth > 0) {
-                ctx.drawImage(tile, x, y, TAG_MAP_TILE_SIZE, TAG_MAP_TILE_SIZE);
-            } else {
-                ctx.fillStyle = `rgba(34, 96, 38, ${0.92 - shade})`;
-                ctx.fillRect(x, y, TAG_MAP_TILE_SIZE, TAG_MAP_TILE_SIZE);
+function draw8BitGrasslands() {
+    const tileSize = TAG_MAP_TILE_SIZE;
+
+    for (let y = 0; y < WORLD_HEIGHT; y += tileSize) {
+        for (let x = 0; x < WORLD_WIDTH; x += tileSize) {
+            const checker = ((x + y) / tileSize) % 2 === 0;
+            ctx.fillStyle = checker ? '#5cb85c' : '#4caf50';
+            ctx.fillRect(x, y, tileSize, tileSize);
+
+            const seed = Math.abs(Math.sin((x + 1) * 12.9898 + (y + 1) * 78.233) * 43758.5453) % 1;
+
+            if (seed > 0.92) {
+                ctx.fillStyle = '#3d8b3d';
+                ctx.fillRect(x + 6, y + 10, 4, 4);
+                ctx.fillRect(x + 18, y + 20, 4, 4);
             }
 
-            ctx.fillStyle = `rgba(0, 0, 0, ${0.03 + shade})`;
-            ctx.fillRect(x, y, TAG_MAP_TILE_SIZE, TAG_MAP_TILE_SIZE);
+            if (seed > 0.97) {
+                ctx.fillStyle = '#ff6b9d';
+                ctx.fillRect(x + 12, y + 8, 4, 4);
+                ctx.fillStyle = '#ffe66d';
+                ctx.fillRect(x + 14, y + 6, 4, 4);
+            }
+
+            if (seed < 0.04) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+                ctx.fillRect(x + 22, y + 14, 3, 3);
+            }
         }
     }
-
-    ctx.fillStyle = 'rgba(120, 190, 90, 0.08)';
-    for (let y = 0; y < WORLD_HEIGHT; y += 60) {
-        for (let x = 0; x < WORLD_WIDTH; x += 60) {
-            ctx.fillRect(x + ((y / 60) % 2) * 18, y + 24, 28, 5);
-        }
-    }
-
-    drawTagRocks();
-    drawTagTrees();
-    drawTagHouse();
-
-    const borderGradient = ctx.createLinearGradient(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    borderGradient.addColorStop(0, 'rgba(0, 255, 204, 0.9)');
-    borderGradient.addColorStop(1, 'rgba(116, 210, 255, 0.75)');
-    ctx.strokeStyle = borderGradient;
-    ctx.lineWidth = 10;
-    ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 }
 
 function drawTagRocks() {
@@ -1289,15 +1416,20 @@ function drawTagTrees() {
         ctx.save();
         ctx.translate(tree.x, tree.y);
 
-        ctx.fillStyle = '#5a3d1e';
-        ctx.fillRect(-tree.width * 0.08, 0, tree.width * 0.16, tree.height * 0.42);
+        ctx.fillStyle = '#5c3d1e';
+        ctx.fillRect(tree.width * 0.38, tree.height * 0.55, tree.width * 0.24, tree.height * 0.45);
 
-        ctx.fillStyle = '#2a6d28';
-        ctx.beginPath();
-        ctx.moveTo(0, -tree.height * 0.08);
-        ctx.bezierCurveTo(tree.width * 0.75, tree.height * 0.15, tree.width * 0.75, tree.height * 0.65, 0, tree.height * 0.98);
-        ctx.bezierCurveTo(-tree.width * 0.75, tree.height * 0.65, -tree.width * 0.75, tree.height * 0.15, 0, -tree.height * 0.08);
-        ctx.fill();
+        ctx.fillStyle = '#2d6b2d';
+        ctx.fillRect(0, tree.height * 0.28, tree.width, tree.height * 0.3);
+
+        ctx.fillStyle = '#3d8f3d';
+        ctx.fillRect(4, tree.height * 0.12, tree.width - 8, tree.height * 0.28);
+
+        ctx.fillStyle = '#58b858';
+        ctx.fillRect(8, 2, tree.width - 16, tree.height * 0.18);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.fillRect(10, 6, 6, 4);
 
         ctx.restore();
     });
@@ -1457,6 +1589,21 @@ function drawTagPlayer() {
         ctx.fillRect(tagPlayer.x, tagPlayer.y, tagPlayer.width, tagPlayer.height);
     }
 
+    if (tagHitImmunityTimer > 0) {
+        const flash = Math.sin(tagAnimTime * 18) > 0;
+        ctx.strokeStyle = flash ? 'rgba(116, 210, 255, 0.9)' : 'rgba(255, 255, 255, 0.55)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(
+            tagPlayer.x + tagPlayer.width / 2,
+            tagPlayer.y + tagPlayer.height / 2,
+            tagPlayer.width * 0.62,
+            0,
+            Math.PI * 2
+        );
+        ctx.stroke();
+    }
+
     if (tagShieldTimer > 0) {
         const pulse = 0.9 + Math.sin(tagAnimTime * 8) * 0.1;
         ctx.strokeStyle = 'rgba(255, 95, 162, 0.85)';
@@ -1504,6 +1651,7 @@ function drawTagPlayer() {
 function updateTagHud() {
     tagTimerText.textContent = Math.ceil(TAG_LEVEL_TIME - tagSurvivalTime);
     tagLevelText.textContent = tagLevel;
+    tagHeartsText.textContent = '♥'.repeat(tagHearts) + '♡'.repeat(Math.max(0, TAG_MAX_HEARTS - tagHearts));
 }
 
 function updateInventoryHud() {
@@ -1546,6 +1694,10 @@ function startSpaceRunner() {
 
 document.addEventListener('keydown', e => {
     keys[e.code] = true;
+
+    if (e.code === 'Escape') {
+        closeDrawer();
+    }
 
     if (currentGame === 'spaceRunner') {
         SpaceRunner.handleKey(e);

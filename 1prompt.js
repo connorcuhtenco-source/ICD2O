@@ -352,6 +352,7 @@ const SpaceRunner = (() => {
         finalHighscore.textContent = 'Highscore: ' + (highscore || 0);
         startScreen.classList.add('hidden');
         gameOverScreen.classList.remove('hidden');
+        window.ArcadeSettings?.playSound('gameOver');
     }
 
     function gameLoop() {

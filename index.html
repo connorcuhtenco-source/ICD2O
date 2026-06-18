@@ -8,75 +8,111 @@
 </head>
 <body>
     <div id="brightnessOverlay" aria-hidden="true"></div>
+    <div class="landing-bg" aria-hidden="true">
+        <span class="orb orb-1"></span>
+        <span class="orb orb-2"></span>
+        <span class="orb orb-3"></span>
+    </div>
 
     <div id="menu">
-        <div class="menu-card">
-            <h1>Arcade Arena</h1>
-            <p class="subtitle">Your pocket arcade hub</p>
+        <div class="menu-card landing-card">
+            <p class="landing-kicker">Welcome to</p>
+            <h1 class="landing-title">Arcade Arena</h1>
+            <p class="subtitle">Neon classics. One hub. Endless runs.</p>
 
-            <div class="hub-section">
-                <button id="ourGamesBtn" class="menuBtn hub-toggle" aria-expanded="false" aria-controls="gameButtons">
-                    Our Games
-                </button>
-
-                <div id="gameButtons" class="hub-subpanel hidden">
-                    <button id="tagZoneBtn" class="menuBtn menuBtn-secondary">Tag Zone</button>
-                    <button id="platformerBtn" class="menuBtn menuBtn-secondary">Space Runner</button>
-                    <button id="playBtn" class="menuBtn menuBtn-secondary">Fast Eagle</button>
-                </div>
+            <div class="landing-actions">
+                <button id="ourGamesBtn" class="menuBtn menuBtn-primary">Our Games</button>
+                <button id="settingsBtn" class="menuBtn menuBtn-accent">Settings</button>
+                <button id="keybindsBtn" class="menuBtn menuBtn-accent">Keybinds</button>
             </div>
-
-            <div class="hub-section">
-                <button id="settingsBtn" class="menuBtn hub-toggle" aria-expanded="false" aria-controls="settingsPanel">
-                    Settings
-                </button>
-
-                <div id="settingsPanel" class="hub-subpanel hidden">
-                    <label class="setting-row" for="brightnessSlider">
-                        <span class="setting-label">Brightness</span>
-                        <input type="range" id="brightnessSlider" min="30" max="100" value="100">
-                        <span id="brightnessValue" class="setting-value">100%</span>
-                    </label>
-
-                    <label class="setting-row" for="soundSlider">
-                        <span class="setting-label">Sound</span>
-                        <input type="range" id="soundSlider" min="0" max="100" value="80">
-                        <span id="soundValue" class="setting-value">80%</span>
-                    </label>
-                </div>
-            </div>
-
-            <section id="keybindsPanel" class="keybinds-panel">
-                <h3>Keybinds</h3>
-
-                <div class="keybind-group">
-                    <h4>Tag Zone</h4>
-                    <ul>
-                        <li><kbd>W A S D</kbd> or <kbd>↑ ↓ ← →</kbd> — Move</li>
-                        <li><kbd>Space</kbd> — Use collected power-up</li>
-                    </ul>
-                </div>
-
-                <div class="keybind-group">
-                    <h4>Space Runner</h4>
-                    <ul>
-                        <li><kbd>A</kbd> / <kbd>D</kbd> — Switch lanes</li>
-                        <li><kbd>Space</kbd> — Jump</li>
-                        <li><kbd>S</kbd> — Roll</li>
-                    </ul>
-                </div>
-
-                <div class="keybind-group">
-                    <h4>Fast Eagle</h4>
-                    <ul>
-                        <li><kbd>Space</kbd> or <kbd>Click</kbd> — Flap / restart</li>
-                    </ul>
-                </div>
-            </section>
 
             <p id="highScore">Fast Eagle High Score: 0</p>
         </div>
     </div>
+
+    <div id="gamesPage" class="hidden">
+        <div class="games-page-card">
+            <button id="backToMenuBtn" class="menuBtn back-link">← Back to Hub</button>
+            <h2 class="games-page-title">Our Games</h2>
+            <p class="games-page-subtitle">Pick your challenge and jump in</p>
+
+            <div class="games-grid">
+                <article class="game-tile game-tile-tag">
+                    <div class="game-tile-header">
+                        <h3>Tag Zone</h3>
+                        <span class="difficulty difficulty-medium">Medium</span>
+                    </div>
+                    <p class="game-desc">Dodge taggers across an 8-bit grassland, collect power-ups, and survive timed levels with 3 hearts.</p>
+                    <button id="tagZoneBtn" class="menuBtn play-game-btn">Play</button>
+                </article>
+
+                <article class="game-tile game-tile-space">
+                    <div class="game-tile-header">
+                        <h3>Space Runner</h3>
+                        <span class="difficulty difficulty-hard">Hard</span>
+                    </div>
+                    <p class="game-desc">Weave through asteroid lanes, jump and roll past planets, and chase a new high score in deep space.</p>
+                    <button id="platformerBtn" class="menuBtn play-game-btn">Play</button>
+                </article>
+
+                <article class="game-tile game-tile-eagle">
+                    <div class="game-tile-header">
+                        <h3>Fast Eagle</h3>
+                        <span class="difficulty difficulty-easy">Easy</span>
+                    </div>
+                    <p class="game-desc">Flap through realistic skies, dodge pipes, and grab rainbow stars for a speed burst.</p>
+                    <button id="playBtn" class="menuBtn play-game-btn">Play</button>
+                </article>
+            </div>
+        </div>
+    </div>
+
+    <div id="drawerBackdrop" class="drawer-backdrop drawer-closed"></div>
+    <aside id="sideDrawer" class="side-drawer drawer-closed" aria-hidden="true">
+        <button id="closeDrawerBtn" class="drawer-close" aria-label="Close panel">×</button>
+
+        <div id="settingsDrawerContent" class="drawer-content hidden">
+            <h3>Settings</h3>
+            <label class="setting-row" for="brightnessSlider">
+                <span class="setting-label">Brightness</span>
+                <input type="range" id="brightnessSlider" min="30" max="100" value="100">
+                <span id="brightnessValue" class="setting-value">100%</span>
+            </label>
+            <label class="setting-row" for="soundSlider">
+                <span class="setting-label">Sound</span>
+                <input type="range" id="soundSlider" min="0" max="100" value="80">
+                <span id="soundValue" class="setting-value">80%</span>
+            </label>
+        </div>
+
+        <div id="keybindsDrawerContent" class="drawer-content hidden">
+            <h3>Keybinds</h3>
+
+            <div class="keybind-group">
+                <h4>Tag Zone</h4>
+                <ul>
+                    <li><kbd>W A S D</kbd> or <kbd>↑ ↓ ← →</kbd> — Move</li>
+                    <li><kbd>Space</kbd> — Use collected power-up</li>
+                </ul>
+            </div>
+
+            <div class="keybind-group">
+                <h4>Space Runner</h4>
+                <ul>
+                    <li><kbd>A</kbd> / <kbd>D</kbd> — Switch lanes</li>
+                    <li><kbd>Space</kbd> — Jump</li>
+                    <li><kbd>S</kbd> — Roll</li>
+                </ul>
+            </div>
+
+            <div class="keybind-group">
+                <h4>Fast Eagle</h4>
+                <ul>
+                    <li><kbd>Space</kbd> or <kbd>Click</kbd> — Flap / restart</li>
+                </ul>
+            </div>
+        </div>
+    </aside>
 
     <div id="gameContainer" class="hidden">
         <div class="game-card">
@@ -105,6 +141,11 @@
                 </div>
 
                 <div id="tagHud" class="tag-hud hidden">
+                    <div class="hud-box">
+                        <span>Hearts</span>
+                        <strong id="tagHearts" class="hearts-display">♥♥♥</strong>
+                    </div>
+
                     <div class="hud-box">
                         <span>Time</span>
                         <strong id="tagTimer">0</strong>
