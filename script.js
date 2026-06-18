@@ -232,6 +232,29 @@ function playUiSound(type = 'click') {
         oscillator.start(now);
         oscillator.stop(now + 0.15);
     }
+
+    if (type === 'hover') {
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, now);
+        oscillator.frequency.exponentialRampToValueAtTime(1040, now + 0.05);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.04 * volume, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+        oscillator.start(now);
+        oscillator.stop(now + 0.08);
+    }
+
+    if (type === 'powerOn') {
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(90, now);
+        oscillator.frequency.exponentialRampToValueAtTime(420, now + 0.45);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.11 * volume, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.06 * volume, now + 0.25);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+        oscillator.start(now);
+        oscillator.stop(now + 0.52);
+    }
 }
 
 function openDrawer(type) {
@@ -1752,3 +1775,7 @@ showMenu();
 window.ArcadeSettings = {
     playSound: playUiSound
 };
+
+if (typeof LandingEffects !== 'undefined') {
+    LandingEffects.init(playUiSound);
+}

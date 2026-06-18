@@ -8,25 +8,35 @@
 </head>
 <body>
     <div id="brightnessOverlay" aria-hidden="true"></div>
+
+    <div id="bootOverlay" class="boot-overlay active" aria-hidden="true">
+        <div class="boot-sweep"></div>
+        <div class="boot-scanlines"></div>
+    </div>
+
     <div class="landing-bg" aria-hidden="true">
+        <canvas id="landingCanvas"></canvas>
+        <div class="neon-grid-floor"></div>
         <span class="orb orb-1"></span>
         <span class="orb orb-2"></span>
         <span class="orb orb-3"></span>
     </div>
 
+    <canvas id="mouseTrailCanvas" class="mouse-trail-canvas" aria-hidden="true"></canvas>
+
     <div id="menu">
         <div class="menu-card landing-card">
-            <p class="landing-kicker">Welcome to</p>
-            <h1 class="landing-title">Arcade Arena</h1>
-            <p class="subtitle">Neon classics. One hub. Endless runs.</p>
+            <p class="landing-kicker landing-reveal" data-reveal-order="0">Welcome to</p>
+            <h1 class="landing-title" id="landingTitle" aria-label="Arcade Arena"></h1>
+            <p class="subtitle landing-reveal" data-reveal-order="1">Neon classics. One hub. Endless runs.</p>
 
             <div class="landing-actions">
-                <button id="ourGamesBtn" class="menuBtn menuBtn-primary">Our Games</button>
-                <button id="settingsBtn" class="menuBtn menuBtn-accent">Settings</button>
-                <button id="keybindsBtn" class="menuBtn menuBtn-accent">Keybinds</button>
+                <button id="ourGamesBtn" class="menuBtn menuBtn-primary landing-reveal landing-btn" data-reveal-order="2">Our Games</button>
+                <button id="settingsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="3">Settings</button>
+                <button id="keybindsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="4">Keybinds</button>
             </div>
 
-            <p id="highScore">Fast Eagle High Score: 0</p>
+            <p id="highScore" class="landing-reveal" data-reveal-order="5">Fast Eagle High Score: 0</p>
         </div>
     </div>
 
@@ -176,5 +186,6 @@
 
     <script src="1prompt.js"></script>
     <script src="script.js"></script>
+    <script src="landing-effects.js"></script>
 </body>
 </html>
