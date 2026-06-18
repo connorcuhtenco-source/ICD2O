@@ -211,3 +211,80 @@ canvas {
 .hidden {
     display: none !important;
 }
+
+.space-runner-ui {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.space-runner-ui > * {
+    pointer-events: auto;
+}
+
+.space-runner-score {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    font-size: 1.1em;
+    color: #eef8ff;
+    background: rgba(2, 8, 18, 0.78);
+    border: 2px solid rgba(0, 255, 204, 0.75);
+    padding: 8px 14px;
+    border-radius: 8px;
+    z-index: 5;
+    letter-spacing: 0.08em;
+}
+
+.space-runner-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(4, 12, 26, 0.92);
+    z-index: 10;
+    padding: 24px;
+}
+
+#gameOverScreen.space-runner-overlay {
+    background: rgba(4, 12, 26, 0.82);
+}
+
+.space-runner-overlay .menuBtn {
+    width: auto;
+    min-width: 180px;
+}
+
+#instructions {
+    background: rgba(2, 8, 18, 0.78);
+    border: 1px solid rgba(0, 255, 204, 0.35);
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin-top: 12px;
+    max-width: 360px;
+    font-size: 0.95em;
+    color: #cbd6ef;
+    line-height: 1.5;
+}
+
+#highscore,
+#finalScore,
+#finalHighscore {
+    font-size: 1.1em;
+    margin-bottom: 4px;
+    color: #95ffe0;
+    letter-spacing: 0.1em;
+}
+
+#newHighscore {
+    color: #ffe66d;
+    font-size: 1.6em;
+    font-weight: bold;
+    text-shadow: 0 0 14px rgba(255, 230, 109, 0.45);
+    margin-bottom: 12px;
+    display: none;
+}

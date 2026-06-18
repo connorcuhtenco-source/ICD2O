@@ -14,6 +14,7 @@ const backBtn = document.getElementById('backBtn');
 const restartBtn = document.getElementById('restartBtn');
 
 const tagHud = document.getElementById('tagHud');
+const spaceRunnerUi = document.getElementById('spaceRunnerUi');
 const tagTimerText = document.getElementById('tagTimer');
 const tagLevelText = document.getElementById('tagLevel');
 const inventorySlots = document.querySelectorAll('.inventory-slot');
@@ -114,10 +115,13 @@ function getFastEagleSpeed() {
 
 function showMenu() {
     stopGame();
+    SpaceRunner.stop();
     currentGame = null;
     menu.classList.remove('hidden');
     gameContainer.classList.add('hidden');
     tagHud.classList.add('hidden');
+    spaceRunnerUi.classList.add('hidden');
+    gameMessage.classList.remove('hidden');
 }
 
 function showGameScreen(name, message, useCanvas = false, showRestart = false) {
@@ -201,6 +205,8 @@ function initFastEagle() {
 }
 
 function startFastEagle() {
+    spaceRunnerUi.classList.add('hidden');
+    SpaceRunner.stop();
     tagHud.classList.add('hidden');
     showGameScreen('Fast Eagle', '', true, false);
     initFastEagle();
@@ -498,6 +504,8 @@ function endFastEagle() {
 }
 
 function startTagZone() {
+    spaceRunnerUi.classList.add('hidden');
+    SpaceRunner.stop();
     currentGame = 'tagZone';
     canvas.width = 960;
     canvas.height = 620;
@@ -1109,8 +1117,27 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
+function startSpaceRunner() {
+    stopGame();
+    currentGame = 'spaceRunner';
+    tagHud.classList.add('hidden');
+    showGameScreen('Space Runner', '', true, false);
+    gameMessage.classList.add('hidden');
+    restartBtn.classList.add('hidden');
+    spaceRunnerUi.classList.remove('hidden');
+    SpaceRunner.open(canvas, ctx);
+}
+
 document.addEventListener('keydown', e => {
     keys[e.code] = true;
+
+    if (currentGame === 'spaceRunner') {
+        SpaceRunner.handleKey(e);
+        if (e.code === 'Space') {
+            e.preventDefault();
+        }
+        return;
+    }
 
     if (e.code === 'Space') {
         e.preventDefault();
@@ -1138,9 +1165,7 @@ canvas.addEventListener('click', () => {
 
 tagZoneBtn.addEventListener('click', startTagZone);
 
-platformerBtn.addEventListener('click', () => {
-    window.location.href = 'space-runner.html';
-});
+platformerBtn.addEventListener('click', startSpaceRunner);
 
 playBtn.addEventListener('click', startFastEagle);
 

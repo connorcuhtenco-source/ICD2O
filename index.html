@@ -29,6 +29,25 @@
             <div class="canvas-wrapper">
                 <canvas id="gameCanvas" width="480" height="720" class="hidden"></canvas>
 
+                <div id="spaceRunnerUi" class="space-runner-ui hidden">
+                    <div id="scoreDisplay" class="space-runner-score hidden"></div>
+
+                    <div id="startScreen" class="space-runner-overlay">
+                        <div id="highscore">Highscore: <span id="highscoreValue">0</span></div>
+                        <button id="startButton" class="menuBtn">Start</button>
+                        <div id="instructions">
+                            Controls: A/D to move, Space to jump, S to roll.
+                        </div>
+                    </div>
+
+                    <div id="gameOverScreen" class="space-runner-overlay hidden">
+                        <div id="newHighscore">New Highscore!</div>
+                        <div id="finalScore"></div>
+                        <div id="finalHighscore"></div>
+                        <button id="playAgainButton" class="menuBtn">Play Again</button>
+                    </div>
+                </div>
+
                 <div id="tagHud" class="tag-hud hidden">
                     <div class="hud-box">
                         <span>Time</span>
@@ -58,6 +77,7 @@
         </div>
     </div>
 
+    <script src="1prompt.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
