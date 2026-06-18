@@ -276,6 +276,7 @@ function showGamesPage() {
     menu.classList.add('hidden');
     gamesPage.classList.remove('hidden');
     gameContainer.classList.add('hidden');
+    LandingEffects.clearMouseTrail();
     playUiSound('click');
 }
 
@@ -319,6 +320,7 @@ function showGameScreen(name, message, useCanvas = false, showRestart = false) {
     menu.classList.add('hidden');
     gamesPage.classList.add('hidden');
     gameContainer.classList.remove('hidden');
+    LandingEffects.clearMouseTrail();
     gameTitle.textContent = name;
     gameMessage.textContent = message;
     canvas.classList.toggle('hidden', !useCanvas);
@@ -1967,7 +1969,21 @@ const LandingEffects = (() => {
         });
     }
 
+    function clearMouseTrail() {
+        trail.length = 0;
+        mouse.x = -1000;
+        mouse.y = -1000;
+
+        if (trailCtx && trailCanvas) {
+            trailCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+            trailCanvas.classList.add('hidden');
+        }
+    }
+
     function drawMouseTrail() {
+        if (!trailCtx || !trailCanvas) return;
+
+        trailCanvas.classList.remove('hidden');
         trailCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         if (mouse.x < 0) return;
 
@@ -2004,6 +2020,11 @@ const LandingEffects = (() => {
             drawStars(time);
             drawParticles();
             drawMouseTrail();
+        } else {
+            clearMouseTrail();
+            if (landingCtx) {
+                landingCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+            }
         }
         landingAnimationId = requestAnimationFrame(animateLanding);
     }
@@ -2069,7 +2090,7 @@ const LandingEffects = (() => {
         }
     }
 
-    return { init };
+    return { init, clearMouseTrail };
 })();
 
 loadSettings();
