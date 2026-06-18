@@ -93,6 +93,7 @@ body {
 
 .boot-overlay.boot-done {
     opacity: 0;
+    visibility: hidden;
 }
 
 .boot-sweep {

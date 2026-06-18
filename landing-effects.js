@@ -86,9 +86,28 @@ const LandingEffects = (() => {
         element.classList.add('revealed');
     }
 
+    function finishBoot() {
+        if (bootOverlay) {
+            bootOverlay.classList.remove('boot-sweeping', 'active');
+            bootOverlay.classList.add('boot-done');
+        }
+
+        if (landingTitle) {
+            landingTitle.querySelectorAll('.title-letter').forEach(letter => letter.classList.add('powered-on'));
+        }
+
+        document.querySelectorAll('.landing-reveal').forEach((element, index) => {
+            if (!element.classList.contains('revealed')) {
+                revealElement(element, index * 40);
+            }
+        });
+    }
+
     function runBootSequence() {
         if (bootPlayed) return;
         bootPlayed = true;
+
+        const failsafe = window.setTimeout(finishBoot, 5000);
 
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -97,8 +116,8 @@ const LandingEffects = (() => {
             document.querySelectorAll('.landing-reveal').forEach((element, index) => {
                 revealElement(element, index * 60);
             });
-            bootOverlay.classList.add('boot-done');
-            bootOverlay.classList.remove('active');
+            window.clearTimeout(failsafe);
+            finishBoot();
             return;
         }
 
@@ -121,9 +140,8 @@ const LandingEffects = (() => {
         const lettersDone = 700 + letters.length * LETTER_STAGGER_MS + 200;
 
         window.setTimeout(() => {
-            bootOverlay.classList.remove('boot-sweeping');
-            bootOverlay.classList.add('boot-done');
-            bootOverlay.classList.remove('active');
+            window.clearTimeout(failsafe);
+            finishBoot();
         }, lettersDone);
 
         document.querySelectorAll('.landing-reveal').forEach((element, index) => {
@@ -272,38 +290,46 @@ const LandingEffects = (() => {
         bootOverlay = document.getElementById('bootOverlay');
         landingTitle = document.getElementById('landingTitle');
 
-        if (!landingCanvas || !trailCanvas || !bootOverlay || !landingTitle) return;
+        if (!landingCanvas || !trailCanvas || !bootOverlay || !landingTitle) {
+            finishBoot();
+            return;
+        }
 
-        playSound = soundFn || playSound;
-        landingCtx = landingCanvas.getContext('2d');
-        trailCtx = trailCanvas.getContext('2d');
+        try {
+            playSound = soundFn || playSound;
+            landingCtx = landingCanvas.getContext('2d');
+            trailCtx = trailCanvas.getContext('2d');
 
-        buildTitleLetters();
-        resizeCanvases();
-        initStars();
-        initParticles();
-        setupButtonHovers();
-        runBootSequence();
-
-        window.addEventListener('resize', () => {
+            buildTitleLetters();
             resizeCanvases();
             initStars();
             initParticles();
-        });
+            setupButtonHovers();
+            runBootSequence();
 
-        window.addEventListener('mousemove', event => {
-            if (!isLandingVisible()) return;
-            mouse.x = event.clientX;
-            mouse.y = event.clientY;
-        });
+            window.addEventListener('resize', () => {
+                resizeCanvases();
+                initStars();
+                initParticles();
+            });
 
-        window.addEventListener('mouseleave', () => {
-            mouse.x = -1000;
-            mouse.y = -1000;
-        });
+            window.addEventListener('mousemove', event => {
+                if (!isLandingVisible()) return;
+                mouse.x = event.clientX;
+                mouse.y = event.clientY;
+            });
 
-        if (!animationId) {
-            animationId = requestAnimationFrame(animate);
+            window.addEventListener('mouseleave', () => {
+                mouse.x = -1000;
+                mouse.y = -1000;
+            });
+
+            if (!animationId) {
+                animationId = requestAnimationFrame(animate);
+            }
+        } catch (error) {
+            console.error('Landing effects failed to start:', error);
+            finishBoot();
         }
     }
 
