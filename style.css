@@ -974,6 +974,13 @@ canvas {
 #inventoryHud {
     display: flex;
     gap: 8px;
+}
+
+.tag-hud-right {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
     margin-left: auto;
 }
 
@@ -1024,6 +1031,89 @@ canvas {
     border-color: #ff5fa2;
     background: linear-gradient(160deg, rgba(255, 95, 162, 0.35), rgba(2, 8, 18, 0.9));
     box-shadow: 0 0 14px rgba(255, 95, 162, 0.35);
+}
+
+.inventory-slot.pistol {
+    border-color: #c9a66b;
+    background: linear-gradient(160deg, rgba(201, 166, 107, 0.35), rgba(2, 8, 18, 0.9));
+    box-shadow: 0 0 14px rgba(201, 166, 107, 0.35);
+}
+
+.tag-ability-hud {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.ability-slot {
+    min-width: 72px;
+    padding: 8px 10px;
+    border: 2px solid rgba(201, 166, 107, 0.85);
+    background: rgba(2, 8, 18, 0.88);
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 0 16px rgba(201, 166, 107, 0.28);
+}
+
+.ability-slot .ability-name {
+    display: block;
+    color: #9aa6b8;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.ability-slot strong {
+    display: block;
+    color: #ffe66d;
+    font-size: 18px;
+    margin-top: 2px;
+}
+
+.achievement-toast-host {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 30;
+    pointer-events: none;
+}
+
+.achievement-toast {
+    min-width: 240px;
+    max-width: 320px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 230, 109, 0.55);
+    background: linear-gradient(135deg, rgba(8, 16, 36, 0.96), rgba(20, 8, 44, 0.96));
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 20px rgba(255, 230, 109, 0.18);
+    color: #fff;
+    opacity: 0;
+    transform: translateX(24px);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.achievement-toast.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.achievement-toast h4 {
+    margin: 0 0 4px;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #ffe66d;
+}
+
+.achievement-toast p {
+    margin: 0;
+    color: #cbd6ef;
+    font-size: 13px;
+    line-height: 1.45;
 }
 
 .hidden {

@@ -39,6 +39,9 @@ const tagTimerText = document.getElementById('tagTimer');
 const tagLevelText = document.getElementById('tagLevel');
 const tagHeartsText = document.getElementById('tagHearts');
 const inventorySlots = document.querySelectorAll('.inventory-slot');
+const tagAbilityHud = document.getElementById('tagAbilityHud');
+const tagPistolSlot = document.getElementById('tagPistolSlot');
+const tagPistolAmmoText = document.getElementById('tagPistolAmmo');
 
 const tagPlayerIdleSprite = new Image();
 tagPlayerIdleSprite.src = 'sprites/characters/owlet-idle.png';
@@ -86,6 +89,9 @@ const TAG_MAX_HEARTS = 3;
 const TAG_HIT_IMMUNITY_TIME = 3;
 const TAG_HIT_BOOST_TIME = 1.5;
 const TAG_HIT_BOOST_MULTIPLIER = 1.35;
+const TAG_PISTOL_AMMO = 5;
+const TAG_PISTOL_SPAWN_CHANCE = 0.25;
+const TAG_BULLET_SPEED = 560;
 const TAG_MAP_TILE_SIZE = 32;
 const TAG_BARRIER_DEPTH = 96;
 const TAG_MAP_TILE_SOURCES = [
@@ -109,6 +115,9 @@ let tagBoostTimer = 0;
 let tagHearts = TAG_MAX_HEARTS;
 let tagHitImmunityTimer = 0;
 let tagHitBoostTimer = 0;
+let tagPistolEquipped = false;
+let tagPistolAmmo = 0;
+let tagBullets = [];
 let countdown = 3;
 let countdownActive = false;
 let camX = 0;
@@ -134,6 +143,14 @@ const itemTypes = [
     { name: 'Freeze', className: 'freeze', color: '#74d2ff', glow: 'rgba(116, 210, 255, 0.65)', icon: '❄' },
     { name: 'Shield', className: 'shield', color: '#ff5fa2', glow: 'rgba(255, 95, 162, 0.65)', icon: '🛡' }
 ];
+
+const pistolItemType = {
+    name: 'Pistol',
+    className: 'pistol',
+    color: '#c9a66b',
+    glow: 'rgba(201, 166, 107, 0.65)',
+    icon: '🔫'
+};
 
 const tagMapTileImages = TAG_MAP_TILE_SOURCES.map(src => {
     const img = new Image();
@@ -190,9 +207,34 @@ function unlockAchievement(id) {
     unlockedAchievements.add(id);
     saveAchievements();
 
+    const achievement = ACHIEVEMENTS.find(entry => entry.id === id);
+    if (achievement && currentGame === 'tagZone') {
+        showAchievementToast(achievement);
+    }
+
     if (achievementsModal && !achievementsModal.classList.contains('hidden')) {
         renderAchievementsList();
     }
+}
+
+function showAchievementToast(achievement) {
+    const host = document.getElementById('achievementToastHost');
+    if (!host) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'achievement-toast';
+    toast.innerHTML = `
+        <h4>${achievement.icon} Achievement Unlocked</h4>
+        <p><strong>${achievement.name}</strong> — ${achievement.description}</p>
+    `;
+    host.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('visible'));
+    playUiSound('achievement');
+
+    window.setTimeout(() => {
+        toast.classList.remove('visible');
+        window.setTimeout(() => toast.remove(), 320);
+    }, 3800);
 }
 
 function hasAchievement(id) {
@@ -367,6 +409,41 @@ function playUiSound(type = 'click') {
         oscillator.start(now);
         oscillator.stop(now + 0.52);
     }
+
+    if (type === 'achievement') {
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(523, now);
+        oscillator.frequency.exponentialRampToValueAtTime(784, now + 0.12);
+        oscillator.frequency.exponentialRampToValueAtTime(1047, now + 0.28);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.14 * volume, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.1 * volume, now + 0.18);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+        oscillator.start(now);
+        oscillator.stop(now + 0.44);
+    }
+
+    if (type === 'shoot') {
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(280, now);
+        oscillator.frequency.exponentialRampToValueAtTime(120, now + 0.08);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.08 * volume, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+        oscillator.start(now);
+        oscillator.stop(now + 0.11);
+    }
+
+    if (type === 'enemyHit') {
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(180, now);
+        oscillator.frequency.exponentialRampToValueAtTime(60, now + 0.14);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.09 * volume, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+        oscillator.start(now);
+        oscillator.stop(now + 0.17);
+    }
 }
 
 function openDrawer(type) {
@@ -424,6 +501,7 @@ function showMenu() {
     gamesPage.classList.add('hidden');
     gameContainer.classList.add('hidden');
     tagHud.classList.add('hidden');
+    tagAbilityHud?.classList.add('hidden');
     spaceRunnerUi.classList.add('hidden');
     gameMessage.classList.remove('hidden');
 }
@@ -946,9 +1024,13 @@ function startTagZone() {
     tagHearts = TAG_MAX_HEARTS;
     tagHitImmunityTimer = 0;
     tagHitBoostTimer = 0;
+    tagPistolEquipped = false;
+    tagPistolAmmo = 0;
+    tagBullets = [];
     setupTagLevel();
 
     tagHud.classList.remove('hidden');
+    tagAbilityHud?.classList.remove('hidden');
     showGameScreen('Tag Zone', 'Get ready...', true, false);
     restartBtn.classList.add('hidden');
     startLoop();
@@ -980,11 +1062,14 @@ function setupTagLevel() {
         isMoving: false
     };
 
-    const taggerCount = Math.min(2 + tagLevel, 7);
-    taggers = Array.from({ length: taggerCount }, () => createTagger());
-
     const itemCount = Math.max(18 - tagLevel * 2, 8);
-    tagItems = Array.from({ length: itemCount }, createTagItem);
+    tagItems = Array.from({ length: itemCount }, () => createTagItem());
+
+    if (Math.random() < TAG_PISTOL_SPAWN_CHANCE) {
+        tagItems.push(createTagItem('pistol'));
+    }
+
+    spawnTaggersForLevel();
     tagMapTiles = createTagTiles();
     tagMapTrees = createTagBarrierTrees();
     tagMapRocks = [];
@@ -993,7 +1078,25 @@ function setupTagLevel() {
 
     gameMessage.textContent = 'Get ready...';
     updateInventoryHud();
+    updateAbilityHud();
     updateTagHud();
+}
+
+function spawnTaggersForLevel() {
+    taggers = [];
+
+    const regularCount = Math.min(2 + tagLevel, 7);
+    for (let i = 0; i < regularCount; i++) {
+        taggers.push(createTagger('regular'));
+    }
+
+    if (tagLevel >= 3) {
+        taggers.push(createTagger('brute'), createTagger('brute'));
+    }
+
+    if (tagLevel >= 5) {
+        taggers.push(createTagger('stalker'), createTagger('stalker'));
+    }
 }
 
 function createTagTiles() {
@@ -1074,12 +1177,44 @@ function createTagMapTrees(count = 3) {
     return trees;
 }
 
-function createTagger() {
+function createTagger(type = 'regular') {
     let x;
     let y;
-    const width = 72;
-    const height = 72;
     const minDistanceFromPlayer = 450;
+    const configs = {
+        regular: {
+            width: 72,
+            height: 72,
+            hitboxOffsetX: 18,
+            hitboxOffsetY: 16,
+            hitboxWidth: 36,
+            hitboxHeight: 46,
+            speed: 155 + tagLevel * 22
+        },
+        brute: {
+            width: 100,
+            height: 100,
+            hitboxOffsetX: 24,
+            hitboxOffsetY: 22,
+            hitboxWidth: 52,
+            hitboxHeight: 62,
+            speed: 88 + tagLevel * 5,
+            oneShot: true
+        },
+        stalker: {
+            width: 72,
+            height: 72,
+            hitboxOffsetX: 18,
+            hitboxOffsetY: 16,
+            hitboxWidth: 36,
+            hitboxHeight: 46,
+            speed: 310 + tagLevel * 6,
+            aura: 'blue'
+        }
+    };
+    const config = configs[type] || configs.regular;
+    const width = config.width;
+    const height = config.height;
 
     do {
         x = TAG_BARRIER_DEPTH + Math.random() * (WORLD_WIDTH - TAG_BARRIER_DEPTH * 2 - width);
@@ -1092,20 +1227,25 @@ function createTagger() {
     );
 
     return {
+        type,
         x,
         y,
         width,
         height,
-        hitboxOffsetX: 18,
-        hitboxOffsetY: 16,
-        hitboxWidth: 36,
-        hitboxHeight: 46,
-        speed: 120 + tagLevel * 18
+        hitboxOffsetX: config.hitboxOffsetX,
+        hitboxOffsetY: config.hitboxOffsetY,
+        hitboxWidth: config.hitboxWidth,
+        hitboxHeight: config.hitboxHeight,
+        speed: config.speed,
+        oneShot: config.oneShot || false,
+        aura: config.aura || null
     };
 }
 
-function createTagItem() {
-    const type = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+function createTagItem(forcedType = null) {
+    const type = forcedType === 'pistol'
+        ? pistolItemType
+        : itemTypes[Math.floor(Math.random() * itemTypes.length)];
 
     return {
         x: TAG_BARRIER_DEPTH + 80 + Math.random() * (WORLD_WIDTH - TAG_BARRIER_DEPTH * 2 - 160),
@@ -1176,6 +1316,7 @@ function updateTagZone(delta) {
     updateTaggerAnimation(delta);
     collectTagItems();
     checkTaggerCollisions();
+    updateTagBullets(delta);
 
     if (tagSurvivalTime >= TAG_LEVEL_TIME) {
         tagLevel += 1;
@@ -1322,11 +1463,20 @@ function checkTaggerCollisions() {
 
         if (rectsOverlap(playerHitbox, taggerHitbox)) {
             if (tagShieldTimer > 0) {
-                const newTagger = createTagger();
+                const newTagger = createTagger(tagger.type || 'regular');
                 tagger.x = newTagger.x;
                 tagger.y = newTagger.y;
                 tagShieldTimer = 0;
                 gameMessage.textContent = 'Shield saved you';
+                return;
+            }
+
+            if (tagger.oneShot) {
+                tagNoHitRun = false;
+                tagHearts = 0;
+                updateTagHud();
+                playUiSound('hit');
+                endTagZone();
                 return;
             }
 
@@ -1401,8 +1551,104 @@ function useTagItem() {
         gameMessage.textContent = 'Shield activated';
     }
 
+    if (item.name === 'Pistol') {
+        tagPistolEquipped = true;
+        tagPistolAmmo = TAG_PISTOL_AMMO;
+        gameMessage.textContent = 'Pistol equipped — Space to shoot';
+    }
+
     updateInventoryHud();
+    updateAbilityHud();
     playUiSound('collect');
+}
+
+function handleTagZoneSpace() {
+    if (currentGame !== 'tagZone' || !gameRunning || countdownActive) return;
+
+    if (tagPistolEquipped && tagPistolAmmo > 0) {
+        shootTagPistol();
+        return;
+    }
+
+    useTagItem();
+}
+
+function findNearestTagger() {
+    const playerCenterX = tagPlayer.x + tagPlayer.width / 2;
+    const playerCenterY = tagPlayer.y + tagPlayer.height / 2;
+    let nearest = null;
+    let nearestDistance = Infinity;
+
+    taggers.forEach(tagger => {
+        const taggerCenterX = tagger.x + tagger.width / 2;
+        const taggerCenterY = tagger.y + tagger.height / 2;
+        const distance = Math.hypot(taggerCenterX - playerCenterX, taggerCenterY - playerCenterY);
+
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearest = tagger;
+        }
+    });
+
+    return nearest;
+}
+
+function shootTagPistol() {
+    const target = findNearestTagger();
+
+    if (!target) {
+        gameMessage.textContent = 'No targets nearby';
+        return;
+    }
+
+    tagBullets.push({
+        x: tagPlayer.x + tagPlayer.width / 2,
+        y: tagPlayer.y + tagPlayer.height / 2,
+        target,
+        speed: TAG_BULLET_SPEED,
+        radius: 7
+    });
+
+    tagPistolAmmo -= 1;
+
+    if (tagPistolAmmo <= 0) {
+        tagPistolEquipped = false;
+        tagPistolAmmo = 0;
+        gameMessage.textContent = 'Pistol empty';
+    }
+
+    updateAbilityHud();
+    playUiSound('shoot');
+}
+
+function updateTagBullets(delta) {
+    tagBullets = tagBullets.filter(bullet => {
+        if (!taggers.includes(bullet.target)) {
+            return false;
+        }
+
+        const targetX = bullet.target.x + bullet.target.width / 2;
+        const targetY = bullet.target.y + bullet.target.height / 2;
+        const dx = targetX - bullet.x;
+        const dy = targetY - bullet.y;
+        const distance = Math.hypot(dx, dy) || 1;
+
+        bullet.x += (dx / distance) * bullet.speed * delta;
+        bullet.y += (dy / distance) * bullet.speed * delta;
+
+        if (distance < bullet.target.width * 0.42) {
+            taggers = taggers.filter(tagger => tagger !== bullet.target);
+            playUiSound('enemyHit');
+            return false;
+        }
+
+        return (
+            bullet.x > -40 &&
+            bullet.x < WORLD_WIDTH + 40 &&
+            bullet.y > -40 &&
+            bullet.y < WORLD_HEIGHT + 40
+        );
+    });
 }
 
 function endTagZone() {
@@ -1421,6 +1667,7 @@ function drawTagZone() {
     drawTagMap();
     drawTagItems();
     drawTaggers();
+    drawTagBullets();
     drawTagPlayer();
 
     ctx.restore();
@@ -1602,6 +1849,19 @@ function drawTagItems() {
 }
 
 function drawTagPowerUp(type, radius) {
+    if (type.className === 'pistol') {
+        ctx.fillStyle = type.color;
+        ctx.strokeStyle = '#f4e2c0';
+        ctx.lineWidth = 2;
+        ctx.fillRect(-radius * 0.55, -radius * 0.18, radius * 1.1, radius * 0.36);
+        ctx.strokeRect(-radius * 0.55, -radius * 0.18, radius * 1.1, radius * 0.36);
+        ctx.fillRect(radius * 0.2, -radius * 0.08, radius * 0.55, radius * 0.22);
+        ctx.strokeRect(radius * 0.2, -radius * 0.08, radius * 0.55, radius * 0.22);
+        ctx.fillStyle = '#5a4630';
+        ctx.fillRect(-radius * 0.2, radius * 0.12, radius * 0.28, radius * 0.42);
+        return;
+    }
+
     if (type.className === 'boost') {
         ctx.fillStyle = type.color;
         ctx.strokeStyle = '#fff8d6';
@@ -1667,12 +1927,35 @@ function drawTaggers() {
     taggers.forEach(tagger => {
         ctx.save();
 
+        if (tagger.aura === 'blue') {
+            const pulse = 0.85 + Math.sin(tagAnimTime * 7) * 0.15;
+            ctx.fillStyle = `rgba(74, 144, 255, ${0.18 * pulse})`;
+            ctx.beginPath();
+            ctx.arc(
+                tagger.x + tagger.width / 2,
+                tagger.y + tagger.height / 2,
+                tagger.width * 0.72 * pulse,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            ctx.strokeStyle = `rgba(116, 210, 255, ${0.75 * pulse})`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
         if (frozen) {
             ctx.shadowColor = 'rgba(116, 210, 255, 0.8)';
             ctx.shadowBlur = 18;
         }
 
-        if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+        if (tagger.type === 'brute') {
+            ctx.fillStyle = frozen ? '#8be9ff' : '#8b1f1f';
+            ctx.fillRect(tagger.x, tagger.y, tagger.width, tagger.height);
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(tagger.x + 4, tagger.y + 4, tagger.width - 8, tagger.height - 8);
+        } else if (sprite && sprite.complete && sprite.naturalWidth > 0) {
             ctx.drawImage(sprite, tagger.x, tagger.y, tagger.width, tagger.height);
         } else {
             ctx.fillStyle = frozen ? '#8be9ff' : '#ff4d4d';
@@ -1684,6 +1967,19 @@ function drawTaggers() {
             ctx.fillRect(tagger.x, tagger.y, tagger.width, tagger.height);
         }
 
+        ctx.restore();
+    });
+}
+
+function drawTagBullets() {
+    tagBullets.forEach(bullet => {
+        ctx.save();
+        ctx.fillStyle = '#ffe66d';
+        ctx.shadowColor = 'rgba(255, 230, 109, 0.9)';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
     });
 }
@@ -1787,6 +2083,28 @@ function drawTagPlayer() {
         ctx.stroke();
         ctx.setLineDash([]);
     }
+
+    if (tagPistolEquipped) {
+        drawEquippedPistol();
+    }
+}
+
+function drawEquippedPistol() {
+    const gripX = tagPlayerFacing === 1 ? tagPlayer.x + tagPlayer.width - 8 : tagPlayer.x + 8;
+    const gripY = tagPlayer.y + tagPlayer.height * 0.55;
+
+    ctx.save();
+    ctx.translate(gripX, gripY);
+    if (tagPlayerFacing === -1) ctx.scale(-1, 1);
+
+    ctx.fillStyle = '#5a4630';
+    ctx.fillRect(-4, 0, 8, 16);
+    ctx.fillStyle = '#c9a66b';
+    ctx.fillRect(0, -3, 20, 8);
+    ctx.fillStyle = '#2f2418';
+    ctx.fillRect(16, -2, 8, 6);
+
+    ctx.restore();
 }
 
 function updateTagHud() {
@@ -1807,6 +2125,14 @@ function updateInventoryHud() {
             slot.innerHTML = `<span class="power-icon">${item.icon}</span>${item.name}`;
         }
     });
+}
+
+function updateAbilityHud() {
+    if (!tagPistolSlot || !tagPistolAmmoText) return;
+
+    const showPistol = tagPistolEquipped && tagPistolAmmo > 0;
+    tagPistolSlot.classList.toggle('hidden', !showPistol);
+    tagPistolAmmoText.textContent = String(tagPistolAmmo);
 }
 
 function rectsOverlap(a, b) {
@@ -1857,7 +2183,7 @@ document.addEventListener('keydown', e => {
         }
 
         if (currentGame === 'tagZone') {
-            useTagItem();
+            handleTagZoneSpace();
         }
     }
 });

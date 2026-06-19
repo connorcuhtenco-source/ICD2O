@@ -173,12 +173,24 @@
                         <strong id="tagLevel">1</strong>
                     </div>
 
-                    <div id="inventoryHud">
-                        <div class="inventory-slot"></div>
-                        <div class="inventory-slot"></div>
-                        <div class="inventory-slot"></div>
+                    <div class="tag-hud-right">
+                        <div id="tagAbilityHud" class="tag-ability-hud hidden">
+                            <div id="tagPistolSlot" class="ability-slot pistol hidden">
+                                <span class="power-icon">🔫</span>
+                                <span class="ability-name">Pistol</span>
+                                <strong id="tagPistolAmmo">0</strong>
+                            </div>
+                        </div>
+
+                        <div id="inventoryHud">
+                            <div class="inventory-slot"></div>
+                            <div class="inventory-slot"></div>
+                            <div class="inventory-slot"></div>
+                        </div>
                     </div>
                 </div>
+
+                <div id="achievementToastHost" class="achievement-toast-host"></div>
 
                 <button id="restartBtn" class="menuBtn hidden canvas-restart-btn">Restart</button>
             </div>
