@@ -5,7 +5,12 @@ const menu = document.getElementById('menu');
 const gameContainer = document.getElementById('gameContainer');
 const gameTitle = document.getElementById('gameTitle');
 const gameMessage = document.getElementById('gameMessage');
-const highScoreText = document.getElementById('highScore');
+
+const achievementsBtn = document.getElementById('achievementsBtn');
+const achievementsBackdrop = document.getElementById('achievementsBackdrop');
+const achievementsModal = document.getElementById('achievementsModal');
+const achievementsList = document.getElementById('achievementsList');
+const closeAchievementsBtn = document.getElementById('closeAchievementsBtn');
 
 const tagZoneBtn = document.getElementById('tagZoneBtn');
 const platformerBtn = document.getElementById('platformerBtn');
@@ -75,6 +80,7 @@ let tagMapTrees = [];
 let tagMapRocks = [];
 let tagHouse = null;
 let tagLevel = 1;
+let tagNoHitRun = true;
 let tagSurvivalTime = 0;
 let tagFreezeTimer = 0;
 let tagShieldTimer = 0;
@@ -113,6 +119,112 @@ function getFastEagleSpeed() {
     return starPowerTimer > 0 ? PIPE_SPEED * STAR_SPEED_MULTIPLIER : PIPE_SPEED;
 }
 
+const ACHIEVEMENTS_STORAGE_KEY = 'arcadeAchievements';
+const ACHIEVEMENTS = [
+    {
+        id: 'true-eagle',
+        name: 'True Eagle',
+        description: 'Reach score 99 in Fast Eagle.',
+        icon: '🦅'
+    },
+    {
+        id: 'hardcore',
+        name: 'Hardcore',
+        description: 'Reach level 5 in Tag Zone without getting hit.',
+        icon: '💀'
+    },
+    {
+        id: 'how-are-you-alive',
+        name: 'How are you alive?',
+        description: 'Get a 200,000 high score in Space Runner.',
+        icon: '🚀'
+    }
+];
+
+let unlockedAchievements = new Set();
+
+function loadAchievements() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(ACHIEVEMENTS_STORAGE_KEY) || '[]');
+        unlockedAchievements = new Set(Array.isArray(saved) ? saved : []);
+    } catch {
+        unlockedAchievements = new Set();
+    }
+
+    const spaceRunnerHighscore = parseInt(localStorage.getItem('spaceRunnerHighscore') || '0', 10);
+    checkSpaceRunnerAchievements(spaceRunnerHighscore);
+}
+
+function saveAchievements() {
+    localStorage.setItem(ACHIEVEMENTS_STORAGE_KEY, JSON.stringify([...unlockedAchievements]));
+}
+
+function unlockAchievement(id) {
+    if (unlockedAchievements.has(id)) return;
+    unlockedAchievements.add(id);
+    saveAchievements();
+
+    if (achievementsModal && !achievementsModal.classList.contains('hidden')) {
+        renderAchievementsList();
+    }
+}
+
+function hasAchievement(id) {
+    return unlockedAchievements.has(id);
+}
+
+function renderAchievementsList() {
+    if (!achievementsList) return;
+
+    achievementsList.innerHTML = ACHIEVEMENTS.map(achievement => {
+        const unlocked = hasAchievement(achievement.id);
+
+        return `
+            <article class="achievement-card ${unlocked ? 'unlocked' : 'locked'}">
+                <h4>${achievement.icon} ${achievement.name}</h4>
+                <p>${achievement.description}</p>
+                <span class="achievement-status ${unlocked ? 'unlocked' : 'locked'}">${unlocked ? 'Unlocked' : 'Locked'}</span>
+            </article>
+        `;
+    }).join('');
+}
+
+function openAchievementsModal() {
+    if (!achievementsModal || !achievementsBackdrop) return;
+
+    renderAchievementsList();
+    achievementsBackdrop.classList.remove('hidden');
+    achievementsModal.classList.remove('hidden');
+    achievementsModal.setAttribute('aria-hidden', 'false');
+    closeAchievementsBtn?.focus();
+}
+
+function closeAchievementsModal() {
+    if (!achievementsModal || !achievementsBackdrop) return;
+
+    achievementsBackdrop.classList.add('hidden');
+    achievementsModal.classList.add('hidden');
+    achievementsModal.setAttribute('aria-hidden', 'true');
+}
+
+function checkFastEagleAchievements() {
+    if (score >= 99) {
+        unlockAchievement('true-eagle');
+    }
+}
+
+function checkTagZoneAchievements() {
+    if (tagLevel >= 5 && tagNoHitRun) {
+        unlockAchievement('hardcore');
+    }
+}
+
+function checkSpaceRunnerAchievements(highscore) {
+    if (highscore >= 200000) {
+        unlockAchievement('how-are-you-alive');
+    }
+}
+
 function showMenu() {
     stopGame();
     SpaceRunner.stop();
@@ -131,10 +243,6 @@ function showGameScreen(name, message, useCanvas = false, showRestart = false) {
     gameMessage.textContent = message;
     canvas.classList.toggle('hidden', !useCanvas);
     restartBtn.classList.toggle('hidden', !showRestart);
-}
-
-function updateHighScore() {
-    highScoreText.textContent = `Fast Eagle High Score: ${highScore}`;
 }
 
 function stopGame() {
@@ -259,6 +367,11 @@ function updateFastEagle(delta) {
         if (!pipe.passed && pipe.x + PIPE_WIDTH < bird.x) {
             score += 1;
             pipe.passed = true;
+
+            if (score >= 99) {
+                checkFastEagleAchievements();
+            }
+
             pipesPassedForStar += 1;
 
             if (pipesPassedForStar >= 3) {
@@ -498,7 +611,7 @@ function drawScore() {
 function endFastEagle() {
     gameRunning = false;
     highScore = Math.max(highScore, score);
-    updateHighScore();
+    checkFastEagleAchievements();
     gameMessage.textContent = `Game Over - Score ${score}`;
     restartBtn.classList.remove('hidden');
 }
@@ -511,6 +624,7 @@ function startTagZone() {
     canvas.height = 620;
 
     tagLevel = 1;
+    tagNoHitRun = true;
     setupTagLevel();
 
     tagHud.classList.remove('hidden');
@@ -702,6 +816,7 @@ function updateTagZone(delta) {
 
     if (tagSurvivalTime >= TAG_LEVEL_TIME) {
         tagLevel += 1;
+        checkTagZoneAchievements();
         gameMessage.textContent = `Level ${tagLevel}`;
         setupTagLevel();
     }
@@ -840,6 +955,7 @@ function checkTaggerCollisions() {
                 return;
             }
 
+            tagNoHitRun = false;
             endTagZone();
             return;
         }
@@ -1176,5 +1292,20 @@ restartBtn.addEventListener('click', () => {
 
 backBtn.addEventListener('click', showMenu);
 
-updateHighScore();
+achievementsBtn?.addEventListener('click', openAchievementsModal);
+closeAchievementsBtn?.addEventListener('click', closeAchievementsModal);
+achievementsBackdrop?.addEventListener('click', closeAchievementsModal);
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && achievementsModal && !achievementsModal.classList.contains('hidden')) {
+        closeAchievementsModal();
+    }
+});
+
+window.ArcadeAchievements = {
+    onSpaceRunnerGameOver(highscore) {
+        checkSpaceRunnerAchievements(highscore);
+    }
+};
+
+loadAchievements();
 showMenu();

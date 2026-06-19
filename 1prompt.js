@@ -349,6 +349,11 @@ const SpaceRunner = (() => {
 
         finalScore.textContent = 'Score: ' + Math.floor(score);
         finalHighscore.textContent = 'Highscore: ' + (highscore || 0);
+
+        if (window.ArcadeAchievements?.onSpaceRunnerGameOver) {
+            window.ArcadeAchievements.onSpaceRunnerGameOver(highscore || 0);
+        }
+
         startScreen.classList.add('hidden');
         gameOverScreen.classList.remove('hidden');
     }

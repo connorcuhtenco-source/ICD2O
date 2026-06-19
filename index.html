@@ -18,9 +18,16 @@
                 <button id="playBtn" class="menuBtn">Fast Eagle</button>
             </div>
 
-            <p id="highScore">Fast Eagle High Score: 0</p>
+            <button id="achievementsBtn" class="menuBtn menuBtn-achievements">Achievements</button>
         </div>
     </div>
+
+    <div id="achievementsBackdrop" class="modal-backdrop hidden"></div>
+    <aside id="achievementsModal" class="achievements-modal hidden" aria-hidden="true">
+        <button id="closeAchievementsBtn" class="modal-close" aria-label="Close achievements">×</button>
+        <h3 class="achievements-title">Achievements</h3>
+        <div id="achievementsList" class="achievements-list"></div>
+    </aside>
 
     <div id="gameContainer" class="hidden">
         <div class="game-card">
