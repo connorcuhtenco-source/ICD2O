@@ -59,11 +59,11 @@ const lizardWalkSprites = [];
 
 for (let i = 1; i <= 6; i++) {
     const demonImg = new Image();
-    demonImg.src = `sprites/monsters/demon/Walk${i}.png`;
+    demonImg.src = `sprites/enemys/Walk${i}.png`;
     demonWalkSprites.push(demonImg);
 
     const lizardImg = new Image();
-    lizardImg.src = `sprites/monsters/lizard/Walk${i}.png`;
+    lizardImg.src = `sprites/enemys/Walk${i} copy.png`;
     lizardWalkSprites.push(lizardImg);
 }
 
