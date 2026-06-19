@@ -1219,22 +1219,22 @@ function createTagger(type = 'regular') {
             speed: 155 + tagLevel * 22
         },
         brute: {
-            width: 128,
-            height: 128,
-            hitboxOffsetX: 36,
-            hitboxOffsetY: 32,
-            hitboxWidth: 56,
-            hitboxHeight: 64,
-            speed: 88 + tagLevel * 5,
+            width: 208,
+            height: 208,
+            hitboxOffsetX: 58,
+            hitboxOffsetY: 52,
+            hitboxWidth: 92,
+            hitboxHeight: 104,
+            speed: 128 + tagLevel * 9,
             oneShot: true
         },
         stalker: {
-            width: 96,
-            height: 96,
-            hitboxOffsetX: 24,
-            hitboxOffsetY: 22,
-            hitboxWidth: 48,
-            hitboxHeight: 58,
+            width: 144,
+            height: 144,
+            hitboxOffsetX: 36,
+            hitboxOffsetY: 34,
+            hitboxWidth: 72,
+            hitboxHeight: 86,
             speed: 310 + tagLevel * 6,
             aura: 'blue'
         }
