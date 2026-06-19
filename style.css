@@ -1033,42 +1033,10 @@ canvas {
     box-shadow: 0 0 14px rgba(255, 95, 162, 0.35);
 }
 
-.inventory-slot.pistol {
-    border-color: #c9a66b;
-    background: linear-gradient(160deg, rgba(201, 166, 107, 0.35), rgba(2, 8, 18, 0.9));
-    box-shadow: 0 0 14px rgba(201, 166, 107, 0.35);
-}
-
-.tag-ability-hud {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    align-items: flex-end;
-}
-
-.ability-slot {
-    min-width: 72px;
-    padding: 8px 10px;
-    border: 2px solid rgba(201, 166, 107, 0.85);
-    background: rgba(2, 8, 18, 0.88);
-    border-radius: 10px;
-    text-align: center;
-    box-shadow: 0 0 16px rgba(201, 166, 107, 0.28);
-}
-
-.ability-slot .ability-name {
-    display: block;
-    color: #9aa6b8;
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
-.ability-slot strong {
-    display: block;
-    color: #ffe66d;
-    font-size: 18px;
-    margin-top: 2px;
+.inventory-slot.nuke {
+    border-color: #ff6b35;
+    background: linear-gradient(160deg, rgba(255, 107, 53, 0.35), rgba(2, 8, 18, 0.9));
+    box-shadow: 0 0 14px rgba(255, 107, 53, 0.35);
 }
 
 .achievement-toast-host {
