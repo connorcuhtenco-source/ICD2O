@@ -100,6 +100,7 @@ const TAG_HIT_IMMUNITY_TIME = 3;
 const TAG_HIT_BOOST_TIME = 1.5;
 const TAG_HIT_BOOST_MULTIPLIER = 1.35;
 const TAG_NUKE_SPAWN_CHANCE = 0.10;
+const TAG_NUKE_DURATION = 2.4;
 const TAG_MAP_TILE_SIZE = 32;
 const TAG_BARRIER_DEPTH = 96;
 const TAG_MAP_TILE_SOURCES = [
@@ -124,6 +125,7 @@ let tagHearts = TAG_MAX_HEARTS;
 let tagHitImmunityTimer = 0;
 let tagHitBoostTimer = 0;
 let tagNukeEffectTimer = 0;
+let tagNukeActive = false;
 let countdown = 3;
 let countdownActive = false;
 let camX = 0;
@@ -1042,6 +1044,7 @@ function startTagZone() {
     tagHitImmunityTimer = 0;
     tagHitBoostTimer = 0;
     tagNukeEffectTimer = 0;
+    tagNukeActive = false;
     setupTagLevel();
 
     tagHud.classList.remove('hidden');
@@ -1216,22 +1219,22 @@ function createTagger(type = 'regular') {
             speed: 155 + tagLevel * 22
         },
         brute: {
-            width: 110,
-            height: 110,
-            hitboxOffsetX: 30,
-            hitboxOffsetY: 28,
-            hitboxWidth: 50,
-            hitboxHeight: 60,
+            width: 128,
+            height: 128,
+            hitboxOffsetX: 36,
+            hitboxOffsetY: 32,
+            hitboxWidth: 56,
+            hitboxHeight: 64,
             speed: 88 + tagLevel * 5,
             oneShot: true
         },
         stalker: {
-            width: 72,
-            height: 72,
-            hitboxOffsetX: 18,
-            hitboxOffsetY: 16,
-            hitboxWidth: 36,
-            hitboxHeight: 46,
+            width: 96,
+            height: 96,
+            hitboxOffsetX: 24,
+            hitboxOffsetY: 22,
+            hitboxWidth: 48,
+            hitboxHeight: 58,
             speed: 310 + tagLevel * 6,
             aura: 'blue'
         }
@@ -1326,6 +1329,23 @@ function updateTagZone(delta) {
         return;
     }
 
+    if (tagNukeActive) {
+        tagAnimTime += delta;
+        tagNukeEffectTimer = Math.max(0, tagNukeEffectTimer - delta);
+
+        if (tagNukeEffectTimer <= 0) {
+            tagNukeActive = false;
+            tagLevel += 1;
+            checkTagZoneAchievements();
+            setupTagLevel({ skipCountdown: true, keepInventory: true });
+        }
+
+        camX = clamp(tagPlayer.x + tagPlayer.width / 2 - canvas.width / 2, 0, WORLD_WIDTH - canvas.width);
+        camY = clamp(tagPlayer.y + tagPlayer.height / 2 - canvas.height / 2, 0, WORLD_HEIGHT - canvas.height);
+        updateTagHud();
+        return;
+    }
+
     tagSurvivalTime += delta;
     tagAnimTime += delta;
     tagFreezeTimer = Math.max(0, tagFreezeTimer - delta);
@@ -1333,7 +1353,6 @@ function updateTagZone(delta) {
     tagBoostTimer = Math.max(0, tagBoostTimer - delta);
     tagHitImmunityTimer = Math.max(0, tagHitImmunityTimer - delta);
     tagHitBoostTimer = Math.max(0, tagHitBoostTimer - delta);
-    tagNukeEffectTimer = Math.max(0, tagNukeEffectTimer - delta);
 
     moveTagPlayer(delta);
     updateTagPlayerAnimation(delta);
@@ -1587,15 +1606,16 @@ function useTagItem() {
 }
 
 function triggerTagNuke() {
+    if (tagNukeActive) return;
+
+    tagNukeActive = true;
+    tagNukeEffectTimer = TAG_NUKE_DURATION;
     taggers = [];
-    tagNukeEffectTimer = 1.8;
-    tagLevel += 1;
-    checkTagZoneAchievements();
-    setupTagLevel({ skipCountdown: true, keepInventory: true });
+    gameMessage.textContent = 'NUKE!';
 }
 
 function handleTagZoneSpace() {
-    if (currentGame !== 'tagZone' || !gameRunning || countdownActive) return;
+    if (currentGame !== 'tagZone' || !gameRunning || countdownActive || tagNukeActive) return;
     useTagItem();
 }
 
@@ -1800,24 +1820,44 @@ function drawTagItems() {
 }
 
 function drawTagNukeEffect() {
-    const intensity = tagNukeEffectTimer / 1.8;
+    const progress = 1 - tagNukeEffectTimer / TAG_NUKE_DURATION;
+    const intensity = tagNukeEffectTimer / TAG_NUKE_DURATION;
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    const radius = (1 - intensity) * Math.max(canvas.width, canvas.height) * 0.75 + 40;
+    const maxRadius = Math.max(canvas.width, canvas.height) * 0.85;
+    const radius = 40 + progress * maxRadius;
+
+    ctx.fillStyle = `rgba(20, 0, 0, ${0.35 * intensity})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const flash = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-    flash.addColorStop(0, `rgba(255, 255, 220, ${0.75 * intensity})`);
-    flash.addColorStop(0.35, `rgba(255, 140, 40, ${0.55 * intensity})`);
-    flash.addColorStop(0.7, `rgba(255, 60, 0, ${0.28 * intensity})`);
+    flash.addColorStop(0, `rgba(255, 255, 220, ${0.9 * intensity})`);
+    flash.addColorStop(0.25, `rgba(255, 180, 60, ${0.7 * intensity})`);
+    flash.addColorStop(0.55, `rgba(255, 80, 20, ${0.45 * intensity})`);
+    flash.addColorStop(0.8, `rgba(255, 30, 0, ${0.2 * intensity})`);
     flash.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = flash;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.strokeStyle = `rgba(255, 230, 109, ${0.8 * intensity})`;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius * 0.72, 0, Math.PI * 2);
-    ctx.stroke();
+    for (let ring = 0; ring < 3; ring++) {
+        const ringProgress = Math.max(0, progress - ring * 0.12);
+        const ringRadius = 40 + ringProgress * maxRadius * 0.92;
+        ctx.strokeStyle = `rgba(255, 230, 109, ${(0.85 - ring * 0.2) * intensity})`;
+        ctx.lineWidth = 5 - ring;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, ringRadius * 0.72, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    if (progress > 0.35) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.85 * intensity})`;
+        ctx.font = 'bold 42px Courier New';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('NUKE!', centerX, centerY - 24);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+    }
 }
 
 function drawTagPowerUp(type, radius) {
