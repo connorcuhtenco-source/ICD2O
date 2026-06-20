@@ -101,6 +101,8 @@ const TAG_HIT_BOOST_TIME = 1.5;
 const TAG_HIT_BOOST_MULTIPLIER = 1.35;
 const TAG_NUKE_SPAWN_CHANCE = 0.10;
 const TAG_NUKE_DURATION = 2.4;
+const TAG_PLAYER_SIZE = 64;
+const TAG_REGULAR_ENEMY_SIZE = 72;
 const TAG_MAP_TILE_SIZE = 32;
 const TAG_BARRIER_DEPTH = 96;
 const TAG_MAP_TILE_SOURCES = [
@@ -126,6 +128,9 @@ let tagHitImmunityTimer = 0;
 let tagHitBoostTimer = 0;
 let tagNukeEffectTimer = 0;
 let tagNukeActive = false;
+let tagStopTimeTimer = 0;
+let tagTimeAccelActive = false;
+let tagMatchStopTimeSpawn = false;
 let countdown = 3;
 let countdownActive = false;
 let camX = 0;
@@ -158,6 +163,14 @@ const nukeItemType = {
     color: '#ff6b35',
     glow: 'rgba(255, 107, 53, 0.7)',
     icon: '☢'
+};
+
+const stopTimeItemType = {
+    name: 'Stop Time',
+    className: 'stop-time',
+    color: '#b388ff',
+    glow: 'rgba(179, 136, 255, 0.65)',
+    icon: '⏸'
 };
 
 const tagMapTileImages = TAG_MAP_TILE_SOURCES.map(src => {
@@ -483,6 +496,7 @@ function closeDrawer() {
 
 function showGamesPage() {
     menu.classList.add('hidden');
+    ArcadeMeta.hideMetaPages();
     gamesPage.classList.remove('hidden');
     gameContainer.classList.add('hidden');
     LandingEffects.clearMouseTrail();
@@ -517,6 +531,7 @@ function showMenu() {
     SpaceRunner.stop();
     currentGame = null;
     closeDrawer();
+    ArcadeMeta.hideMetaPages();
     menu.classList.remove('hidden');
     gamesPage.classList.add('hidden');
     gameContainer.classList.add('hidden');
@@ -528,6 +543,7 @@ function showMenu() {
 function showGameScreen(name, message, useCanvas = false, showRestart = false) {
     menu.classList.add('hidden');
     gamesPage.classList.add('hidden');
+    ArcadeMeta.hideMetaPages();
     gameContainer.classList.remove('hidden');
     LandingEffects.clearMouseTrail();
     gameTitle.textContent = name;
@@ -557,6 +573,10 @@ function loop(timestamp) {
 
     const delta = Math.min((timestamp - lastTime) / 1000, 0.033);
     lastTime = timestamp;
+
+    if (currentGame) {
+        ArcadeMeta.tickPlayTime(delta);
+    }
 
     if (currentGame === 'fastEagle') {
         updateFastEagle(delta);
@@ -1026,6 +1046,7 @@ function endFastEagle() {
     gameRunning = false;
     highScore = Math.max(highScore, score);
     checkFastEagleAchievements();
+    ArcadeMeta.onFastEagleEnd(score);
     gameMessage.textContent = `Game Over - Score ${score}`;
     restartBtn.classList.remove('hidden');
     playUiSound('gameOver');
@@ -1045,6 +1066,14 @@ function startTagZone() {
     tagHitBoostTimer = 0;
     tagNukeEffectTimer = 0;
     tagNukeActive = false;
+    tagStopTimeTimer = 0;
+    tagTimeAccelActive = false;
+    tagMatchStopTimeSpawn = false;
+
+    const metaRolls = ArcadeMeta.onTagZoneStart();
+    tagMatchStopTimeSpawn = metaRolls.spawnStopTime;
+    tagTimeAccelActive = metaRolls.activateTimeAccel;
+
     setupTagLevel();
 
     tagHud.classList.remove('hidden');
@@ -1084,8 +1113,8 @@ function setupTagLevel(options = {}) {
     tagPlayer = {
         x: WORLD_WIDTH / 2,
         y: WORLD_HEIGHT / 2,
-        width: 64,
-        height: 64,
+        width: TAG_PLAYER_SIZE,
+        height: TAG_PLAYER_SIZE,
         speed: 275,
         isMoving: false
     };
@@ -1095,6 +1124,15 @@ function setupTagLevel(options = {}) {
 
     if (Math.random() < TAG_NUKE_SPAWN_CHANCE) {
         tagItems.push(createTagItem('nuke'));
+    }
+
+    if (tagMatchStopTimeSpawn) {
+        tagItems.push(createTagItem('stopTime'));
+        tagMatchStopTimeSpawn = false;
+    }
+
+    if (tagTimeAccelActive && tagLevel === 1) {
+        gameMessage.textContent = 'Time Acceleration active!';
     }
 
     spawnTaggersForLevel();
@@ -1210,8 +1248,8 @@ function createTagger(type = 'regular') {
     const minDistanceFromPlayer = 450;
     const configs = {
         regular: {
-            width: 72,
-            height: 72,
+            width: TAG_REGULAR_ENEMY_SIZE,
+            height: TAG_REGULAR_ENEMY_SIZE,
             hitboxOffsetX: 18,
             hitboxOffsetY: 16,
             hitboxWidth: 36,
@@ -1219,22 +1257,22 @@ function createTagger(type = 'regular') {
             speed: 155 + tagLevel * 22
         },
         brute: {
-            width: 208,
-            height: 208,
-            hitboxOffsetX: 58,
-            hitboxOffsetY: 52,
-            hitboxWidth: 92,
-            hitboxHeight: 104,
+            width: Math.round(TAG_PLAYER_SIZE * 4.25),
+            height: Math.round(TAG_PLAYER_SIZE * 4.25),
+            hitboxOffsetX: 78,
+            hitboxOffsetY: 72,
+            hitboxWidth: 116,
+            hitboxHeight: 128,
             speed: 128 + tagLevel * 9,
             oneShot: true
         },
         stalker: {
-            width: 144,
-            height: 144,
-            hitboxOffsetX: 36,
-            hitboxOffsetY: 34,
-            hitboxWidth: 72,
-            hitboxHeight: 86,
+            width: TAG_REGULAR_ENEMY_SIZE * 3,
+            height: TAG_REGULAR_ENEMY_SIZE * 3,
+            hitboxOffsetX: 54,
+            hitboxOffsetY: 50,
+            hitboxWidth: 108,
+            hitboxHeight: 130,
             speed: 310 + tagLevel * 6,
             aura: 'blue'
         }
@@ -1272,7 +1310,9 @@ function createTagger(type = 'regular') {
 function createTagItem(forcedType = null) {
     const type = forcedType === 'nuke'
         ? nukeItemType
-        : itemTypes[Math.floor(Math.random() * itemTypes.length)];
+        : forcedType === 'stopTime'
+            ? stopTimeItemType
+            : itemTypes[Math.floor(Math.random() * itemTypes.length)];
 
     return {
         x: TAG_BARRIER_DEPTH + 80 + Math.random() * (WORLD_WIDTH - TAG_BARRIER_DEPTH * 2 - 160),
@@ -1346,13 +1386,16 @@ function updateTagZone(delta) {
         return;
     }
 
-    tagSurvivalTime += delta;
+    tagSurvivalTime += delta * (tagTimeAccelActive ? 1.65 : 1);
     tagAnimTime += delta;
     tagFreezeTimer = Math.max(0, tagFreezeTimer - delta);
     tagShieldTimer = Math.max(0, tagShieldTimer - delta);
     tagBoostTimer = Math.max(0, tagBoostTimer - delta);
     tagHitImmunityTimer = Math.max(0, tagHitImmunityTimer - delta);
     tagHitBoostTimer = Math.max(0, tagHitBoostTimer - delta);
+    tagStopTimeTimer = Math.max(0, tagStopTimeTimer - delta);
+
+    ArcadeMeta.onTagZoneUpdate(tagSurvivalTime, tagLevel);
 
     moveTagPlayer(delta);
     updateTagPlayerAnimation(delta);
@@ -1363,6 +1406,7 @@ function updateTagZone(delta) {
 
     if (tagSurvivalTime >= TAG_LEVEL_TIME) {
         tagLevel += 1;
+        ArcadeMeta.onTagLevelSurvived();
         checkTagZoneAchievements();
         gameMessage.textContent = `Level ${tagLevel}`;
         setupTagLevel();
@@ -1394,7 +1438,9 @@ function moveTagPlayer(delta) {
         dy /= length;
     }
 
-    const speedMultiplier = (tagBoostTimer > 0 ? 1.65 : 1) * (tagHitBoostTimer > 0 ? TAG_HIT_BOOST_MULTIPLIER : 1);
+    const speedMultiplier = (tagBoostTimer > 0 ? 1.65 : 1)
+        * (tagHitBoostTimer > 0 ? TAG_HIT_BOOST_MULTIPLIER : 1)
+        * (tagTimeAccelActive ? 1.55 : 1);
     const speed = tagPlayer.speed * speedMultiplier;
     const bounds = getTagPlayableBounds();
     const nextX = clamp(tagPlayer.x + dx * speed * delta, bounds.minX, bounds.maxX);
@@ -1421,7 +1467,7 @@ function updateTagPlayerAnimation(delta) {
 }
 
 function moveTaggers(delta) {
-    if (tagFreezeTimer > 0) return;
+    if (tagFreezeTimer > 0 || tagStopTimeTimer > 0) return;
 
     taggers.forEach(tagger => {
         const targetX = tagPlayer.x - tagger.x;
@@ -1592,6 +1638,11 @@ function useTagItem() {
     if (item.name === 'Shield') {
         tagShieldTimer = 6;
         gameMessage.textContent = 'Shield activated';
+    }
+
+    if (item.name === 'Stop Time') {
+        tagStopTimeTimer = 3.5;
+        gameMessage.textContent = 'Time stopped!';
     }
 
     if (item.name === 'Nuke') {
@@ -1861,6 +1912,19 @@ function drawTagNukeEffect() {
 }
 
 function drawTagPowerUp(type, radius) {
+    if (type.className === 'stop-time') {
+        ctx.strokeStyle = '#e8d9ff';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(179, 136, 255, 0.85)';
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 0.72, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(-radius * 0.12, -radius * 0.32, radius * 0.24, radius * 0.64);
+        return;
+    }
+
     if (type.className === 'nuke') {
         ctx.fillStyle = type.color;
         ctx.strokeStyle = '#fff2cc';
@@ -2205,8 +2269,9 @@ document.addEventListener('keydown', event => {
 });
 
 window.ArcadeAchievements = {
-    onSpaceRunnerGameOver(highscore) {
+    onSpaceRunnerGameOver(highscore, runScore) {
         checkSpaceRunnerAchievements(highscore);
+        ArcadeMeta.onSpaceRunnerEnd(runScore || 0);
     }
 };
 
@@ -2439,13 +2504,17 @@ const LandingEffects = (() => {
                 continue;
             }
             const radius = 3 + (1 - point.life) * 8;
-            trailCtx.fillStyle = `rgba(0, 255, 204, ${point.life * 0.35})`;
+            const trailStyle = window.ArcadeMeta?.getTrailStyle(point.life * 0.35) || {
+                fill: `rgba(0, 255, 204, ${point.life * 0.35})`,
+                stroke: `rgba(255, 77, 141, ${point.life * 0.25})`
+            };
+            trailCtx.fillStyle = trailStyle.fill;
             trailCtx.beginPath();
             trailCtx.arc(point.x, point.y, radius, 0, Math.PI * 2);
             trailCtx.fill();
             if (i > 0) {
                 const prev = trail[i - 1];
-                trailCtx.strokeStyle = `rgba(255, 77, 141, ${point.life * 0.25})`;
+                trailCtx.strokeStyle = trailStyle.stroke;
                 trailCtx.lineWidth = 2;
                 trailCtx.beginPath();
                 trailCtx.moveTo(prev.x, prev.y);
@@ -2536,6 +2605,7 @@ const LandingEffects = (() => {
 
 loadSettings();
 loadAchievements();
+ArcadeMeta.init();
 setupHubControls();
 showMenu();
 

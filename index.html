@@ -30,15 +30,25 @@
             <h1 class="landing-title" id="landingTitle" aria-label="Arcade Arena">ARCADE ARENA</h1>
             <p class="subtitle landing-reveal" data-reveal-order="1">Neon classics. One hub. Endless runs.</p>
 
-            <div class="landing-actions">
-                <button id="ourGamesBtn" class="menuBtn menuBtn-primary landing-reveal landing-btn" data-reveal-order="2">Our Games</button>
-                <button id="settingsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="3">Settings</button>
-                <button id="keybindsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="4">Keybinds</button>
+            <div class="hub-token-bar landing-reveal" data-reveal-order="1">
+                <span class="token-label">Arcade Tokens</span>
+                <strong class="token-count">0</strong>
             </div>
 
-            <button id="achievementsBtn" class="menuBtn menuBtn-achievements landing-reveal landing-btn" data-reveal-order="5">Achievements</button>
+            <div id="dailyQuestBoard" class="daily-quest-board landing-reveal" data-reveal-order="2"></div>
+
+            <div class="landing-actions">
+                <button id="ourGamesBtn" class="menuBtn menuBtn-primary landing-reveal landing-btn" data-reveal-order="3">Our Games</button>
+                <button id="inventoryBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="4">Inventory</button>
+                <button id="settingsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="5">Settings</button>
+                <button id="keybindsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="6">Keybinds</button>
+            </div>
+
+            <button id="achievementsBtn" class="menuBtn menuBtn-achievements landing-reveal landing-btn" data-reveal-order="7">Achievements</button>
         </div>
     </div>
+
+    <div id="tokenToastHost" class="token-toast-host"></div>
 
     <div id="achievementsBackdrop" class="modal-backdrop hidden"></div>
     <aside id="achievementsModal" class="achievements-modal hidden" aria-hidden="true">
@@ -50,6 +60,10 @@
     <div id="gamesPage" class="hidden">
         <div class="games-page-card">
             <button id="backToMenuBtn" class="menuBtn back-link">← Back to Hub</button>
+            <div class="hub-token-bar games-token-bar">
+                <span class="token-label">Arcade Tokens</span>
+                <strong class="token-count">0</strong>
+            </div>
             <h2 class="games-page-title">Our Games</h2>
             <p class="games-page-subtitle">Pick your challenge and jump in</p>
 
@@ -81,6 +95,35 @@
                     <button id="playBtn" class="menuBtn play-game-btn">Play</button>
                 </article>
             </div>
+
+            <button id="neonShopBtn" class="menuBtn menuBtn-shop">Neon Shop</button>
+        </div>
+    </div>
+
+    <div id="shopPage" class="hidden">
+        <div class="meta-page-card">
+            <button id="backFromShopBtn" class="menuBtn back-link">← Back to Our Games</button>
+            <div class="hub-token-bar games-token-bar">
+                <span class="token-label">Arcade Tokens</span>
+                <strong class="token-count">0</strong>
+            </div>
+            <h2 class="meta-page-title">Neon Shop</h2>
+            <p class="meta-page-subtitle">Spend Arcade Tokens on trails, themes, and power-up upgrades</p>
+            <button id="shopInventoryLink" class="menuBtn menuBtn-accent shop-inventory-link">Open Inventory</button>
+            <div id="shopList" class="shop-list"></div>
+        </div>
+    </div>
+
+    <div id="inventoryPage" class="hidden">
+        <div class="meta-page-card">
+            <button id="backFromInventoryBtn" class="menuBtn back-link">← Back to Hub</button>
+            <div class="hub-token-bar games-token-bar">
+                <span class="token-label">Arcade Tokens</span>
+                <strong class="token-count">0</strong>
+            </div>
+            <h2 class="meta-page-title">Inventory</h2>
+            <p class="meta-page-subtitle">View and equip your neon cosmetics and upgrades</p>
+            <div id="inventoryList" class="inventory-list"></div>
         </div>
     </div>
 
@@ -212,6 +255,7 @@
         }, 4500);
     </script>
     <script src="1prompt.js"></script>
+    <script src="arcade-meta.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

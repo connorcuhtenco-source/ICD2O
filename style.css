@@ -30,6 +30,222 @@ body {
     50% { background-position: 100% 50%; }
 }
 
+body.theme-sunset {
+    background: linear-gradient(135deg, #2a0800 0%, #6b1a00 25%, #ff6b35 55%, #ff4d8d 80%, #2a0800 100%);
+}
+
+body.theme-ocean {
+    background: linear-gradient(135deg, #001833 0%, #003d5c 30%, #0077b6 55%, #00b4d8 75%, #001833 100%);
+}
+
+body.theme-void {
+    background: linear-gradient(135deg, #0a0014 0%, #1a0033 35%, #3d0066 60%, #12001f 100%);
+}
+
+.hub-token-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0 16px;
+    padding: 8px 16px;
+    border: 1px solid rgba(255, 230, 109, 0.45);
+    border-radius: 999px;
+    background: rgba(2, 8, 18, 0.72);
+}
+
+.token-label {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #9aa6b8;
+}
+
+.token-count {
+    color: #ffe66d;
+    font-size: 18px;
+}
+
+.daily-quest-board {
+    display: grid;
+    gap: 10px;
+    width: min(92vw, 420px);
+    margin: 0 auto 18px;
+    text-align: left;
+}
+
+.daily-quest-card {
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 255, 204, 0.35);
+    background: rgba(2, 8, 18, 0.78);
+}
+
+.daily-quest-card.completed {
+    border-color: rgba(255, 230, 109, 0.5);
+    opacity: 0.85;
+}
+
+.daily-quest-text {
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: #eef8ff;
+}
+
+.daily-quest-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.daily-quest-bar span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #00ffcc, #ffe66d);
+    border-radius: 999px;
+}
+
+.daily-quest-reward {
+    margin: 0;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #9aa6b8;
+}
+
+.menuBtn-shop {
+    width: min(90vw, 420px);
+    margin-top: 24px;
+    border-color: #ff6b9d;
+    background: rgba(255, 107, 157, 0.1);
+}
+
+.meta-page-card {
+    width: min(96vw, 900px);
+    margin: 0 auto;
+    padding: 28px 24px 40px;
+    text-align: center;
+}
+
+.meta-page-title {
+    margin: 8px 0 6px;
+    font-size: 1.4rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #ffe66d;
+}
+
+.meta-page-subtitle {
+    margin: 0 0 20px;
+    color: #b7c7e8;
+    font-size: 14px;
+}
+
+.shop-inventory-link {
+    width: auto;
+    min-width: 200px;
+    margin-bottom: 20px;
+    font-size: 12px;
+}
+
+.shop-list,
+.inventory-list {
+    display: grid;
+    gap: 14px;
+    text-align: left;
+}
+
+.shop-item,
+.inventory-item {
+    padding: 16px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(2, 8, 18, 0.78);
+}
+
+.shop-item.owned,
+.inventory-item.equipped {
+    border-color: rgba(0, 255, 204, 0.35);
+}
+
+.shop-item h4,
+.inventory-item h4 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #95ffe0;
+}
+
+.shop-item p,
+.inventory-item p {
+    margin: 0 0 10px;
+    color: #cbd6ef;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.shop-buy-btn,
+.shop-equip-btn,
+.shop-unequip-btn {
+    width: auto;
+    min-width: 160px;
+    font-size: 11px;
+    padding: 8px 14px;
+}
+
+.shop-tag {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #ffe66d;
+}
+
+.shop-tag.equipped {
+    color: #00ffcc;
+}
+
+.empty-inventory {
+    color: #9aa6b8;
+    font-size: 14px;
+}
+
+.token-toast-host {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 10002;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.token-toast {
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 230, 109, 0.5);
+    background: rgba(8, 16, 36, 0.95);
+    color: #ffe66d;
+    font-size: 13px;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.token-toast.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.inventory-slot.stop-time {
+    border-color: #b388ff;
+    background: linear-gradient(160deg, rgba(179, 136, 255, 0.35), rgba(2, 8, 18, 0.9));
+    box-shadow: 0 0 14px rgba(179, 136, 255, 0.35);
+}
+
 .landing-bg {
     position: fixed;
     inset: 0;

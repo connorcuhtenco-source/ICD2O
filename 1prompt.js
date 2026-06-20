@@ -57,6 +57,9 @@ const SpaceRunner = (() => {
     let immunityEnd;
     let lastSpeedIncrease;
     let gameStartTime;
+    let shieldPickups;
+    let lastShieldSpawnCheck;
+    let neonShieldHits;
 
     function resetGame() {
         player = {
@@ -82,6 +85,9 @@ const SpaceRunner = (() => {
         immunityEnd = 0;
         lastSpeedIncrease = 0;
         gameStartTime = Date.now();
+        shieldPickups = [];
+        lastShieldSpawnCheck = Date.now();
+        neonShieldHits = 0;
         scoreDisplay.textContent = 'Score: 0';
         scoreDisplay.classList.remove('hidden');
     }
@@ -107,8 +113,8 @@ const SpaceRunner = (() => {
         ctx.save();
         const x = player.x;
         const y = player.y;
-        const shadowBlur = player.immune ? 24 : 0;
-        const shadowColor = player.immune ? '#0ff' : '#000';
+        const shadowBlur = player.immune ? 24 : neonShieldHits > 0 ? 28 : 0;
+        const shadowColor = player.immune ? '#0ff' : neonShieldHits > 0 ? '#00ffff' : '#000';
         ctx.shadowColor = shadowColor;
         ctx.shadowBlur = shadowBlur;
         const spriteSize = PLAYER_SPRITE_SIZE;
@@ -123,6 +129,16 @@ const SpaceRunner = (() => {
         }
 
         ctx.restore();
+
+        if (neonShieldHits > 0) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.85)';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(x, y, PLAYER_RADIUS + 14, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
     }
 
     function drawSingleObstacle(obs) {
@@ -191,6 +207,10 @@ const SpaceRunner = (() => {
             }
         }
 
+        if (neonShieldHits > 0) {
+            text += ` | Shield: ${neonShieldHits}`;
+        }
+
         scoreDisplay.textContent = text;
     }
 
@@ -199,6 +219,7 @@ const SpaceRunner = (() => {
 
         if (player.rolling) {
             drawStars();
+            drawShieldPickups();
             for (const obs of obstacles) {
                 if (obs.y < player.y) drawSingleObstacle(obs);
             }
@@ -209,6 +230,7 @@ const SpaceRunner = (() => {
         } else {
             drawObstacles();
             drawStars();
+            drawShieldPickups();
             drawPlayer();
         }
 
@@ -302,6 +324,37 @@ const SpaceRunner = (() => {
         }
     }
 
+    function spawnShieldPickup() {
+        shieldPickups.push({
+            lane: Math.floor(Math.random() * LANES),
+            y: -STAR_RADIUS
+        });
+    }
+
+    function updateShieldPickups(dt) {
+        for (const pickup of shieldPickups) {
+            pickup.y += speed * dt;
+        }
+        shieldPickups = shieldPickups.filter(pickup => pickup.y < GAME_HEIGHT + STAR_RADIUS);
+    }
+
+    function drawShieldPickups() {
+        for (const pickup of shieldPickups) {
+            const x = pickup.lane * LANE_WIDTH + LANE_WIDTH / 2;
+            ctx.save();
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 22;
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(x, pickup.y, STAR_RADIUS * 0.9, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.22)';
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
     function spawnStar() {
         const lane = Math.floor(Math.random() * LANES);
         stars.push({
@@ -311,16 +364,34 @@ const SpaceRunner = (() => {
     }
 
     function checkCollisions() {
-        for (const obs of obstacles) {
-            if (obs.lane === player.lane) {
-                const dist = Math.abs(obs.y - player.y);
-                if (dist < PLAYER_RADIUS + OBSTACLE_HIT_RADIUS) {
-                    if (player.jumping || player.rolling) continue;
-                    if (player.immune) continue;
-                    endGame();
-                    return;
-                }
+        for (let i = 0; i < shieldPickups.length; i++) {
+            const pickup = shieldPickups[i];
+            if (pickup.lane === player.lane && Math.abs(pickup.y - player.y) < PLAYER_RADIUS + STAR_RADIUS) {
+                neonShieldHits = 10;
+                shieldPickups.splice(i, 1);
+                window.ArcadeSettings?.playSound('collect');
+                break;
             }
+        }
+
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            const obs = obstacles[i];
+            if (obs.lane !== player.lane) continue;
+
+            const dist = Math.abs(obs.y - player.y);
+            if (dist >= PLAYER_RADIUS + OBSTACLE_HIT_RADIUS) continue;
+            if (player.jumping || player.rolling) continue;
+
+            if (neonShieldHits > 0) {
+                neonShieldHits -= 1;
+                obstacles.splice(i, 1);
+                window.ArcadeSettings?.playSound('enemyHit');
+                continue;
+            }
+
+            if (player.immune) continue;
+            endGame();
+            return;
         }
 
         for (let i = 0; i < stars.length; i++) {
@@ -352,7 +423,7 @@ const SpaceRunner = (() => {
         finalHighscore.textContent = 'Highscore: ' + (highscore || 0);
 
         if (window.ArcadeAchievements?.onSpaceRunnerGameOver) {
-            window.ArcadeAchievements.onSpaceRunnerGameOver(highscore || 0);
+            window.ArcadeAchievements.onSpaceRunnerGameOver(highscore || 0, Math.floor(score));
         }
 
         startScreen.classList.add('hidden');
@@ -365,11 +436,23 @@ const SpaceRunner = (() => {
 
         const now = Date.now();
         const dt = (now - (gameLoop.lastTime || now)) / 16.67;
+        const dtSeconds = (now - (gameLoop.lastTime || now)) / 1000;
         gameLoop.lastTime = now;
         score = now - gameStartTime;
+
+        window.ArcadeMeta?.tickPlayTime?.(Math.min(dtSeconds, 0.05));
+
         updatePlayer();
         updateObstacles(dt);
         updateStars(dt);
+        updateShieldPickups(dt);
+
+        if (window.ArcadeMeta?.hasEquippedUpgrade?.('space-shield') && now - lastShieldSpawnCheck >= 20000) {
+            lastShieldSpawnCheck = now;
+            if (Math.random() < 0.2) {
+                spawnShieldPickup();
+            }
+        }
 
         if (now - lastObstacleTime > 900 - Math.min(600, speed * 40)) {
             spawnObstacle();
