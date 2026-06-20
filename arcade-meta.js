@@ -26,6 +26,10 @@ const ArcadeMeta = (() => {
         { id: 'theme-void', category: 'theme', name: 'Void Purple', price: 150, desc: 'Dark cosmic purple background.', preview: 'preview-theme-void' }
     ];
 
+    const PROMO_CODES = {
+        'FREECOINS!': 300
+    };
+
     const DAILY_QUEST_POOL = [
         { id: 'tag-survive-120', text: 'Survive 2 minutes in Tag Zone', goal: 120, reward: 30, track: 'tagSurvivalRun' },
         { id: 'fast-eagle-50', text: 'Score 50 in Fast Eagle', goal: 50, reward: 25, track: 'fastEagleScore' },
@@ -54,7 +58,8 @@ const ArcadeMeta = (() => {
             },
             daily: { date: '', quests: [] },
             playTimeAccumulator: 0,
-            tagMatchCount: 0
+            tagMatchCount: 0,
+            redeemedPromoCodes: []
         };
     }
 
@@ -63,6 +68,7 @@ const ArcadeMeta = (() => {
             const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
             state = { ...defaultState(), ...saved };
             state.equipped = { ...defaultState().equipped, ...saved?.equipped };
+            state.redeemedPromoCodes = Array.isArray(saved?.redeemedPromoCodes) ? saved.redeemedPromoCodes : [];
             ensureDailyQuests();
         } catch {
             state = defaultState();
@@ -450,6 +456,49 @@ const ArcadeMeta = (() => {
         if (runScore >= 50000) addTokens(20, 'Big Space Runner score');
     }
 
+    function setPromoMessage(message, type = '') {
+        const el = document.getElementById('promoCodeMessage');
+        if (!el) return;
+        el.textContent = message;
+        el.className = `shop-promo-message ${type}`.trim();
+    }
+
+    function normalizePromoCode(code) {
+        return code.trim().toUpperCase();
+    }
+
+    function redeemPromoCode() {
+        const input = document.getElementById('promoCodeInput');
+        if (!input) return;
+
+        const raw = input.value.trim();
+        if (!raw) {
+            setPromoMessage('Enter a promo code first.', 'error');
+            return;
+        }
+
+        const code = normalizePromoCode(raw);
+        const reward = PROMO_CODES[code];
+
+        if (!reward) {
+            setPromoMessage('Invalid promo code.', 'error');
+            window.ArcadeSettings?.playSound('hit');
+            return;
+        }
+
+        if (state.redeemedPromoCodes.includes(code)) {
+            setPromoMessage('You already redeemed this code.', 'error');
+            return;
+        }
+
+        state.redeemedPromoCodes.push(code);
+        save();
+        addTokens(reward, `Promo code ${code}`);
+        input.value = '';
+        setPromoMessage(`Redeemed! +${reward} Arcade Tokens added.`, 'success');
+        window.ArcadeSettings?.playSound('collect');
+    }
+
     function hasEquippedUpgrade(id) {
         if (id === 'tag-stop-time') return state.equipped.tagStopTime;
         if (id === 'tag-time-accel') return state.equipped.tagTimeAccel;
@@ -476,6 +525,14 @@ const ArcadeMeta = (() => {
             hideMetaPages();
             document.getElementById('menu')?.classList.remove('hidden');
             window.ArcadeSettings?.playSound('click');
+        });
+
+        document.getElementById('redeemPromoBtn')?.addEventListener('click', redeemPromoCode);
+        document.getElementById('promoCodeInput')?.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                redeemPromoCode();
+            }
         });
     }
 

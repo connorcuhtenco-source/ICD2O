@@ -373,6 +373,65 @@ body.theme-void {
     text-align: center;
 }
 
+.shop-promo-section {
+    margin-top: 36px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.shop-promo-box {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: stretch;
+    margin-bottom: 10px;
+}
+
+.shop-promo-input {
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(2, 8, 18, 0.92);
+    color: #eef8ff;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+}
+
+.shop-promo-input:focus {
+    outline: none;
+    border-color: rgba(0, 255, 204, 0.45);
+    box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.12);
+}
+
+.shop-promo-box .shop-price-btn {
+    flex: 0 0 140px;
+}
+
+.shop-promo-message {
+    min-height: 18px;
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: #9aa6b8;
+}
+
+.shop-promo-message.success {
+    color: #00ffcc;
+}
+
+.shop-promo-message.error {
+    color: #ff9bd2;
+}
+
+.shop-promo-hint {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: #ffe66d;
+}
+
 .menuBtn-shop {
     border-color: #ff6b9d;
     background: rgba(255, 107, 157, 0.1);
