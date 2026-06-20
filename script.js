@@ -97,8 +97,8 @@ const TAG_LEVEL_TIME = 25;
 const TAG_MAX_INVENTORY = 3;
 const TAG_MAX_HEARTS = 3;
 const TAG_HIT_IMMUNITY_TIME = 3;
-const TAG_HIT_BOOST_TIME = 1.5;
-const TAG_HIT_BOOST_MULTIPLIER = 1.35;
+const TAG_HIT_BOOST_TIME = 4;
+const TAG_HIT_BOOST_MULTIPLIER = 2.15;
 const TAG_NUKE_SPAWN_CHANCE = 0.10;
 const TAG_NUKE_DURATION = 2.4;
 const TAG_PLAYER_SIZE = 64;
@@ -130,7 +130,6 @@ let tagNukeEffectTimer = 0;
 let tagNukeActive = false;
 let tagStopTimeTimer = 0;
 let tagTimeAccelActive = false;
-let tagMatchStopTimeSpawn = false;
 let countdown = 3;
 let countdownActive = false;
 let camX = 0;
@@ -1069,10 +1068,8 @@ function startTagZone() {
     tagNukeActive = false;
     tagStopTimeTimer = 0;
     tagTimeAccelActive = false;
-    tagMatchStopTimeSpawn = false;
 
     const metaRolls = ArcadeMeta.onTagZoneStart();
-    tagMatchStopTimeSpawn = metaRolls.spawnStopTime;
     tagTimeAccelActive = metaRolls.activateTimeAccel;
 
     setupTagLevel();
@@ -1127,9 +1124,8 @@ function setupTagLevel(options = {}) {
         tagItems.push(createTagItem('nuke'));
     }
 
-    if (tagMatchStopTimeSpawn) {
+    if (ArcadeMeta.rollStopTimeSpawn?.()) {
         tagItems.push(createTagItem('stopTime'));
-        tagMatchStopTimeSpawn = false;
     }
 
     if (tagTimeAccelActive && tagLevel === 1) {

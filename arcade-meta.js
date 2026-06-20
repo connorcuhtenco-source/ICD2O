@@ -74,7 +74,14 @@ const ArcadeMeta = (() => {
             state = defaultState();
             ensureDailyQuests();
         }
+        syncOwnedUpgrades();
         applyTheme();
+    }
+
+    function syncOwnedUpgrades() {
+        if (isOwned('tag-stop-time')) state.equipped.tagStopTime = true;
+        if (isOwned('tag-time-accel')) state.equipped.tagTimeAccel = true;
+        if (isOwned('space-shield')) state.equipped.spaceShield = true;
     }
 
     function save() {
@@ -287,6 +294,11 @@ const ArcadeMeta = (() => {
         if (state.tokens < item.price) return false;
         state.tokens -= item.price;
         state.owned.push(id);
+        if (item.category === 'upgrade') {
+            if (id === 'tag-stop-time') state.equipped.tagStopTime = true;
+            else if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
+            else if (id === 'space-shield') state.equipped.spaceShield = true;
+        }
         save();
         renderShop();
         renderInventory();
@@ -416,9 +428,12 @@ const ArcadeMeta = (() => {
         state.tagMatchCount += 1;
         save();
         return {
-            spawnStopTime: state.equipped.tagStopTime && Math.random() < 0.25,
-            activateTimeAccel: state.equipped.tagTimeAccel && state.tagMatchCount % 2 === 0 && Math.random() < 0.15
+            activateTimeAccel: state.equipped.tagTimeAccel && Math.random() < 0.75
         };
+    }
+
+    function rollStopTimeSpawn() {
+        return state.equipped.tagStopTime && Math.random() < 0.85;
     }
 
     function onTagZoneUpdate(survivalTime, level) {
@@ -548,6 +563,7 @@ const ArcadeMeta = (() => {
         playGlitchTransition,
         tickPlayTime,
         onTagZoneStart,
+        rollStopTimeSpawn,
         onTagZoneUpdate,
         onTagLevelSurvived,
         onFastEagleEnd,
