@@ -4,26 +4,26 @@ const ArcadeMeta = (() => {
     const PLAY_REWARD_TOKENS = 25;
 
     const TRAIL_STYLES = {
-        'trail-cyan': { fill: 'rgba(0, 255, 204, {a})', stroke: 'rgba(255, 77, 141, {a})' },
-        'trail-pink': { fill: 'rgba(255, 77, 141, {a})', stroke: 'rgba(255, 230, 109, {a})' },
-        'trail-gold': { fill: 'rgba(255, 230, 109, {a})', stroke: 'rgba(255, 140, 40, {a})' },
-        'trail-purple': { fill: 'rgba(180, 100, 255, {a})', stroke: 'rgba(0, 255, 204, {a})' },
-        'trail-green': { fill: 'rgba(100, 255, 120, {a})', stroke: 'rgba(74, 210, 255, {a})' }
+        'trail-cyan': { fill: 'rgba(0, 255, 204, {a})', stroke: 'rgba(255, 77, 141, {a})', preview: 'preview-trail-cyan' },
+        'trail-pink': { fill: 'rgba(255, 77, 141, {a})', stroke: 'rgba(255, 230, 109, {a})', preview: 'preview-trail-pink' },
+        'trail-gold': { fill: 'rgba(255, 230, 109, {a})', stroke: 'rgba(255, 140, 40, {a})', preview: 'preview-trail-gold' },
+        'trail-purple': { fill: 'rgba(180, 100, 255, {a})', stroke: 'rgba(0, 255, 204, {a})', preview: 'preview-trail-purple' },
+        'trail-green': { fill: 'rgba(100, 255, 120, {a})', stroke: 'rgba(74, 210, 255, {a})', preview: 'preview-trail-green' }
     };
 
     const SHOP_ITEMS = [
-        { id: 'trail-cyan', category: 'trail', name: 'Neon Cyan Trail', price: 0, desc: 'Classic hub trail (included free).' },
-        { id: 'trail-pink', category: 'trail', name: 'Hot Pink Trail', price: 75, desc: 'Magenta neon with gold sparks.' },
-        { id: 'trail-gold', category: 'trail', name: 'Gold Rush Trail', price: 100, desc: 'Golden streaks across the hub.' },
-        { id: 'trail-purple', category: 'trail', name: 'Violet Pulse Trail', price: 100, desc: 'Purple glow with cyan accents.' },
-        { id: 'trail-green', category: 'trail', name: 'Toxic Green Trail', price: 90, desc: 'Radioactive green neon trail.' },
-        { id: 'theme-default', category: 'theme', name: 'Aurora Default', price: 0, desc: 'The classic Arcade Arena look.' },
-        { id: 'theme-sunset', category: 'theme', name: 'Neon Sunset', price: 120, desc: 'Warm orange and magenta skies.' },
-        { id: 'theme-ocean', category: 'theme', name: 'Deep Ocean', price: 120, desc: 'Cool blue underwater neon vibes.' },
-        { id: 'theme-void', category: 'theme', name: 'Void Purple', price: 150, desc: 'Dark purple cosmic background.' },
-        { id: 'tag-stop-time', category: 'upgrade', name: 'Stop Time', price: 200, desc: 'Tag Zone: 25% chance to spawn. Freezes enemies and the timer briefly.' },
-        { id: 'tag-time-accel', category: 'upgrade', name: 'Time Acceleration', price: 250, desc: 'Tag Zone: 15% chance every 2 matches. You move faster and the level timer ticks down faster until the wave ends.' },
-        { id: 'space-shield', category: 'upgrade', name: 'Neon Shield', price: 300, desc: 'Space Runner: 20% chance every 20s for a shield pickup. Smash through 10 asteroids.' }
+        { id: 'tag-stop-time', category: 'upgrade', name: 'Stop Time', price: 200, desc: 'Freezes enemies and the timer for a few seconds.', preview: 'preview-stop-time', icon: '⏸' },
+        { id: 'tag-time-accel', category: 'upgrade', name: 'Time Acceleration', price: 250, desc: 'Move faster while the level timer speeds up until the wave ends.', preview: 'preview-time-accel', icon: '⏩' },
+        { id: 'space-shield', category: 'upgrade', name: 'Neon Shield', price: 300, desc: 'Smash through 10 asteroids with a neon barrier.', preview: 'preview-space-shield', icon: '🛡' },
+        { id: 'trail-cyan', category: 'trail', name: 'Neon Cyan Trail', price: 0, desc: 'Classic cyan and pink neon mouse trail.', preview: 'preview-trail-cyan' },
+        { id: 'trail-pink', category: 'trail', name: 'Hot Pink Trail', price: 75, desc: 'Magenta streaks with gold sparks.', preview: 'preview-trail-pink' },
+        { id: 'trail-gold', category: 'trail', name: 'Gold Rush Trail', price: 100, desc: 'Golden arcade streaks behind your cursor.', preview: 'preview-trail-gold' },
+        { id: 'trail-purple', category: 'trail', name: 'Violet Pulse Trail', price: 100, desc: 'Purple glow with cyan accents.', preview: 'preview-trail-purple' },
+        { id: 'trail-green', category: 'trail', name: 'Toxic Green Trail', price: 90, desc: 'Radioactive green neon trail.', preview: 'preview-trail-green' },
+        { id: 'theme-default', category: 'theme', name: 'Aurora Default', price: 0, desc: 'The classic Arcade Arena aurora look.', preview: 'preview-theme-default' },
+        { id: 'theme-sunset', category: 'theme', name: 'Neon Sunset', price: 120, desc: 'Warm orange and magenta skies.', preview: 'preview-theme-sunset' },
+        { id: 'theme-ocean', category: 'theme', name: 'Deep Ocean', price: 120, desc: 'Cool blue underwater neon vibes.', preview: 'preview-theme-ocean' },
+        { id: 'theme-void', category: 'theme', name: 'Void Purple', price: 150, desc: 'Dark cosmic purple background.', preview: 'preview-theme-void' }
     ];
 
     const DAILY_QUEST_POOL = [
@@ -35,9 +35,7 @@ const ArcadeMeta = (() => {
     ];
 
     let state = null;
-    let playSessionSeconds = 0;
-    let tagRunSurvival = 0;
-    let tagRunLevel = 1;
+    let glitchPlaying = false;
 
     function todayKey() {
         return new Date().toISOString().slice(0, 10);
@@ -157,6 +155,126 @@ const ArcadeMeta = (() => {
         return false;
     }
 
+    function getItemsByCategory(category) {
+        return SHOP_ITEMS.filter(item => item.category === category);
+    }
+
+    function renderPreview(item) {
+        if (item.icon) {
+            return `<span class="shop-preview-icon">${item.icon}</span>`;
+        }
+        return `<div class="shop-preview-art ${item.preview}"></div>`;
+    }
+
+    function renderShopAction(item) {
+        const owned = isOwned(item.id);
+        const equipped = isEquipped(item.id);
+
+        if (owned && (item.category === 'trail' || item.category === 'theme')) {
+            return equipped
+                ? '<button class="shop-price-btn equipped" disabled>EQUIPPED</button>'
+                : `<button class="shop-price-btn equip" data-equip="${item.id}">EQUIP</button>`;
+        }
+
+        if (owned && item.category === 'upgrade') {
+            return equipped
+                ? '<button class="shop-price-btn equipped" disabled>ENABLED</button>'
+                : `<button class="shop-price-btn equip" data-equip="${item.id}">ENABLE</button>`;
+        }
+
+        if (owned || item.price === 0) {
+            return '<button class="shop-price-btn owned" disabled>OWNED</button>';
+        }
+
+        const canBuy = state.tokens >= item.price;
+        return `<button class="shop-price-btn buy" data-buy="${item.id}" ${canBuy ? '' : 'disabled'}><span class="shop-coin">🪙</span>${item.price}</button>`;
+    }
+
+    function renderInventoryAction(item) {
+        const equipped = isEquipped(item.id);
+
+        if (item.category === 'trail' || item.category === 'theme') {
+            return equipped
+                ? '<button class="shop-price-btn equipped" disabled>EQUIPPED</button>'
+                : `<button class="shop-price-btn equip" data-equip="${item.id}">EQUIP</button>`;
+        }
+
+        return equipped
+            ? `<button class="shop-price-btn unequip" data-unequip="${item.id}">DISABLE</button>`
+            : `<button class="shop-price-btn equip" data-equip="${item.id}">ENABLE</button>`;
+    }
+
+    function renderShopCard(item) {
+        return `
+            <article class="shop-card ${isOwned(item.id) ? 'owned' : ''} ${isEquipped(item.id) ? 'equipped' : ''}">
+                <h4 class="shop-card-name">${item.name.toUpperCase()}</h4>
+                <div class="shop-card-preview">${renderPreview(item)}</div>
+                <p class="shop-card-desc">${item.desc}</p>
+                ${renderShopAction(item)}
+            </article>
+        `;
+    }
+
+    function renderInventoryCard(item) {
+        return `
+            <article class="shop-card owned ${isEquipped(item.id) ? 'equipped' : ''}">
+                <h4 class="shop-card-name">${item.name.toUpperCase()}</h4>
+                <div class="shop-card-preview">${renderPreview(item)}</div>
+                <p class="shop-card-desc">${item.desc}</p>
+                ${renderInventoryAction(item)}
+            </article>
+        `;
+    }
+
+    function bindShopActions(container) {
+        container.querySelectorAll('[data-buy]').forEach(btn => {
+            btn.addEventListener('click', () => buyItem(btn.dataset.buy));
+        });
+        container.querySelectorAll('[data-equip]').forEach(btn => {
+            btn.addEventListener('click', () => equipItem(btn.dataset.equip));
+        });
+        container.querySelectorAll('[data-unequip]').forEach(btn => {
+            btn.addEventListener('click', () => unequipUpgrade(btn.dataset.unequip));
+        });
+    }
+
+    function renderShopSection(containerId, category) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const items = getItemsByCategory(category);
+        container.innerHTML = items.map(renderShopCard).join('');
+        bindShopActions(container);
+    }
+
+    function renderInventorySection(containerId, category) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const items = getItemsByCategory(category).filter(item => isOwned(item.id) && item.price > 0);
+
+        if (!items.length) {
+            container.innerHTML = '<p class="shop-empty-section">Nothing has been bought yet</p>';
+            return;
+        }
+
+        container.innerHTML = items.map(renderInventoryCard).join('');
+        bindShopActions(container);
+    }
+
+    function renderShop() {
+        renderShopSection('shopPowerUps', 'upgrade');
+        renderShopSection('shopTrails', 'trail');
+        renderShopSection('shopBackgrounds', 'theme');
+        updateTokenDisplays();
+    }
+
+    function renderInventory() {
+        renderInventorySection('inventoryPowerUps', 'upgrade');
+        renderInventorySection('inventoryTrails', 'trail');
+        renderInventorySection('inventoryBackgrounds', 'theme');
+    }
+
     function buyItem(id) {
         const item = SHOP_ITEMS.find(i => i.id === id);
         if (!item || isOwned(id)) return false;
@@ -164,7 +282,6 @@ const ArcadeMeta = (() => {
         state.tokens -= item.price;
         state.owned.push(id);
         save();
-        updateTokenDisplays();
         renderShop();
         renderInventory();
         window.ArcadeSettings?.playSound('collect');
@@ -197,19 +314,58 @@ const ArcadeMeta = (() => {
         if (id === 'space-shield') state.equipped.spaceShield = false;
         save();
         renderInventory();
+        renderShop();
     }
 
-    function tickPlayTime(deltaSeconds) {
-        playSessionSeconds += deltaSeconds;
-        state.playTimeAccumulator += deltaSeconds;
+    function hideAllHubPages() {
+        document.getElementById('menu')?.classList.add('hidden');
+        document.getElementById('gamesPage')?.classList.add('hidden');
+        document.getElementById('shopPage')?.classList.add('hidden');
+        document.getElementById('inventoryPage')?.classList.add('hidden');
+    }
 
-        while (state.playTimeAccumulator >= PLAY_REWARD_SECONDS) {
-            state.playTimeAccumulator -= PLAY_REWARD_SECONDS;
-            addTokens(PLAY_REWARD_TOKENS, '5 minutes played');
+    function showShopPage() {
+        hideAllHubPages();
+        document.getElementById('shopPage')?.classList.remove('hidden');
+        renderShop();
+    }
+
+    function showInventoryPage() {
+        hideAllHubPages();
+        document.getElementById('inventoryPage')?.classList.remove('hidden');
+        renderInventory();
+    }
+
+    function hideMetaPages() {
+        document.getElementById('shopPage')?.classList.add('hidden');
+        document.getElementById('inventoryPage')?.classList.add('hidden');
+    }
+
+    function playGlitchTransition(onMidpoint) {
+        if (glitchPlaying) return;
+        glitchPlaying = true;
+
+        const overlay = document.getElementById('glitchTransition');
+        if (!overlay) {
+            onMidpoint();
+            glitchPlaying = false;
+            return;
         }
 
-        updateDailyProgress('playTime', deltaSeconds);
-        save();
+        overlay.classList.remove('hidden');
+        overlay.classList.add('active');
+        window.ArcadeSettings?.playSound('powerOn');
+
+        window.setTimeout(() => {
+            onMidpoint();
+            window.setTimeout(() => {
+                overlay.classList.remove('active');
+                window.setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    glitchPlaying = false;
+                }, 350);
+            }, 180);
+        }, 620);
     }
 
     function updateDailyProgress(track, value) {
@@ -235,16 +391,23 @@ const ArcadeMeta = (() => {
             }
         });
 
-        if (changed) {
-            save();
-            renderDailyBoard();
+        if (changed) save();
+    }
+
+    function tickPlayTime(deltaSeconds) {
+        state.playTimeAccumulator += deltaSeconds;
+
+        while (state.playTimeAccumulator >= PLAY_REWARD_SECONDS) {
+            state.playTimeAccumulator -= PLAY_REWARD_SECONDS;
+            addTokens(PLAY_REWARD_TOKENS, '5 minutes played');
         }
+
+        updateDailyProgress('playTime', deltaSeconds);
+        save();
     }
 
     function onTagZoneStart() {
         state.tagMatchCount += 1;
-        tagRunSurvival = 0;
-        tagRunLevel = 1;
         save();
         return {
             spawnStopTime: state.equipped.tagStopTime && Math.random() < 0.25,
@@ -268,10 +431,7 @@ const ArcadeMeta = (() => {
                 addTokens(def.reward, `Daily: ${def.text}`);
             }
         });
-        if (changed) {
-            save();
-            renderDailyBoard();
-        }
+        if (changed) save();
     }
 
     function onTagLevelSurvived() {
@@ -297,164 +457,38 @@ const ArcadeMeta = (() => {
         return false;
     }
 
-    function renderDailyBoard() {
-        const board = document.getElementById('dailyQuestBoard');
-        if (!board) return;
-        ensureDailyQuests();
-
-        board.innerHTML = state.daily.quests.map(quest => {
-            const def = getQuestDef(quest.id);
-            if (!def) return '';
-            const pct = Math.min(100, Math.round((quest.progress / def.goal) * 100));
-            return `
-                <article class="daily-quest-card ${quest.completed ? 'completed' : ''}">
-                    <p class="daily-quest-text">${def.text}</p>
-                    <div class="daily-quest-bar"><span style="width:${pct}%"></span></div>
-                    <p class="daily-quest-reward">${quest.completed ? 'Complete!' : `Reward: ${def.reward} tokens`}</p>
-                </article>
-            `;
-        }).join('');
-    }
-
-    function renderShop() {
-        const list = document.getElementById('shopList');
-        if (!list) return;
-
-        list.innerHTML = SHOP_ITEMS.map(item => {
-            const owned = isOwned(item.id);
-            const equipped = isEquipped(item.id);
-            const canBuy = !owned && state.tokens >= item.price;
-
-            let action = '';
-            if (owned && (item.category === 'trail' || item.category === 'theme')) {
-                action = equipped
-                    ? '<span class="shop-tag equipped">Equipped</span>'
-                    : `<button class="menuBtn shop-equip-btn" data-equip="${item.id}">Equip</button>`;
-            } else if (owned && item.category === 'upgrade') {
-                action = equipped
-                    ? '<span class="shop-tag equipped">Active in Inventory</span>'
-                    : `<button class="menuBtn shop-equip-btn" data-equip="${item.id}">Enable</button>`;
-            } else if (owned) {
-                action = '<span class="shop-tag owned">Owned</span>';
-            } else if (item.price === 0) {
-                action = '<span class="shop-tag owned">Free</span>';
-            } else {
-                action = `<button class="menuBtn shop-buy-btn" data-buy="${item.id}" ${canBuy ? '' : 'disabled'}>Buy — ${item.price} 🪙</button>`;
-            }
-
-            return `
-                <article class="shop-item ${owned ? 'owned' : ''}">
-                    <h4>${item.name}</h4>
-                    <p>${item.desc}</p>
-                    ${action}
-                </article>
-            `;
-        }).join('');
-
-        list.querySelectorAll('[data-buy]').forEach(btn => {
-            btn.addEventListener('click', () => buyItem(btn.dataset.buy));
-        });
-        list.querySelectorAll('[data-equip]').forEach(btn => {
-            btn.addEventListener('click', () => equipItem(btn.dataset.equip));
-        });
-    }
-
-    function renderInventory() {
-        const list = document.getElementById('inventoryList');
-        if (!list) return;
-
-        const ownedItems = SHOP_ITEMS.filter(i => isOwned(i.id));
-
-        list.innerHTML = ownedItems.map(item => {
-            const equipped = isEquipped(item.id);
-            let controls = '';
-
-            if (item.category === 'trail' || item.category === 'theme') {
-                controls = equipped
-                    ? '<span class="shop-tag equipped">Equipped</span>'
-                    : `<button class="menuBtn shop-equip-btn" data-equip="${item.id}">Equip</button>`;
-            } else if (item.category === 'upgrade') {
-                controls = equipped
-                    ? `<button class="menuBtn shop-unequip-btn" data-unequip="${item.id}">Disable</button>`
-                    : `<button class="menuBtn shop-equip-btn" data-equip="${item.id}">Enable</button>`;
-            }
-
-            return `
-                <article class="inventory-item ${equipped ? 'equipped' : ''}">
-                    <h4>${item.name}</h4>
-                    <p>${item.desc}</p>
-                    ${controls}
-                </article>
-            `;
-        }).join('') || '<p class="empty-inventory">Play and visit the Neon Shop to collect items.</p>';
-
-        list.querySelectorAll('[data-equip]').forEach(btn => {
-            btn.addEventListener('click', () => equipItem(btn.dataset.equip));
-        });
-        list.querySelectorAll('[data-unequip]').forEach(btn => {
-            btn.addEventListener('click', () => unequipUpgrade(btn.dataset.unequip));
-        });
-    }
-
-    function showShopPage() {
-        document.getElementById('menu')?.classList.add('hidden');
-        document.getElementById('gamesPage')?.classList.add('hidden');
-        document.getElementById('inventoryPage')?.classList.add('hidden');
-        document.getElementById('shopPage')?.classList.remove('hidden');
-        renderShop();
-        updateTokenDisplays();
-    }
-
-    function showInventoryPage() {
-        document.getElementById('menu')?.classList.add('hidden');
-        document.getElementById('gamesPage')?.classList.add('hidden');
-        document.getElementById('shopPage')?.classList.add('hidden');
-        document.getElementById('inventoryPage')?.classList.remove('hidden');
-        renderInventory();
-    }
-
-    function hideMetaPages() {
-        document.getElementById('shopPage')?.classList.add('hidden');
-        document.getElementById('inventoryPage')?.classList.add('hidden');
-    }
-
     function setupControls() {
-        document.getElementById('neonShopBtn')?.addEventListener('click', () => {
-            showShopPage();
-            window.ArcadeSettings?.playSound('click');
+        document.getElementById('shopBtn')?.addEventListener('click', () => {
+            playGlitchTransition(showShopPage);
         });
+
         document.getElementById('inventoryBtn')?.addEventListener('click', () => {
-            showInventoryPage();
-            window.ArcadeSettings?.playSound('click');
+            playGlitchTransition(showInventoryPage);
         });
+
         document.getElementById('backFromShopBtn')?.addEventListener('click', () => {
             hideMetaPages();
-            document.getElementById('gamesPage')?.classList.remove('hidden');
+            document.getElementById('menu')?.classList.remove('hidden');
             window.ArcadeSettings?.playSound('click');
         });
+
         document.getElementById('backFromInventoryBtn')?.addEventListener('click', () => {
             hideMetaPages();
             document.getElementById('menu')?.classList.remove('hidden');
             window.ArcadeSettings?.playSound('click');
         });
-        document.getElementById('shopInventoryLink')?.addEventListener('click', showInventoryPage);
     }
 
     function init() {
         load();
         setupControls();
-        renderDailyBoard();
         updateTokenDisplays();
-    }
-
-    function resetTagRunTracking() {
-        tagRunSurvival = 0;
-        tagRunLevel = 1;
     }
 
     return {
         init,
         hideMetaPages,
+        playGlitchTransition,
         tickPlayTime,
         onTagZoneStart,
         onTagZoneUpdate,
@@ -462,7 +496,6 @@ const ArcadeMeta = (() => {
         onFastEagleEnd,
         onSpaceRunnerEnd,
         getTrailStyle,
-        hasEquippedUpgrade,
-        resetTagRunTracking
+        hasEquippedUpgrade
     };
 })();

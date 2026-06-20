@@ -500,11 +500,12 @@ function showGamesPage() {
     gamesPage.classList.remove('hidden');
     gameContainer.classList.add('hidden');
     LandingEffects.clearMouseTrail();
-    playUiSound('click');
 }
 
 function setupHubControls() {
-    ourGamesBtn.addEventListener('click', showGamesPage);
+    ourGamesBtn.addEventListener('click', () => {
+        ArcadeMeta.playGlitchTransition(showGamesPage);
+    });
     settingsBtn.addEventListener('click', () => openDrawer('settings'));
     keybindsBtn.addEventListener('click', () => openDrawer('keybinds'));
     closeDrawerBtn.addEventListener('click', closeDrawer);

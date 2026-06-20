@@ -30,15 +30,9 @@
             <h1 class="landing-title" id="landingTitle" aria-label="Arcade Arena">ARCADE ARENA</h1>
             <p class="subtitle landing-reveal" data-reveal-order="1">Neon classics. One hub. Endless runs.</p>
 
-            <div class="hub-token-bar landing-reveal" data-reveal-order="1">
-                <span class="token-label">Arcade Tokens</span>
-                <strong class="token-count">0</strong>
-            </div>
-
-            <div id="dailyQuestBoard" class="daily-quest-board landing-reveal" data-reveal-order="2"></div>
-
             <div class="landing-actions">
-                <button id="ourGamesBtn" class="menuBtn menuBtn-primary landing-reveal landing-btn" data-reveal-order="3">Our Games</button>
+                <button id="ourGamesBtn" class="menuBtn menuBtn-primary landing-reveal landing-btn" data-reveal-order="2">Our Games</button>
+                <button id="shopBtn" class="menuBtn menuBtn-shop landing-reveal landing-btn" data-reveal-order="3">Shop</button>
                 <button id="inventoryBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="4">Inventory</button>
                 <button id="settingsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="5">Settings</button>
                 <button id="keybindsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="6">Keybinds</button>
@@ -46,6 +40,12 @@
 
             <button id="achievementsBtn" class="menuBtn menuBtn-achievements landing-reveal landing-btn" data-reveal-order="7">Achievements</button>
         </div>
+    </div>
+
+    <div id="glitchTransition" class="glitch-transition hidden" aria-hidden="true">
+        <div class="glitch-layer glitch-rgb"></div>
+        <div class="glitch-layer glitch-noise"></div>
+        <div class="glitch-scanlines"></div>
     </div>
 
     <div id="tokenToastHost" class="token-toast-host"></div>
@@ -57,13 +57,9 @@
         <div id="achievementsList" class="achievements-list"></div>
     </aside>
 
-    <div id="gamesPage" class="hidden">
+    <div id="gamesPage" class="hidden hub-page">
         <div class="games-page-card">
             <button id="backToMenuBtn" class="menuBtn back-link">← Back to Hub</button>
-            <div class="hub-token-bar games-token-bar">
-                <span class="token-label">Arcade Tokens</span>
-                <strong class="token-count">0</strong>
-            </div>
             <h2 class="games-page-title">Our Games</h2>
             <p class="games-page-subtitle">Pick your challenge and jump in</p>
 
@@ -95,35 +91,62 @@
                     <button id="playBtn" class="menuBtn play-game-btn">Play</button>
                 </article>
             </div>
-
-            <button id="neonShopBtn" class="menuBtn menuBtn-shop">Neon Shop</button>
         </div>
     </div>
 
-    <div id="shopPage" class="hidden">
-        <div class="meta-page-card">
-            <button id="backFromShopBtn" class="menuBtn back-link">← Back to Our Games</button>
-            <div class="hub-token-bar games-token-bar">
-                <span class="token-label">Arcade Tokens</span>
-                <strong class="token-count">0</strong>
+    <div id="shopPage" class="hidden hub-page shop-page">
+        <div class="shop-shell">
+            <header class="shop-header">
+                <button id="backFromShopBtn" class="shop-back-btn">← BACK</button>
+                <h2 class="shop-header-title">SHOP</h2>
+                <div class="shop-token-pill">
+                    <span class="shop-coin" aria-hidden="true">🪙</span>
+                    <strong class="token-count">0</strong>
+                </div>
+            </header>
+
+            <div class="shop-sections">
+                <section class="shop-section">
+                    <h3 class="shop-section-title"><span class="shop-section-bar"></span>POWER UPS</h3>
+                    <div id="shopPowerUps" class="shop-grid"></div>
+                </section>
+
+                <section class="shop-section">
+                    <h3 class="shop-section-title"><span class="shop-section-bar"></span>MOUSE TRAILS</h3>
+                    <div id="shopTrails" class="shop-grid"></div>
+                </section>
+
+                <section class="shop-section">
+                    <h3 class="shop-section-title"><span class="shop-section-bar"></span>BACKGROUNDS</h3>
+                    <div id="shopBackgrounds" class="shop-grid"></div>
+                </section>
             </div>
-            <h2 class="meta-page-title">Neon Shop</h2>
-            <p class="meta-page-subtitle">Spend Arcade Tokens on trails, themes, and power-up upgrades</p>
-            <button id="shopInventoryLink" class="menuBtn menuBtn-accent shop-inventory-link">Open Inventory</button>
-            <div id="shopList" class="shop-list"></div>
         </div>
     </div>
 
-    <div id="inventoryPage" class="hidden">
-        <div class="meta-page-card">
-            <button id="backFromInventoryBtn" class="menuBtn back-link">← Back to Hub</button>
-            <div class="hub-token-bar games-token-bar">
-                <span class="token-label">Arcade Tokens</span>
-                <strong class="token-count">0</strong>
+    <div id="inventoryPage" class="hidden hub-page shop-page inventory-page">
+        <div class="shop-shell">
+            <header class="shop-header">
+                <button id="backFromInventoryBtn" class="shop-back-btn">← BACK</button>
+                <h2 class="shop-header-title">INVENTORY</h2>
+            </header>
+
+            <div class="shop-sections">
+                <section class="shop-section">
+                    <h3 class="shop-section-title"><span class="shop-section-bar"></span>POWER UPS</h3>
+                    <div id="inventoryPowerUps" class="shop-grid"></div>
+                </section>
+
+                <section class="shop-section">
+                    <h3 class="shop-section-title"><span class="shop-section-bar"></span>MOUSE TRAILS</h3>
+                    <div id="inventoryTrails" class="shop-grid"></div>
+                </section>
+
+                <section class="shop-section">
+                    <h3 class="shop-section-title"><span class="shop-section-bar"></span>BACKGROUNDS</h3>
+                    <div id="inventoryBackgrounds" class="shop-grid"></div>
+                </section>
             </div>
-            <h2 class="meta-page-title">Inventory</h2>
-            <p class="meta-page-subtitle">View and equip your neon cosmetics and upgrades</p>
-            <div id="inventoryList" class="inventory-list"></div>
         </div>
     </div>
 
