@@ -14,7 +14,7 @@ const achievementsList = document.getElementById('achievementsList');
 const closeAchievementsBtn = document.getElementById('closeAchievementsBtn');
 
 const tagZoneBtn = document.getElementById('tagZoneBtn');
-const neonOrbitBtn = document.getElementById('neonOrbitBtn');
+const laserDashBtn = document.getElementById('laserDashBtn');
 const platformerBtn = document.getElementById('platformerBtn');
 const playBtn = document.getElementById('playBtn');
 const backBtn = document.getElementById('backBtn');
@@ -529,8 +529,8 @@ function showMenu() {
     gameContainer.classList.add('hidden');
     tagHud.classList.add('hidden');
     spaceRunnerUi.classList.add('hidden');
-    document.getElementById('orbitHud')?.classList.add('hidden');
-    NeonOrbit?.stop();
+    document.getElementById('dashHud')?.classList.add('hidden');
+    LaserDash?.stop();
     gameMessage.classList.remove('hidden');
 }
 
@@ -622,7 +622,7 @@ function initFastEagle() {
 function startFastEagle() {
     spaceRunnerUi.classList.add('hidden');
     SpaceRunner.stop();
-    NeonOrbit?.stop();
+    LaserDash?.stop();
     tagHud.classList.add('hidden');
     showGameScreen('Fast Eagle', '', true, false);
     initFastEagle();
@@ -1050,7 +1050,7 @@ function endFastEagle() {
 function startTagZone() {
     spaceRunnerUi.classList.add('hidden');
     SpaceRunner.stop();
-    NeonOrbit?.stop();
+    LaserDash?.stop();
     currentGame = 'tagZone';
     canvas.width = 960;
     canvas.height = 620;
@@ -2160,21 +2160,21 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function startNeonOrbit() {
+function startLaserDash() {
     stopGame();
     SpaceRunner.stop();
-    currentGame = 'neonOrbit';
+    currentGame = 'laserDash';
     tagHud.classList.add('hidden');
     spaceRunnerUi.classList.add('hidden');
-    showGameScreen('Neon Orbit', '', true, false);
+    showGameScreen('Laser Dash', '', true, false);
     gameMessage.classList.add('hidden');
     restartBtn.classList.add('hidden');
-    NeonOrbit.open(canvas, ctx);
+    LaserDash.open(canvas, ctx);
 }
 
 function startSpaceRunner() {
     stopGame();
-    NeonOrbit?.stop();
+    LaserDash?.stop();
     currentGame = 'spaceRunner';
     tagHud.classList.add('hidden');
     showGameScreen('Space Runner', '', true, false);
@@ -2199,11 +2199,8 @@ document.addEventListener('keydown', e => {
         return;
     }
 
-    if (currentGame === 'neonOrbit') {
-        NeonOrbit.handleKey(e, true);
-        if (e.code === 'Space' || e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'KeyA' || e.code === 'KeyD') {
-            e.preventDefault();
-        }
+    if (currentGame === 'laserDash') {
+        LaserDash.handleKey(e, true);
         return;
     }
 
@@ -2223,12 +2220,11 @@ document.addEventListener('keydown', e => {
 
 document.addEventListener('keyup', e => {
     keys[e.code] = false;
-    if (currentGame === 'neonOrbit') NeonOrbit.handleKey(e, false);
 });
 
 tagZoneBtn.addEventListener('click', startTagZone);
 
-neonOrbitBtn?.addEventListener('click', startNeonOrbit);
+laserDashBtn?.addEventListener('click', startLaserDash);
 
 platformerBtn.addEventListener('click', startSpaceRunner);
 

@@ -14,9 +14,9 @@ const ArcadeMeta = (() => {
     const SHOP_ITEMS = [
         { id: 'tag-time-accel', category: 'upgrade', name: 'Time Acceleration', price: 250, desc: 'Move faster while the level timer speeds up until the wave ends.', preview: 'preview-time-accel', icon: '⏩' },
         { id: 'space-shield', category: 'upgrade', name: 'Neon Shield', price: 300, desc: 'Smash through 10 asteroids with a neon barrier.', preview: 'preview-space-shield', icon: '🛡' },
-        { id: 'orbit-sticky-paddle', category: 'upgrade', name: 'Sticky Paddle', price: 120, desc: 'Catch the ball on your paddle so you can aim before launching.', icon: '🧲' },
-        { id: 'orbit-multi-ball', category: 'upgrade', name: 'Multi-Ball', price: 150, desc: 'Press Space to split active balls into three.', icon: '⚪' },
-        { id: 'orbit-laser-gate', category: 'upgrade', name: 'Laser Gate', price: 180, desc: 'One shield per run that saves a ball slipping past the paddle.', icon: '⌁' },
+        { id: 'dash-shield-buffer', category: 'upgrade', name: 'Shield Buffer', price: 120, desc: 'Absorbs your first Laser Dash hit, then grants brief invincibility.', icon: '🛡' },
+        { id: 'dash-chronos-module', category: 'upgrade', name: 'Chronos Module', price: 150, desc: 'Extends Time Dilation from 0.5s to 1.5s in Laser Dash.', icon: '⏳' },
+        { id: 'dash-sonic-blast', category: 'upgrade', name: 'Sonic Blast', price: 180, desc: 'Press W once per Laser Dash run to clear all obstacles.', icon: '💥' },
         { id: 'trail-cyan', category: 'trail', name: 'Neon Cyan Trail', price: 0, desc: 'Classic cyan and pink neon mouse trail.', preview: 'preview-trail-cyan' },
         { id: 'trail-pink', category: 'trail', name: 'Hot Pink Trail', price: 75, desc: 'Magenta streaks with gold sparks.', preview: 'preview-trail-pink' },
         { id: 'trail-gold', category: 'trail', name: 'Gold Rush Trail', price: 100, desc: 'Golden arcade streaks behind your cursor.', preview: 'preview-trail-gold' },
@@ -56,9 +56,9 @@ const ArcadeMeta = (() => {
                 theme: 'theme-default',
                 tagTimeAccel: false,
                 spaceShield: false,
-                orbitSticky: false,
-                orbitMultiball: false,
-                orbitLaserGate: false
+                dashShieldBuffer: false,
+                dashChronosModule: false,
+                dashSonicBlast: false
             },
             daily: { date: '', quests: [] },
             playTimeAccumulator: 0,
@@ -85,9 +85,9 @@ const ArcadeMeta = (() => {
     function syncOwnedUpgrades() {
         if (isOwned('tag-time-accel')) state.equipped.tagTimeAccel = true;
         if (isOwned('space-shield')) state.equipped.spaceShield = true;
-        if (isOwned('orbit-sticky-paddle')) state.equipped.orbitSticky = true;
-        if (isOwned('orbit-multi-ball')) state.equipped.orbitMultiball = true;
-        if (isOwned('orbit-laser-gate')) state.equipped.orbitLaserGate = true;
+        if (isOwned('dash-shield-buffer')) state.equipped.dashShieldBuffer = true;
+        if (isOwned('dash-chronos-module')) state.equipped.dashChronosModule = true;
+        if (isOwned('dash-sonic-blast')) state.equipped.dashSonicBlast = true;
     }
 
     function save() {
@@ -170,9 +170,9 @@ const ArcadeMeta = (() => {
         if (item.category === 'theme') return state.equipped.theme === id;
         if (id === 'tag-time-accel') return state.equipped.tagTimeAccel;
         if (id === 'space-shield') return state.equipped.spaceShield;
-        if (id === 'orbit-sticky-paddle') return state.equipped.orbitSticky;
-        if (id === 'orbit-multi-ball') return state.equipped.orbitMultiball;
-        if (id === 'orbit-laser-gate') return state.equipped.orbitLaserGate;
+        if (id === 'dash-shield-buffer') return state.equipped.dashShieldBuffer;
+        if (id === 'dash-chronos-module') return state.equipped.dashChronosModule;
+        if (id === 'dash-sonic-blast') return state.equipped.dashSonicBlast;
         return false;
     }
 
@@ -332,9 +332,9 @@ const ArcadeMeta = (() => {
         if (item.category === 'upgrade') {
             if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
             else if (id === 'space-shield') state.equipped.spaceShield = true;
-            else if (id === 'orbit-sticky-paddle') state.equipped.orbitSticky = true;
-            else if (id === 'orbit-multi-ball') state.equipped.orbitMultiball = true;
-            else if (id === 'orbit-laser-gate') state.equipped.orbitLaserGate = true;
+            else if (id === 'dash-shield-buffer') state.equipped.dashShieldBuffer = true;
+            else if (id === 'dash-chronos-module') state.equipped.dashChronosModule = true;
+            else if (id === 'dash-sonic-blast') state.equipped.dashSonicBlast = true;
         }
         save();
         renderShop();
@@ -354,9 +354,9 @@ const ArcadeMeta = (() => {
             applyTheme();
         } else if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
         else if (id === 'space-shield') state.equipped.spaceShield = true;
-        else if (id === 'orbit-sticky-paddle') state.equipped.orbitSticky = true;
-        else if (id === 'orbit-multi-ball') state.equipped.orbitMultiball = true;
-        else if (id === 'orbit-laser-gate') state.equipped.orbitLaserGate = true;
+        else if (id === 'dash-shield-buffer') state.equipped.dashShieldBuffer = true;
+        else if (id === 'dash-chronos-module') state.equipped.dashChronosModule = true;
+        else if (id === 'dash-sonic-blast') state.equipped.dashSonicBlast = true;
 
         save();
         renderShop();
@@ -368,9 +368,9 @@ const ArcadeMeta = (() => {
     function unequipUpgrade(id) {
         if (id === 'tag-time-accel') state.equipped.tagTimeAccel = false;
         if (id === 'space-shield') state.equipped.spaceShield = false;
-        if (id === 'orbit-sticky-paddle') state.equipped.orbitSticky = false;
-        if (id === 'orbit-multi-ball') state.equipped.orbitMultiball = false;
-        if (id === 'orbit-laser-gate') state.equipped.orbitLaserGate = false;
+        if (id === 'dash-shield-buffer') state.equipped.dashShieldBuffer = false;
+        if (id === 'dash-chronos-module') state.equipped.dashChronosModule = false;
+        if (id === 'dash-sonic-blast') state.equipped.dashSonicBlast = false;
         save();
         renderInventory();
         renderShop();
@@ -473,9 +473,9 @@ const ArcadeMeta = (() => {
         };
     }
 
-    function onNeonOrbitEnd(runScore, wave) {
-        if (runScore >= 500) addTokens(6, 'Neon Orbit run');
-        if (wave >= 5) addTokens(8, 'Neon Orbit wave clear');
+    function onLaserDashEnd(runScore) {
+        if (runScore >= 300) addTokens(6, 'Laser Dash run');
+        if (runScore >= 800) addTokens(10, 'Laser Dash high score');
     }
 
     function onTagZoneUpdate(survivalTime, level) {
@@ -559,9 +559,9 @@ const ArcadeMeta = (() => {
     function hasEquippedUpgrade(id) {
         if (id === 'tag-time-accel') return state.equipped.tagTimeAccel;
         if (id === 'space-shield') return state.equipped.spaceShield;
-        if (id === 'orbit-sticky-paddle') return state.equipped.orbitSticky;
-        if (id === 'orbit-multi-ball') return state.equipped.orbitMultiball;
-        if (id === 'orbit-laser-gate') return state.equipped.orbitLaserGate;
+        if (id === 'dash-shield-buffer') return state.equipped.dashShieldBuffer;
+        if (id === 'dash-chronos-module') return state.equipped.dashChronosModule;
+        if (id === 'dash-sonic-blast') return state.equipped.dashSonicBlast;
         return false;
     }
 
@@ -611,7 +611,7 @@ const ArcadeMeta = (() => {
         onTagLevelSurvived,
         onFastEagleEnd,
         onSpaceRunnerEnd,
-        onNeonOrbitEnd,
+        onLaserDashEnd,
         getTrailStyle,
         hasEquippedUpgrade
     };
