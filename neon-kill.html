@@ -190,7 +190,7 @@
         </div>
         <div id="startScreen">
             <h1>NEON KILL</h1>
-            <p class="hint">Click to lock pointer. WASD move · Space jump/slam · Shift slide · LMB shoot · Hold RMB charge pierce · E parry.<br>Parry reflects shots for 3× damage. Kill enemies to absorb heal particles.</p>
+            <p class="hint">Click to lock pointer. WASD move · Space jump/slam · Shift slide · Tap LMB shoot · Hold LMB charge pierce · RMB/E parry.<br>Parry reflects shots for 3× damage. Kill enemies to absorb heal particles.</p>
             <button class="btn" id="startBtn">Enter Arena</button>
         </div>
         <div id="gameOverScreen">
@@ -247,7 +247,6 @@
         let gunRecoil = 0;
         let freezeTimer = 0;
         let flashTimer = 0;
-        let flashSolid = false;
         let screenShake = 0;
         let isCharging = false;
         let chargeLevel = 0;
@@ -280,7 +279,10 @@
 
         const REVOLVER_BASE = { x: 0.35, y: -0.35, z: -0.7 };
         const parryRestPos = new THREE.Vector3(-0.5, -0.4, -0.6);
-        const parryPunchPos = new THREE.Vector3(-0.5, -0.4, -0.32);
+        const parryWindPos = new THREE.Vector3(-0.52, -0.41, -0.52);
+        const parryStrikePos = new THREE.Vector3(0.1, -0.32, -0.36);
+        const parryWindRot = { x: 0, y: -0.28, z: 0 };
+        const parryStrikeRot = { x: -0.15, y: 0.18, z: Math.PI / 4 };
 
         function addSolidWithEdges(geo, fillMat, edgeMat) {
             const mesh = new THREE.Mesh(geo, fillMat);
@@ -403,10 +405,15 @@
         scene.add(camera);
 
         const parryFlashEl = document.getElementById('parryFlash');
-        const PARRY_DURATION = 0.15;
-        const PARRY_FLASH_DURATION = 0.1;
+        const PARRY_WINDOW = 0.2;
+        const PARRY_ANIM_MS = 150;
+        const PARRY_FLASH_DECAY = 0.15;
+        const TAP_HOLD_THRESHOLD = 0.16;
+        const CHARGE_RATE = 112;
 
         let audioCtx = null;
+        let leftHoldTime = 0;
+        let chargeCommitted = false;
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -429,61 +436,20 @@
             osc.stop(t + 0.11);
         }
 
-        function playParryActivateSound() {
-            const ctx = initAudio();
-            const t = ctx.currentTime;
-            const len = Math.floor(ctx.sampleRate * 0.16);
-            const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-            const noise = ctx.createBufferSource();
-            noise.buffer = buffer;
-            const filter = ctx.createBiquadFilter();
-            filter.type = 'bandpass';
-            filter.frequency.setValueAtTime(600, t);
-            filter.frequency.exponentialRampToValueAtTime(2800, t + 0.12);
-            filter.Q.value = 2.5;
-            const gain = ctx.createGain();
-            gain.gain.setValueAtTime(0.22, t);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-            noise.connect(filter);
-            filter.connect(gain);
-            gain.connect(ctx.destination);
-            noise.start(t);
-            noise.stop(t + 0.17);
-        }
-
         function playParryImpactSound() {
             const ctx = initAudio();
             const t = ctx.currentTime;
-            const master = ctx.createGain();
-            master.gain.setValueAtTime(0.85, t);
-            master.connect(ctx.destination);
-
             const osc = ctx.createOscillator();
             osc.type = 'sine';
-            osc.frequency.setValueAtTime(1200, t);
-            const oscGain = ctx.createGain();
-            oscGain.gain.setValueAtTime(0.4, t);
-            oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-            osc.connect(oscGain);
-            oscGain.connect(master);
+            osc.frequency.setValueAtTime(1400, t);
+            osc.frequency.exponentialRampToValueAtTime(900, t + 0.08);
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.55, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
             osc.start(t);
-            osc.stop(t + 0.3);
-
-            const nLen = Math.floor(ctx.sampleRate * 0.09);
-            const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
-            const nd = nBuf.getChannelData(0);
-            for (let i = 0; i < nLen; i++) nd[i] = Math.random() * 2 - 1;
-            const noise = ctx.createBufferSource();
-            noise.buffer = nBuf;
-            const nGain = ctx.createGain();
-            nGain.gain.setValueAtTime(0.3, t);
-            nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
-            noise.connect(nGain);
-            nGain.connect(master);
-            noise.start(t);
-            noise.stop(t + 0.1);
+            osc.stop(t + 0.24);
         }
 
         function playPierceBlastSound() {
@@ -632,7 +598,7 @@
         }
 
         function shootPlayer() {
-            if (shootCooldown > 0 || isCharging) return;
+            if (shootCooldown > 0) return;
             shootCooldown = 0.18;
             gunRecoil = 0.08;
             playShootSound();
@@ -646,7 +612,7 @@
             scene.add(mesh);
             projectiles.push({
                 mesh, vel: dir.clone().multiplyScalar(speed), owner: 'player',
-                life: 3, damage: PLAYER_SHOT_DAMAGE, parry: false
+                life: 3, damage: PLAYER_SHOT_DAMAGE
             });
         }
 
@@ -681,17 +647,26 @@
             hitSet.forEach(enemy => damageEnemy(enemy, PIERCE_DAMAGE, !onGround));
         }
 
-        function releaseChargeShot() {
-            if (chargeLevel >= 100) firePierceShot();
+        function releaseLeftMouse() {
+            if (chargeCommitted || leftHoldTime >= TAP_HOLD_THRESHOLD) {
+                if (chargeLevel >= 100) firePierceShot();
+            } else {
+                shootPlayer();
+            }
             chargeLevel = 0;
             isCharging = false;
+            chargeCommitted = false;
+            leftHoldTime = 0;
             drawBatteryHUD();
         }
 
-        function updateCharge(dt) {
-            if (mouseDown.right && gameRunning && !player.isParrying) {
+        function updateLeftMouse(dt) {
+            if (!mouseDown.left || !gameRunning || player.isParrying) return;
+            leftHoldTime += dt;
+            if (leftHoldTime >= TAP_HOLD_THRESHOLD) {
+                chargeCommitted = true;
                 isCharging = true;
-                chargeLevel = Math.min(100, chargeLevel + dt * 115);
+                chargeLevel = Math.min(100, chargeLevel + dt * CHARGE_RATE);
                 drawBatteryHUD();
             }
         }
@@ -708,13 +683,13 @@
         }
 
         function startParry() {
-            if (player.isParrying) return;
+            if (player.isParrying || isCharging) return;
             player.isParrying = true;
-            parryTimer = PARRY_DURATION;
+            parryTimer = PARRY_WINDOW;
             parryAnimTimer = 0;
             armGroup.visible = true;
             armGroup.position.copy(parryRestPos);
-            playParryActivateSound();
+            armGroup.rotation.set(0, 0, 0);
         }
 
         function getParryHitCenter() {
@@ -726,8 +701,7 @@
 
         function triggerParrySuccess(impactPos) {
             freezeTimer = 0.1;
-            flashTimer = PARRY_FLASH_DURATION;
-            flashSolid = true;
+            flashTimer = PARRY_FLASH_DECAY;
             parryFlashEl.classList.add('solid');
             parryFlashEl.style.opacity = '1';
             playParryImpactSound();
@@ -749,22 +723,41 @@
             }
         }
 
+        function lerpRot(a, b, t) {
+            armGroup.rotation.x = THREE.MathUtils.lerp(a.x, b.x, t);
+            armGroup.rotation.y = THREE.MathUtils.lerp(a.y, b.y, t);
+            armGroup.rotation.z = THREE.MathUtils.lerp(a.z, b.z, t);
+        }
+
         function updateParryArm(dt) {
-            if (player.isParrying) {
-                parryAnimTimer += dt;
-                const t = Math.min(1, parryAnimTimer / PARRY_DURATION);
-                if (t <= 0.5) {
-                    const p = t / 0.5;
-                    const eased = 1 - Math.pow(1 - p, 3);
-                    armGroup.position.lerpVectors(parryRestPos, parryPunchPos, eased);
-                } else {
-                    const p = (t - 0.5) / 0.5;
-                    const eased = p * p;
-                    armGroup.position.lerpVectors(parryPunchPos, parryRestPos, eased);
-                }
+            if (!player.isParrying) {
+                armGroup.visible = false;
+                armGroup.position.copy(parryRestPos);
+                armGroup.rotation.set(0, 0, 0);
+                return;
+            }
+
+            armGroup.visible = true;
+            parryAnimTimer += dt;
+            const ms = parryAnimTimer * 1000;
+
+            if (ms <= 30) {
+                const p = ms / 30;
+                armGroup.position.lerpVectors(parryRestPos, parryWindPos, p);
+                lerpRot({ x: 0, y: 0, z: 0 }, parryWindRot, p);
+            } else if (ms <= 70) {
+                const p = (ms - 31) / 39;
+                const eased = 1 - Math.pow(1 - p, 4);
+                armGroup.position.lerpVectors(parryWindPos, parryStrikePos, eased);
+                lerpRot(parryWindRot, parryStrikeRot, eased);
+            } else if (ms <= PARRY_ANIM_MS) {
+                const p = (ms - 71) / (PARRY_ANIM_MS - 71);
+                armGroup.position.lerpVectors(parryStrikePos, parryRestPos, p);
+                lerpRot(parryStrikeRot, { x: 0, y: 0, z: 0 }, p);
             } else {
                 armGroup.visible = false;
                 armGroup.position.copy(parryRestPos);
+                armGroup.rotation.set(0, 0, 0);
             }
         }
 
@@ -814,11 +807,8 @@
         function updateFlash(dt) {
             if (flashTimer > 0) {
                 flashTimer = Math.max(0, flashTimer - dt);
-                parryFlashEl.style.opacity = String(Math.min(1, flashTimer / PARRY_FLASH_DURATION));
-                if (flashTimer <= 0) {
-                    parryFlashEl.classList.remove('solid');
-                    flashSolid = false;
-                }
+                parryFlashEl.style.opacity = String(Math.min(1, flashTimer / PARRY_FLASH_DECAY));
+                if (flashTimer <= 0) parryFlashEl.classList.remove('solid');
             }
         }
 
@@ -894,10 +884,11 @@
             beamEffects = [];
             freezeTimer = 0;
             flashTimer = 0;
-            flashSolid = false;
             screenShake = 0;
             isCharging = false;
             chargeLevel = 0;
+            chargeCommitted = false;
+            leftHoldTime = 0;
             parryFlashEl.style.opacity = '0';
             parryFlashEl.classList.remove('solid');
             parryAnimTimer = 0;
@@ -1017,17 +1008,18 @@
                 p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
                 p.life -= dt;
 
-                if (player.isParrying && parryAnimTimer > 0.02 && parryAnimTimer < 0.09 && p.owner === 'enemy') {
-                    const d = p.mesh.position.distanceTo(getParryHitCenter());
-                    if (d < 1.4) {
-                        const impact = p.mesh.position.clone();
-                        p.vel.negate();
-                        p.owner = 'player';
-                        p.damage = PARRY_SHOT_DAMAGE;
-                        p.parry = true;
-                        p.vel.multiplyScalar(1.5);
-                        triggerParrySuccess(impact);
-                        return true;
+                if (player.isParrying && p.owner === 'enemy') {
+                    const ms = parryAnimTimer * 1000;
+                    if (ms >= 31 && ms <= 70) {
+                        const d = p.mesh.position.distanceTo(getParryHitCenter());
+                        if (d < 1.5) {
+                            const impact = p.mesh.position.clone();
+                            p.vel.negate().multiplyScalar(1.5);
+                            p.owner = 'player';
+                            p.damage = PARRY_SHOT_DAMAGE;
+                            triggerParrySuccess(impact);
+                            return true;
+                        }
                     }
                 }
 
@@ -1088,8 +1080,7 @@
             if (freezeTimer > 0) freezeTimer = Math.max(0, freezeTimer - rawDt);
 
             if (gameRunning) {
-                updateCharge(rawDt);
-                if (mouseDown.left) shootPlayer();
+                updateLeftMouse(rawDt);
                 updatePlayer(dt);
                 applyScreenShake();
                 if (screenShake > 0) screenShake = Math.max(0, screenShake - rawDt * 2.2);
@@ -1127,15 +1118,23 @@
             if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') player.isSliding = false;
         });
         document.addEventListener('mousedown', e => {
-            if (e.button === 0) mouseDown.left = true;
-            if (e.button === 2) { e.preventDefault(); mouseDown.right = true; }
+            if (e.button === 0) {
+                mouseDown.left = true;
+                leftHoldTime = 0;
+                chargeCommitted = false;
+            }
+            if (e.button === 2) {
+                e.preventDefault();
+                mouseDown.right = true;
+                if (gameRunning) startParry();
+            }
         });
         document.addEventListener('mouseup', e => {
-            if (e.button === 0) mouseDown.left = false;
-            if (e.button === 2) {
-                mouseDown.right = false;
-                if (gameRunning) releaseChargeShot();
+            if (e.button === 0) {
+                mouseDown.left = false;
+                if (gameRunning) releaseLeftMouse();
             }
+            if (e.button === 2) mouseDown.right = false;
         });
         document.addEventListener('contextmenu', e => e.preventDefault());
 
