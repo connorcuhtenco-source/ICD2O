@@ -14,9 +14,9 @@ const ArcadeMeta = (() => {
     const SHOP_ITEMS = [
         { id: 'tag-time-accel', category: 'upgrade', name: 'Time Acceleration', price: 250, desc: 'Move faster while the level timer speeds up until the wave ends.', preview: 'preview-time-accel', icon: '⏩' },
         { id: 'space-shield', category: 'upgrade', name: 'Neon Shield', price: 300, desc: 'Smash through 10 asteroids with a neon barrier.', preview: 'preview-space-shield', icon: '🛡' },
-        { id: 'dash-shield-buffer', category: 'upgrade', name: 'Shield Buffer', price: 120, desc: 'Absorbs your first Laser Dash hit, then grants brief invincibility.', icon: '🛡' },
-        { id: 'dash-chronos-module', category: 'upgrade', name: 'Chronos Module', price: 150, desc: 'Extends Time Dilation from 0.5s to 1.5s in Laser Dash.', icon: '⏳' },
-        { id: 'dash-sonic-blast', category: 'upgrade', name: 'Sonic Blast', price: 180, desc: 'Press W once per Laser Dash run to clear all obstacles.', icon: '💥' },
+        { id: 'kill-overclock-core', category: 'upgrade', name: 'Overclock Core', price: 150, desc: '+25% move and projectile speed in Neon Kill.', icon: '⚡' },
+        { id: 'kill-siphon-nanites', category: 'upgrade', name: 'Siphon Nanites', price: 175, desc: 'Double health restored from defeat particles in Neon Kill.', icon: '💚' },
+        { id: 'kill-slam-module', category: 'upgrade', name: 'Slam Module', price: 200, desc: 'Mid-air Space slams down with a shockwave in Neon Kill.', icon: '💥' },
         { id: 'trail-cyan', category: 'trail', name: 'Neon Cyan Trail', price: 0, desc: 'Classic cyan and pink neon mouse trail.', preview: 'preview-trail-cyan' },
         { id: 'trail-pink', category: 'trail', name: 'Hot Pink Trail', price: 75, desc: 'Magenta streaks with gold sparks.', preview: 'preview-trail-pink' },
         { id: 'trail-gold', category: 'trail', name: 'Gold Rush Trail', price: 100, desc: 'Golden arcade streaks behind your cursor.', preview: 'preview-trail-gold' },
@@ -56,9 +56,9 @@ const ArcadeMeta = (() => {
                 theme: 'theme-default',
                 tagTimeAccel: false,
                 spaceShield: false,
-                dashShieldBuffer: false,
-                dashChronosModule: false,
-                dashSonicBlast: false
+                killOverclock: false,
+                killSiphon: false,
+                killSlam: false
             },
             daily: { date: '', quests: [] },
             playTimeAccumulator: 0,
@@ -85,9 +85,9 @@ const ArcadeMeta = (() => {
     function syncOwnedUpgrades() {
         if (isOwned('tag-time-accel')) state.equipped.tagTimeAccel = true;
         if (isOwned('space-shield')) state.equipped.spaceShield = true;
-        if (isOwned('dash-shield-buffer')) state.equipped.dashShieldBuffer = true;
-        if (isOwned('dash-chronos-module')) state.equipped.dashChronosModule = true;
-        if (isOwned('dash-sonic-blast')) state.equipped.dashSonicBlast = true;
+        if (isOwned('kill-overclock-core')) state.equipped.killOverclock = true;
+        if (isOwned('kill-siphon-nanites')) state.equipped.killSiphon = true;
+        if (isOwned('kill-slam-module')) state.equipped.killSlam = true;
     }
 
     function save() {
@@ -170,9 +170,9 @@ const ArcadeMeta = (() => {
         if (item.category === 'theme') return state.equipped.theme === id;
         if (id === 'tag-time-accel') return state.equipped.tagTimeAccel;
         if (id === 'space-shield') return state.equipped.spaceShield;
-        if (id === 'dash-shield-buffer') return state.equipped.dashShieldBuffer;
-        if (id === 'dash-chronos-module') return state.equipped.dashChronosModule;
-        if (id === 'dash-sonic-blast') return state.equipped.dashSonicBlast;
+        if (id === 'kill-overclock-core') return state.equipped.killOverclock;
+        if (id === 'kill-siphon-nanites') return state.equipped.killSiphon;
+        if (id === 'kill-slam-module') return state.equipped.killSlam;
         return false;
     }
 
@@ -332,9 +332,9 @@ const ArcadeMeta = (() => {
         if (item.category === 'upgrade') {
             if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
             else if (id === 'space-shield') state.equipped.spaceShield = true;
-            else if (id === 'dash-shield-buffer') state.equipped.dashShieldBuffer = true;
-            else if (id === 'dash-chronos-module') state.equipped.dashChronosModule = true;
-            else if (id === 'dash-sonic-blast') state.equipped.dashSonicBlast = true;
+            else if (id === 'kill-overclock-core') state.equipped.killOverclock = true;
+            else if (id === 'kill-siphon-nanites') state.equipped.killSiphon = true;
+            else if (id === 'kill-slam-module') state.equipped.killSlam = true;
         }
         save();
         renderShop();
@@ -354,9 +354,9 @@ const ArcadeMeta = (() => {
             applyTheme();
         } else if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
         else if (id === 'space-shield') state.equipped.spaceShield = true;
-        else if (id === 'dash-shield-buffer') state.equipped.dashShieldBuffer = true;
-        else if (id === 'dash-chronos-module') state.equipped.dashChronosModule = true;
-        else if (id === 'dash-sonic-blast') state.equipped.dashSonicBlast = true;
+        else if (id === 'kill-overclock-core') state.equipped.killOverclock = true;
+        else if (id === 'kill-siphon-nanites') state.equipped.killSiphon = true;
+        else if (id === 'kill-slam-module') state.equipped.killSlam = true;
 
         save();
         renderShop();
@@ -368,9 +368,9 @@ const ArcadeMeta = (() => {
     function unequipUpgrade(id) {
         if (id === 'tag-time-accel') state.equipped.tagTimeAccel = false;
         if (id === 'space-shield') state.equipped.spaceShield = false;
-        if (id === 'dash-shield-buffer') state.equipped.dashShieldBuffer = false;
-        if (id === 'dash-chronos-module') state.equipped.dashChronosModule = false;
-        if (id === 'dash-sonic-blast') state.equipped.dashSonicBlast = false;
+        if (id === 'kill-overclock-core') state.equipped.killOverclock = false;
+        if (id === 'kill-siphon-nanites') state.equipped.killSiphon = false;
+        if (id === 'kill-slam-module') state.equipped.killSlam = false;
         save();
         renderInventory();
         renderShop();
@@ -473,9 +473,9 @@ const ArcadeMeta = (() => {
         };
     }
 
-    function onLaserDashEnd(runScore) {
-        if (runScore >= 300) addTokens(6, 'Laser Dash run');
-        if (runScore >= 800) addTokens(10, 'Laser Dash high score');
+    function onNeonKillEnd(runScore, endWave) {
+        if (runScore >= 500) addTokens(8, 'Neon Kill run');
+        if (endWave >= 4) addTokens(12, 'Neon Kill waves');
     }
 
     function onTagZoneUpdate(survivalTime, level) {
@@ -559,9 +559,9 @@ const ArcadeMeta = (() => {
     function hasEquippedUpgrade(id) {
         if (id === 'tag-time-accel') return state.equipped.tagTimeAccel;
         if (id === 'space-shield') return state.equipped.spaceShield;
-        if (id === 'dash-shield-buffer') return state.equipped.dashShieldBuffer;
-        if (id === 'dash-chronos-module') return state.equipped.dashChronosModule;
-        if (id === 'dash-sonic-blast') return state.equipped.dashSonicBlast;
+        if (id === 'kill-overclock-core') return state.equipped.killOverclock;
+        if (id === 'kill-siphon-nanites') return state.equipped.killSiphon;
+        if (id === 'kill-slam-module') return state.equipped.killSlam;
         return false;
     }
 
@@ -611,7 +611,7 @@ const ArcadeMeta = (() => {
         onTagLevelSurvived,
         onFastEagleEnd,
         onSpaceRunnerEnd,
-        onLaserDashEnd,
+        onNeonKillEnd,
         getTrailStyle,
         hasEquippedUpgrade
     };

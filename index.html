@@ -73,13 +73,13 @@
                     <button id="tagZoneBtn" class="menuBtn play-game-btn">Play</button>
                 </article>
 
-                <article class="game-tile game-tile-dash">
+                <article class="game-tile game-tile-kill">
                     <div class="game-tile-header">
-                        <h3>Laser Dash</h3>
+                        <h3>Neon Kill</h3>
                         <span class="difficulty difficulty-hard">Hard</span>
                     </div>
-                    <p class="game-desc">Snap between three neon lanes in a purple tunnel. Blink through laser walls, dilate time, and outrun the grid.</p>
-                    <button id="laserDashBtn" class="menuBtn play-game-btn">Play</button>
+                    <p class="game-desc">Ultrakill-inspired FPS in a neon arena. Parry plasma, style-chain kills, and siphon health from shattered husks.</p>
+                    <button id="neonKillBtn" class="menuBtn play-game-btn">Play</button>
                 </article>
 
                 <article class="game-tile game-tile-space">
@@ -199,12 +199,11 @@
             </div>
 
             <div class="keybind-group">
-                <h4>Laser Dash</h4>
+                <h4>Neon Kill</h4>
                 <ul>
-                    <li><kbd>A</kbd> / <kbd>D</kbd> or <kbd>←</kbd> / <kbd>→</kbd> — Switch lanes</li>
-                    <li><kbd>Space</kbd> — Phase Blink</li>
-                    <li><kbd>Shift</kbd> — Time Dilation</li>
-                    <li><kbd>W</kbd> or <kbd>↑</kbd> — Sonic Blast (shop upgrade)</li>
+                    <li><kbd>W A S D</kbd> — Move</li>
+                    <li><kbd>Mouse</kbd> — Look · <kbd>LMB</kbd> Shoot · <kbd>RMB/E</kbd> Parry</li>
+                    <li><kbd>Space</kbd> — Jump / Slam · <kbd>Shift</kbd> — Slide</li>
                 </ul>
             </div>
 
@@ -277,38 +276,6 @@
                     </div>
                 </div>
 
-                <div id="dashHud" class="dash-hud hidden">
-                    <div class="hud-box">
-                        <span>Score</span>
-                        <strong id="dashScore">0</strong>
-                    </div>
-                    <div class="hud-box">
-                        <span>Speed</span>
-                        <strong id="dashSpeed">1.0</strong>
-                    </div>
-                    <div class="hud-box">
-                        <span>Blink</span>
-                        <strong id="dashBlink">READY</strong>
-                    </div>
-                    <div class="hud-box">
-                        <span>Dilation</span>
-                        <strong id="dashDilation">READY</strong>
-                    </div>
-                </div>
-
-                <div id="dashStartScreen" class="dash-overlay hidden">
-                    <h3 class="dash-overlay-title">LASER DASH</h3>
-                    <p class="dash-hint">Dodge laser walls and orange beams in a neon tunnel. Blink, dilate time, and use shop upgrades to survive.</p>
-                    <p id="dashHighScore" class="dash-highscore">Best: 0</p>
-                    <button id="dashStartBtn" class="menuBtn">Start</button>
-                </div>
-
-                <div id="dashGameOverScreen" class="dash-overlay hidden">
-                    <h3 class="dash-overlay-title">SYSTEM FAILURE</h3>
-                    <p id="dashFinalScore"></p>
-                    <button id="dashPlayAgainBtn" class="menuBtn">Play Again</button>
-                </div>
-
                 <div id="achievementToastHost" class="achievement-toast-host"></div>
 
                 <button id="restartBtn" class="menuBtn hidden canvas-restart-btn">Restart</button>
@@ -340,7 +307,6 @@
     </script>
     <script src="1prompt.js"></script>
     <script src="arcade-meta.js"></script>
-    <script src="laser-dash.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

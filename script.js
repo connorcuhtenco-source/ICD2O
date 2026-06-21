@@ -14,7 +14,7 @@ const achievementsList = document.getElementById('achievementsList');
 const closeAchievementsBtn = document.getElementById('closeAchievementsBtn');
 
 const tagZoneBtn = document.getElementById('tagZoneBtn');
-const laserDashBtn = document.getElementById('laserDashBtn');
+const neonKillBtn = document.getElementById('neonKillBtn');
 const platformerBtn = document.getElementById('platformerBtn');
 const playBtn = document.getElementById('playBtn');
 const backBtn = document.getElementById('backBtn');
@@ -529,8 +529,6 @@ function showMenu() {
     gameContainer.classList.add('hidden');
     tagHud.classList.add('hidden');
     spaceRunnerUi.classList.add('hidden');
-    document.getElementById('dashHud')?.classList.add('hidden');
-    LaserDash?.stop();
     gameMessage.classList.remove('hidden');
 }
 
@@ -622,7 +620,6 @@ function initFastEagle() {
 function startFastEagle() {
     spaceRunnerUi.classList.add('hidden');
     SpaceRunner.stop();
-    LaserDash?.stop();
     tagHud.classList.add('hidden');
     showGameScreen('Fast Eagle', '', true, false);
     initFastEagle();
@@ -1050,7 +1047,6 @@ function endFastEagle() {
 function startTagZone() {
     spaceRunnerUi.classList.add('hidden');
     SpaceRunner.stop();
-    LaserDash?.stop();
     currentGame = 'tagZone';
     canvas.width = 960;
     canvas.height = 620;
@@ -2160,21 +2156,17 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function startLaserDash() {
-    stopGame();
-    SpaceRunner.stop();
-    currentGame = 'laserDash';
-    tagHud.classList.add('hidden');
-    spaceRunnerUi.classList.add('hidden');
-    showGameScreen('Laser Dash', '', true, false);
-    gameMessage.classList.add('hidden');
-    restartBtn.classList.add('hidden');
-    LaserDash.open(canvas, ctx);
+function startNeonKill() {
+    sessionStorage.setItem('neonKillUpgrades', JSON.stringify({
+        overclock: ArcadeMeta.hasEquippedUpgrade('kill-overclock-core'),
+        siphon: ArcadeMeta.hasEquippedUpgrade('kill-siphon-nanites'),
+        slam: ArcadeMeta.hasEquippedUpgrade('kill-slam-module')
+    }));
+    window.location.href = 'neon-kill.html';
 }
 
 function startSpaceRunner() {
     stopGame();
-    LaserDash?.stop();
     currentGame = 'spaceRunner';
     tagHud.classList.add('hidden');
     showGameScreen('Space Runner', '', true, false);
@@ -2199,11 +2191,6 @@ document.addEventListener('keydown', e => {
         return;
     }
 
-    if (currentGame === 'laserDash') {
-        LaserDash.handleKey(e, true);
-        return;
-    }
-
     if (e.code === 'Space') {
         e.preventDefault();
 
@@ -2224,7 +2211,7 @@ document.addEventListener('keyup', e => {
 
 tagZoneBtn.addEventListener('click', startTagZone);
 
-laserDashBtn?.addEventListener('click', startLaserDash);
+neonKillBtn?.addEventListener('click', startNeonKill);
 
 platformerBtn.addEventListener('click', startSpaceRunner);
 
