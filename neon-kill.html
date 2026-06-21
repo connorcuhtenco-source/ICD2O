@@ -259,64 +259,78 @@
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
 
-        const cyanSolid = new THREE.MeshBasicMaterial({ color: 0x00ffff, depthTest: false, depthWrite: false, fog: false });
-        const cyanEdge = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false, fog: false });
-        const pinkEdge = new THREE.LineBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false, fog: false });
-        const pinkSolid = new THREE.MeshBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.2, depthTest: false, depthWrite: false, fog: false });
+        const viewFlags = { depthTest: false, depthWrite: false, fog: false };
+        const gunBodyMat = new THREE.MeshBasicMaterial({ color: 0x004455, ...viewFlags });
+        const gunGripMat = new THREE.MeshBasicMaterial({ color: 0x002833, ...viewFlags });
+        const gunEdgeMat = new THREE.LineBasicMaterial({ color: 0x00aaaa, transparent: true, opacity: 0.75, ...viewFlags });
+        const barrelMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, ...viewFlags });
+        const barrelEdgeMat = new THREE.LineBasicMaterial({ color: 0x00ffff, ...viewFlags });
+        const armFillMat = new THREE.MeshBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.14, ...viewFlags });
+        const armWireMat = new THREE.LineBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.95, ...viewFlags });
 
-        const GUN_BASE = { x: 0.5, y: -0.4, z: -1.2 };
-        const parryRestPos = new THREE.Vector3(-0.6, -0.5, -1.0);
-        const parryPunchPos = new THREE.Vector3(0.08, -0.5, -0.55);
+        const GUN_BASE = { x: 0.4, y: -0.3, z: -0.8 };
+        const parryRestPos = new THREE.Vector3(-0.5, -0.4, -0.6);
+        const parryPunchPos = new THREE.Vector3(0.05, -0.35, -0.42);
 
-        function addWireBox(w, h, d, mat, edgeMat) {
-            const geo = new THREE.BoxGeometry(w, h, d);
-            const mesh = new THREE.Mesh(geo, mat);
+        function addSolidWithEdges(geo, fillMat, edgeMat) {
+            const mesh = new THREE.Mesh(geo, fillMat);
             const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
             const g = new THREE.Group();
-            g.add(mesh);
-            g.add(wire);
+            g.add(mesh, wire);
             return g;
         }
 
-        const gunModel = new THREE.Group();
-        const grip = addWireBox(0.09, 0.24, 0.13, cyanSolid, cyanEdge);
-        grip.position.set(0, -0.1, 0);
-        const body = addWireBox(0.34, 0.13, 0.15, cyanSolid, cyanEdge);
-        body.position.set(0.04, 0.02, 0);
-        const topRail = addWireBox(0.22, 0.05, 0.08, cyanSolid, cyanEdge);
-        topRail.position.set(0.08, 0.1, 0);
-        const barrelGeo = new THREE.CylinderGeometry(0.034, 0.042, 0.32, 8);
-        const barrel = new THREE.Mesh(barrelGeo, cyanSolid);
-        barrel.rotation.z = Math.PI / 2;
-        barrel.position.set(0.3, 0.05, 0);
-        const barrelWire = new THREE.LineSegments(new THREE.EdgesGeometry(barrelGeo), cyanEdge);
-        barrelWire.rotation.z = Math.PI / 2;
-        barrelWire.position.copy(barrel.position);
-        const muzzleFlare = addWireBox(0.07, 0.07, 0.04, cyanSolid, cyanEdge);
-        muzzleFlare.position.set(0.48, 0.05, 0);
-        const muzzlePoint = new THREE.Object3D();
-        muzzlePoint.position.set(0.52, 0.05, 0);
-        gunModel.add(grip, body, topRail, barrel, barrelWire, muzzleFlare, muzzlePoint);
-        gunModel.position.set(GUN_BASE.x, GUN_BASE.y, GUN_BASE.z);
-        gunModel.rotation.set(-0.08, 0.06, 0.04);
-        gunModel.renderOrder = 999;
-        camera.add(gunModel);
+        function addWireHologram(geo) {
+            const mesh = new THREE.Mesh(geo, armFillMat);
+            const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), armWireMat);
+            const g = new THREE.Group();
+            g.add(mesh, wire);
+            return g;
+        }
 
-        const parryArm = new THREE.Group();
-        const forearm = addWireBox(0.14, 0.1, 0.14, pinkSolid, pinkEdge);
-        forearm.position.set(0, 0, -0.08);
-        const fist = addWireBox(0.2, 0.18, 0.16, pinkSolid, pinkEdge);
-        fist.position.set(0.12, 0.02, 0.02);
-        const knuckle = new THREE.Mesh(
-            new THREE.SphereGeometry(0.06, 6, 6),
-            new THREE.MeshBasicMaterial({ color: 0xff007f, depthTest: false, depthWrite: false, fog: false })
-        );
-        knuckle.position.set(0.22, 0.02, 0.04);
-        parryArm.add(forearm, fist, knuckle);
-        parryArm.visible = false;
-        parryArm.position.copy(parryRestPos);
-        parryArm.renderOrder = 1000;
-        camera.add(parryArm);
+        const gunGroup = new THREE.Group();
+
+        const receiverGeo = new THREE.BoxGeometry(0.32, 0.12, 0.16);
+        const receiver = addSolidWithEdges(receiverGeo, gunBodyMat, gunEdgeMat);
+        receiver.position.set(0, 0.02, 0);
+
+        const gripGeo = new THREE.BoxGeometry(0.1, 0.24, 0.13);
+        const grip = addSolidWithEdges(gripGeo, gunGripMat, gunEdgeMat);
+        grip.position.set(-0.02, -0.14, 0.02);
+
+        const barrelLen = 0.36;
+        const barrelGeo = new THREE.CylinderGeometry(0.034, 0.042, barrelLen, 10);
+        const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0.02, 0.03, -0.08 - barrelLen * 0.5);
+        const barrelWire = new THREE.LineSegments(new THREE.EdgesGeometry(barrelGeo), barrelEdgeMat);
+        barrelWire.rotation.copy(barrel.rotation);
+        barrelWire.position.copy(barrel.position);
+
+        const muzzlePoint = new THREE.Object3D();
+        muzzlePoint.position.set(0.02, 0.03, -0.08 - barrelLen);
+
+        gunGroup.add(receiver, grip, barrel, barrelWire, muzzlePoint);
+        gunGroup.position.set(GUN_BASE.x, GUN_BASE.y, GUN_BASE.z);
+        gunGroup.rotation.set(-0.08, 0.05, 0.03);
+        gunGroup.renderOrder = 999;
+        camera.add(gunGroup);
+
+        const armGroup = new THREE.Group();
+
+        const forearmGeo = new THREE.BoxGeometry(0.38, 0.11, 0.12);
+        const forearm = addWireHologram(forearmGeo);
+        forearm.position.set(-0.06, 0, 0);
+
+        const fistGeo = new THREE.BoxGeometry(0.2, 0.18, 0.16);
+        const fist = addWireHologram(fistGeo);
+        fist.position.set(0.22, 0.01, 0.02);
+
+        armGroup.add(forearm, fist);
+        armGroup.visible = false;
+        armGroup.position.copy(parryRestPos);
+        armGroup.renderOrder = 1000;
+        camera.add(armGroup);
 
         scene.add(camera);
 
@@ -541,15 +555,15 @@
             player.isParrying = true;
             parryTimer = PARRY_DURATION;
             parryAnimTimer = 0;
-            parryArm.visible = true;
-            parryArm.position.copy(parryRestPos);
-            parryArm.rotation.set(0, 0, 0);
+            armGroup.visible = true;
+            armGroup.position.copy(parryRestPos);
+            armGroup.rotation.set(0, 0, 0);
             playParryActivateSound();
         }
 
         function getParryHitCenter() {
             const center = new THREE.Vector3();
-            parryArm.getWorldPosition(center);
+            armGroup.getWorldPosition(center);
             const forward = getAimDirection();
             return center.add(forward.multiplyScalar(0.35));
         }
@@ -584,29 +598,29 @@
                 if (t <= 0.45) {
                     const p = t / 0.45;
                     const eased = 1 - Math.pow(1 - p, 3);
-                    parryArm.position.lerpVectors(parryRestPos, parryPunchPos, eased);
-                    parryArm.rotation.set(-0.35 * eased, 0.25 * eased, -0.5 * eased);
+                    armGroup.position.lerpVectors(parryRestPos, parryPunchPos, eased);
+                    armGroup.rotation.set(-0.35 * eased, 0.25 * eased, -0.5 * eased);
                 } else {
                     const p = (t - 0.45) / 0.55;
                     const eased = p * p;
-                    parryArm.position.lerpVectors(parryPunchPos, parryRestPos, eased);
-                    parryArm.rotation.set(-0.35 * (1 - eased), 0.25 * (1 - eased), -0.5 * (1 - eased));
+                    armGroup.position.lerpVectors(parryPunchPos, parryRestPos, eased);
+                    armGroup.rotation.set(-0.35 * (1 - eased), 0.25 * (1 - eased), -0.5 * (1 - eased));
                 }
             } else {
-                parryArm.visible = false;
-                parryArm.position.copy(parryRestPos);
-                parryArm.rotation.set(0, 0, 0);
+                armGroup.visible = false;
+                armGroup.position.copy(parryRestPos);
+                armGroup.rotation.set(0, 0, 0);
             }
         }
 
         function updateWeaponRig(dt) {
             if (gunRecoil > 0) {
                 gunRecoil = Math.max(0, gunRecoil - dt * 0.55);
-                gunModel.position.z = GUN_BASE.z + gunRecoil * 0.35;
-                gunModel.rotation.x = -0.08 - gunRecoil * 0.6;
+                gunGroup.position.z = GUN_BASE.z + gunRecoil * 0.35;
+                gunGroup.rotation.x = -0.08 - gunRecoil * 0.6;
             } else {
-                gunModel.position.set(GUN_BASE.x, GUN_BASE.y, GUN_BASE.z);
-                gunModel.rotation.x = -0.08;
+                gunGroup.position.set(GUN_BASE.x, GUN_BASE.y, GUN_BASE.z);
+                gunGroup.rotation.x = -0.08;
             }
             updateParryArm(dt);
         }
