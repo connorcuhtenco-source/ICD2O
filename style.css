@@ -935,6 +935,11 @@ body.boot-sequence-active .landing-reveal {
     box-shadow: 0 0 24px rgba(0, 255, 204, 0.12);
 }
 
+.game-tile-mimic {
+    border-color: rgba(255, 77, 200, 0.45);
+    box-shadow: 0 0 24px rgba(255, 77, 200, 0.12);
+}
+
 .game-tile-space {
     border-color: rgba(116, 210, 255, 0.45);
     box-shadow: 0 0 24px rgba(116, 210, 255, 0.12);
@@ -1389,6 +1394,47 @@ canvas {
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
+}
+
+.mimic-hud {
+    position: absolute;
+    inset: 16px 16px auto 16px;
+    pointer-events: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    z-index: 4;
+}
+
+.mimic-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+    background: rgba(4, 6, 16, 0.82);
+    z-index: 5;
+    text-align: center;
+}
+
+.mimic-overlay-title {
+    margin: 0;
+    font-size: 1.4rem;
+    letter-spacing: 0.2em;
+    color: #00ffcc;
+    text-shadow: 0 0 16px rgba(0, 255, 204, 0.5);
+}
+
+.mimic-loadout,
+.mimic-hint {
+    margin: 0;
+    max-width: 420px;
+    color: #b8c4d8;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 .hud-box {

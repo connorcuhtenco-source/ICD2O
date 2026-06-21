@@ -73,6 +73,15 @@
                     <button id="tagZoneBtn" class="menuBtn play-game-btn">Play</button>
                 </article>
 
+                <article class="game-tile game-tile-mimic">
+                    <div class="game-tile-header">
+                        <h3>Neon Mimic</h3>
+                        <span class="difficulty difficulty-hard">Hard</span>
+                    </div>
+                    <p class="game-desc">Start as a blank neon core. Data-tether enemy drones to steal their weapons for 10 seconds — hijack, mimic, survive.</p>
+                    <button id="neonMimicBtn" class="menuBtn play-game-btn">Play</button>
+                </article>
+
                 <article class="game-tile game-tile-space">
                     <div class="game-tile-header">
                         <h3>Space Runner</h3>
@@ -112,6 +121,11 @@
                 </section>
 
                 <section class="shop-section">
+                    <h3 class="shop-section-title"><span class="shop-section-bar"></span>NEON MIMIC CONSUMABLES</h3>
+                    <div id="shopMimicConsumables" class="shop-grid"></div>
+                </section>
+
+                <section class="shop-section">
                     <h3 class="shop-section-title"><span class="shop-section-bar"></span>MOUSE TRAILS</h3>
                     <div id="shopTrails" class="shop-grid"></div>
                 </section>
@@ -145,6 +159,11 @@
                 <section class="shop-section">
                     <h3 class="shop-section-title"><span class="shop-section-bar"></span>POWER UPS</h3>
                     <div id="inventoryPowerUps" class="shop-grid"></div>
+                </section>
+
+                <section class="shop-section">
+                    <h3 class="shop-section-title"><span class="shop-section-bar"></span>NEON MIMIC LOADOUT</h3>
+                    <div id="inventoryMimicConsumables" class="shop-grid"></div>
                 </section>
 
                 <section class="shop-section">
@@ -186,6 +205,16 @@
                 <ul>
                     <li><kbd>W A S D</kbd> or <kbd>↑ ↓ ← →</kbd> — Move</li>
                     <li><kbd>Space</kbd> — Use collected power-up</li>
+                </ul>
+            </div>
+
+            <div class="keybind-group">
+                <h4>Neon Mimic</h4>
+                <ul>
+                    <li><kbd>W A S D</kbd> or <kbd>↑ ↓ ← →</kbd> — Move</li>
+                    <li><kbd>Left Click</kbd> or <kbd>J</kbd> — Fire weapon (when mimicking)</li>
+                    <li><kbd>Right Click</kbd> or <kbd>K</kbd> — Data-Tether (hold to steal)</li>
+                    <li><kbd>Space</kbd> — Core Burst (shop consumable)</li>
                 </ul>
             </div>
 
@@ -258,6 +287,43 @@
                     </div>
                 </div>
 
+                <div id="mimicHud" class="mimic-hud hidden">
+                    <div class="hud-box">
+                        <span>Score</span>
+                        <strong id="mimicScore">0</strong>
+                    </div>
+                    <div class="hud-box">
+                        <span>Shards</span>
+                        <strong id="mimicShards">0</strong>
+                    </div>
+                    <div class="hud-box">
+                        <span>Form</span>
+                        <strong id="mimicPower">BLANK CORE</strong>
+                    </div>
+                    <div class="hud-box">
+                        <span>Tether</span>
+                        <strong id="mimicTether">READY</strong>
+                    </div>
+                    <div class="hud-box">
+                        <span>Core Burst</span>
+                        <strong id="mimicBurst">—</strong>
+                    </div>
+                </div>
+
+                <div id="mimicStartScreen" class="mimic-overlay hidden">
+                    <h3 class="mimic-overlay-title">NEON MIMIC</h3>
+                    <p id="mimicLoadout" class="mimic-loadout">No consumable equipped</p>
+                    <p class="mimic-hint">Hold <kbd>K</kbd> or Right Click to data-tether enemies and steal their power.</p>
+                    <button id="mimicStartBtn" class="menuBtn">Start Run</button>
+                </div>
+
+                <div id="mimicGameOverScreen" class="mimic-overlay hidden">
+                    <h3 class="mimic-overlay-title">CORE DESTROYED</h3>
+                    <p id="mimicFinalScore"></p>
+                    <p id="mimicFinalShards"></p>
+                    <button id="mimicPlayAgainBtn" class="menuBtn">Play Again</button>
+                </div>
+
                 <div id="achievementToastHost" class="achievement-toast-host"></div>
 
                 <button id="restartBtn" class="menuBtn hidden canvas-restart-btn">Restart</button>
@@ -289,6 +355,7 @@
     </script>
     <script src="1prompt.js"></script>
     <script src="arcade-meta.js"></script>
+    <script src="neon-mimic.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

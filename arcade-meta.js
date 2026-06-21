@@ -12,9 +12,12 @@ const ArcadeMeta = (() => {
     };
 
     const SHOP_ITEMS = [
-        { id: 'tag-stop-time', category: 'upgrade', name: 'Stop Time', price: 200, desc: 'Freezes enemies and the timer for a few seconds.', preview: 'preview-stop-time', icon: '⏸' },
         { id: 'tag-time-accel', category: 'upgrade', name: 'Time Acceleration', price: 250, desc: 'Move faster while the level timer speeds up until the wave ends.', preview: 'preview-time-accel', icon: '⏩' },
         { id: 'space-shield', category: 'upgrade', name: 'Neon Shield', price: 300, desc: 'Smash through 10 asteroids with a neon barrier.', preview: 'preview-space-shield', icon: '🛡' },
+        { id: 'mimic-emp', category: 'mimic-consumable', name: 'EMP Overload', price: 75, desc: 'Freezes all enemies for 4 seconds. Equip for Neon Mimic runs.', icon: '⚡' },
+        { id: 'mimic-tether-hack', category: 'mimic-consumable', name: 'Tether Hack', price: 75, desc: 'Resets tether cooldown and boosts tether range 50% for 8 seconds.', icon: '🔗' },
+        { id: 'mimic-overclock', category: 'mimic-consumable', name: 'Overclock Battery', price: 100, desc: 'Refills your power timer and doubles fire rate for that cycle.', icon: '🔋' },
+        { id: 'mimic-shield', category: 'mimic-consumable', name: 'Emergency Shield', price: 150, desc: 'Blocks the next hit. Auto-activates when you take damage.', icon: '🛡' },
         { id: 'trail-cyan', category: 'trail', name: 'Neon Cyan Trail', price: 0, desc: 'Classic cyan and pink neon mouse trail.', preview: 'preview-trail-cyan' },
         { id: 'trail-pink', category: 'trail', name: 'Hot Pink Trail', price: 75, desc: 'Magenta streaks with gold sparks.', preview: 'preview-trail-pink' },
         { id: 'trail-gold', category: 'trail', name: 'Gold Rush Trail', price: 100, desc: 'Golden arcade streaks behind your cursor.', preview: 'preview-trail-gold' },
@@ -52,10 +55,11 @@ const ArcadeMeta = (() => {
             equipped: {
                 trail: 'trail-cyan',
                 theme: 'theme-default',
-                tagStopTime: false,
                 tagTimeAccel: false,
-                spaceShield: false
+                spaceShield: false,
+                mimicConsumable: null
             },
+            mimicCharges: {},
             daily: { date: '', quests: [] },
             playTimeAccumulator: 0,
             tagMatchCount: 0,
@@ -69,6 +73,7 @@ const ArcadeMeta = (() => {
             state = { ...defaultState(), ...saved };
             state.equipped = { ...defaultState().equipped, ...saved?.equipped };
             state.redeemedPromoCodes = Array.isArray(saved?.redeemedPromoCodes) ? saved.redeemedPromoCodes : [];
+            state.mimicCharges = saved?.mimicCharges && typeof saved.mimicCharges === 'object' ? saved.mimicCharges : {};
             ensureDailyQuests();
         } catch {
             state = defaultState();
@@ -79,7 +84,6 @@ const ArcadeMeta = (() => {
     }
 
     function syncOwnedUpgrades() {
-        if (isOwned('tag-stop-time')) state.equipped.tagStopTime = true;
         if (isOwned('tag-time-accel')) state.equipped.tagTimeAccel = true;
         if (isOwned('space-shield')) state.equipped.spaceShield = true;
     }
@@ -162,9 +166,9 @@ const ArcadeMeta = (() => {
         if (!item) return false;
         if (item.category === 'trail') return state.equipped.trail === id;
         if (item.category === 'theme') return state.equipped.theme === id;
-        if (id === 'tag-stop-time') return state.equipped.tagStopTime;
         if (id === 'tag-time-accel') return state.equipped.tagTimeAccel;
         if (id === 'space-shield') return state.equipped.spaceShield;
+        if (item.category === 'mimic-consumable') return state.equipped.mimicConsumable === id;
         return false;
     }
 
@@ -195,6 +199,13 @@ const ArcadeMeta = (() => {
                 : `<button class="shop-price-btn equip" data-equip="${item.id}">ENABLE</button>`;
         }
 
+        if (item.category === 'mimic-consumable') {
+            const charges = state.mimicCharges[item.id] || 0;
+            const canBuy = state.tokens >= item.price;
+            const stock = charges > 0 ? ` · ${charges} owned` : '';
+            return `<button class="shop-price-btn buy" data-buy="${item.id}" ${canBuy ? '' : 'disabled'}><span class="shop-coin">🪙</span>${item.price}${stock}</button>`;
+        }
+
         if (owned || item.price === 0) {
             return '<button class="shop-price-btn owned" disabled>OWNED</button>';
         }
@@ -210,6 +221,13 @@ const ArcadeMeta = (() => {
             return equipped
                 ? '<button class="shop-price-btn equipped" disabled>EQUIPPED</button>'
                 : `<button class="shop-price-btn equip" data-equip="${item.id}">EQUIP</button>`;
+        }
+
+        if (item.category === 'mimic-consumable') {
+            const charges = state.mimicCharges[item.id] || 0;
+            return equipped
+                ? `<button class="shop-price-btn equipped" disabled>LOADOUT (${charges})</button>`
+                : `<button class="shop-price-btn equip" data-equip="${item.id}">LOADOUT (${charges})</button>`;
         }
 
         return equipped
@@ -264,7 +282,10 @@ const ArcadeMeta = (() => {
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        const items = getItemsByCategory(category).filter(item => isOwned(item.id) && item.price > 0);
+        const items = getItemsByCategory(category).filter(item => {
+            if (category === 'mimic-consumable') return (state.mimicCharges[item.id] || 0) > 0;
+            return isOwned(item.id) && item.price > 0;
+        });
 
         if (!items.length) {
             container.innerHTML = '<p class="shop-empty-section">Nothing has been bought yet</p>';
@@ -277,6 +298,7 @@ const ArcadeMeta = (() => {
 
     function renderShop() {
         renderShopSection('shopPowerUps', 'upgrade');
+        renderShopSection('shopMimicConsumables', 'mimic-consumable');
         renderShopSection('shopTrails', 'trail');
         renderShopSection('shopBackgrounds', 'theme');
         updateTokenDisplays();
@@ -284,19 +306,31 @@ const ArcadeMeta = (() => {
 
     function renderInventory() {
         renderInventorySection('inventoryPowerUps', 'upgrade');
+        renderInventorySection('inventoryMimicConsumables', 'mimic-consumable');
         renderInventorySection('inventoryTrails', 'trail');
         renderInventorySection('inventoryBackgrounds', 'theme');
     }
 
     function buyItem(id) {
         const item = SHOP_ITEMS.find(i => i.id === id);
-        if (!item || isOwned(id)) return false;
+        if (!item) return false;
         if (state.tokens < item.price) return false;
+
+        if (item.category === 'mimic-consumable') {
+            state.tokens -= item.price;
+            state.mimicCharges[id] = (state.mimicCharges[id] || 0) + 1;
+            save();
+            renderShop();
+            renderInventory();
+            window.ArcadeSettings?.playSound('collect');
+            return true;
+        }
+
+        if (isOwned(id)) return false;
         state.tokens -= item.price;
         state.owned.push(id);
         if (item.category === 'upgrade') {
-            if (id === 'tag-stop-time') state.equipped.tagStopTime = true;
-            else if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
+            if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
             else if (id === 'space-shield') state.equipped.spaceShield = true;
         }
         save();
@@ -307,16 +341,26 @@ const ArcadeMeta = (() => {
     }
 
     function equipItem(id) {
-        if (!isOwned(id)) return false;
         const item = SHOP_ITEMS.find(i => i.id === id);
         if (!item) return false;
+
+        if (item.category === 'mimic-consumable') {
+            if ((state.mimicCharges[id] || 0) <= 0) return false;
+            state.equipped.mimicConsumable = id;
+            save();
+            renderShop();
+            renderInventory();
+            window.ArcadeSettings?.playSound('click');
+            return true;
+        }
+
+        if (!isOwned(id)) return false;
 
         if (item.category === 'trail') state.equipped.trail = id;
         else if (item.category === 'theme') {
             state.equipped.theme = id;
             applyTheme();
-        } else if (id === 'tag-stop-time') state.equipped.tagStopTime = true;
-        else if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
+        } else if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
         else if (id === 'space-shield') state.equipped.spaceShield = true;
 
         save();
@@ -327,9 +371,9 @@ const ArcadeMeta = (() => {
     }
 
     function unequipUpgrade(id) {
-        if (id === 'tag-stop-time') state.equipped.tagStopTime = false;
         if (id === 'tag-time-accel') state.equipped.tagTimeAccel = false;
         if (id === 'space-shield') state.equipped.spaceShield = false;
+        if (state.equipped.mimicConsumable === id) state.equipped.mimicConsumable = null;
         save();
         renderInventory();
         renderShop();
@@ -428,12 +472,38 @@ const ArcadeMeta = (() => {
         state.tagMatchCount += 1;
         save();
         return {
-            activateTimeAccel: state.equipped.tagTimeAccel && Math.random() < 0.75
+            activateTimeAccel: state.equipped.tagTimeAccel && Math.random() < 0.25
         };
     }
 
-    function rollStopTimeSpawn() {
-        return state.equipped.tagStopTime && Math.random() < 0.85;
+    function getEquippedMimicConsumable() {
+        const id = state.equipped.mimicConsumable;
+        if (!id || (state.mimicCharges[id] || 0) <= 0) return null;
+        return id;
+    }
+
+    function getMimicCharges(id) {
+        return state.mimicCharges[id] || 0;
+    }
+
+    function useMimicCharge(id) {
+        if (state.equipped.mimicConsumable !== id) return false;
+        if ((state.mimicCharges[id] || 0) <= 0) return false;
+        state.mimicCharges[id] -= 1;
+        if (state.mimicCharges[id] <= 0) {
+            state.mimicCharges[id] = 0;
+            if (state.equipped.mimicConsumable === id) state.equipped.mimicConsumable = null;
+        }
+        save();
+        renderInventory();
+        return true;
+    }
+
+    function onNeonMimicEnd(runScore, shards, survivalTime) {
+        const tokenReward = Math.floor(shards / 2);
+        if (tokenReward > 0) addTokens(tokenReward, 'Neon Mimic shards');
+        if (runScore >= 1500) addTokens(8, 'Neon Mimic run');
+        if (survivalTime >= 120) addTokens(5, 'Neon Mimic survival');
     }
 
     function onTagZoneUpdate(survivalTime, level) {
@@ -515,7 +585,6 @@ const ArcadeMeta = (() => {
     }
 
     function hasEquippedUpgrade(id) {
-        if (id === 'tag-stop-time') return state.equipped.tagStopTime;
         if (id === 'tag-time-accel') return state.equipped.tagTimeAccel;
         if (id === 'space-shield') return state.equipped.spaceShield;
         return false;
@@ -563,11 +632,14 @@ const ArcadeMeta = (() => {
         playGlitchTransition,
         tickPlayTime,
         onTagZoneStart,
-        rollStopTimeSpawn,
         onTagZoneUpdate,
         onTagLevelSurvived,
         onFastEagleEnd,
         onSpaceRunnerEnd,
+        onNeonMimicEnd,
+        getEquippedMimicConsumable,
+        getMimicCharges,
+        useMimicCharge,
         getTrailStyle,
         hasEquippedUpgrade
     };

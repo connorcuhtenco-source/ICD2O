@@ -447,9 +447,9 @@ const SpaceRunner = (() => {
         updateStars(dt);
         updateShieldPickups(dt);
 
-        if (window.ArcadeMeta?.hasEquippedUpgrade?.('space-shield') && now - lastShieldSpawnCheck >= 18000) {
+        if (window.ArcadeMeta?.hasEquippedUpgrade?.('space-shield') && now - lastShieldSpawnCheck >= 20000) {
             lastShieldSpawnCheck = now;
-            if (Math.random() < 0.5) {
+            if (Math.random() < 0.35) {
                 spawnShieldPickup();
             }
         }

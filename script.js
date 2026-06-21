@@ -14,6 +14,7 @@ const achievementsList = document.getElementById('achievementsList');
 const closeAchievementsBtn = document.getElementById('closeAchievementsBtn');
 
 const tagZoneBtn = document.getElementById('tagZoneBtn');
+const neonMimicBtn = document.getElementById('neonMimicBtn');
 const platformerBtn = document.getElementById('platformerBtn');
 const playBtn = document.getElementById('playBtn');
 const backBtn = document.getElementById('backBtn');
@@ -128,7 +129,6 @@ let tagHitImmunityTimer = 0;
 let tagHitBoostTimer = 0;
 let tagNukeEffectTimer = 0;
 let tagNukeActive = false;
-let tagStopTimeTimer = 0;
 let tagTimeAccelActive = false;
 let countdown = 3;
 let countdownActive = false;
@@ -162,14 +162,6 @@ const nukeItemType = {
     color: '#ff6b35',
     glow: 'rgba(255, 107, 53, 0.7)',
     icon: '☢'
-};
-
-const stopTimeItemType = {
-    name: 'Stop Time',
-    className: 'stop-time',
-    color: '#b388ff',
-    glow: 'rgba(179, 136, 255, 0.65)',
-    icon: '⏸'
 };
 
 const tagMapTileImages = TAG_MAP_TILE_SOURCES.map(src => {
@@ -537,6 +529,8 @@ function showMenu() {
     gameContainer.classList.add('hidden');
     tagHud.classList.add('hidden');
     spaceRunnerUi.classList.add('hidden');
+    document.getElementById('mimicHud')?.classList.add('hidden');
+    NeonMimic?.stop();
     gameMessage.classList.remove('hidden');
 }
 
@@ -628,6 +622,7 @@ function initFastEagle() {
 function startFastEagle() {
     spaceRunnerUi.classList.add('hidden');
     SpaceRunner.stop();
+    NeonMimic?.stop();
     tagHud.classList.add('hidden');
     showGameScreen('Fast Eagle', '', true, false);
     initFastEagle();
@@ -1055,6 +1050,7 @@ function endFastEagle() {
 function startTagZone() {
     spaceRunnerUi.classList.add('hidden');
     SpaceRunner.stop();
+    NeonMimic?.stop();
     currentGame = 'tagZone';
     canvas.width = 960;
     canvas.height = 620;
@@ -1066,7 +1062,6 @@ function startTagZone() {
     tagHitBoostTimer = 0;
     tagNukeEffectTimer = 0;
     tagNukeActive = false;
-    tagStopTimeTimer = 0;
     tagTimeAccelActive = false;
 
     const metaRolls = ArcadeMeta.onTagZoneStart();
@@ -1122,10 +1117,6 @@ function setupTagLevel(options = {}) {
 
     if (Math.random() < TAG_NUKE_SPAWN_CHANCE) {
         tagItems.push(createTagItem('nuke'));
-    }
-
-    if (ArcadeMeta.rollStopTimeSpawn?.()) {
-        tagItems.push(createTagItem('stopTime'));
     }
 
     if (tagTimeAccelActive && tagLevel === 1) {
@@ -1307,9 +1298,7 @@ function createTagger(type = 'regular') {
 function createTagItem(forcedType = null) {
     const type = forcedType === 'nuke'
         ? nukeItemType
-        : forcedType === 'stopTime'
-            ? stopTimeItemType
-            : itemTypes[Math.floor(Math.random() * itemTypes.length)];
+        : itemTypes[Math.floor(Math.random() * itemTypes.length)];
 
     return {
         x: TAG_BARRIER_DEPTH + 80 + Math.random() * (WORLD_WIDTH - TAG_BARRIER_DEPTH * 2 - 160),
@@ -1390,7 +1379,6 @@ function updateTagZone(delta) {
     tagBoostTimer = Math.max(0, tagBoostTimer - delta);
     tagHitImmunityTimer = Math.max(0, tagHitImmunityTimer - delta);
     tagHitBoostTimer = Math.max(0, tagHitBoostTimer - delta);
-    tagStopTimeTimer = Math.max(0, tagStopTimeTimer - delta);
 
     ArcadeMeta.onTagZoneUpdate(tagSurvivalTime, tagLevel);
 
@@ -1464,7 +1452,7 @@ function updateTagPlayerAnimation(delta) {
 }
 
 function moveTaggers(delta) {
-    if (tagFreezeTimer > 0 || tagStopTimeTimer > 0) return;
+    if (tagFreezeTimer > 0) return;
 
     taggers.forEach(tagger => {
         const targetX = tagPlayer.x - tagger.x;
@@ -1635,11 +1623,6 @@ function useTagItem() {
     if (item.name === 'Shield') {
         tagShieldTimer = 6;
         gameMessage.textContent = 'Shield activated';
-    }
-
-    if (item.name === 'Stop Time') {
-        tagStopTimeTimer = 3.5;
-        gameMessage.textContent = 'Time stopped!';
     }
 
     if (item.name === 'Nuke') {
@@ -1909,19 +1892,6 @@ function drawTagNukeEffect() {
 }
 
 function drawTagPowerUp(type, radius) {
-    if (type.className === 'stop-time') {
-        ctx.strokeStyle = '#e8d9ff';
-        ctx.lineWidth = 2;
-        ctx.fillStyle = 'rgba(179, 136, 255, 0.85)';
-        ctx.beginPath();
-        ctx.arc(0, 0, radius * 0.72, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(-radius * 0.12, -radius * 0.32, radius * 0.24, radius * 0.64);
-        return;
-    }
-
     if (type.className === 'nuke') {
         ctx.fillStyle = type.color;
         ctx.strokeStyle = '#fff2cc';
@@ -2190,8 +2160,21 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
+function startNeonMimic() {
+    stopGame();
+    SpaceRunner.stop();
+    currentGame = 'neonMimic';
+    tagHud.classList.add('hidden');
+    spaceRunnerUi.classList.add('hidden');
+    showGameScreen('Neon Mimic', '', true, false);
+    gameMessage.classList.add('hidden');
+    restartBtn.classList.add('hidden');
+    NeonMimic.open(canvas, ctx);
+}
+
 function startSpaceRunner() {
     stopGame();
+    NeonMimic?.stop();
     currentGame = 'spaceRunner';
     tagHud.classList.add('hidden');
     showGameScreen('Space Runner', '', true, false);
@@ -2216,6 +2199,14 @@ document.addEventListener('keydown', e => {
         return;
     }
 
+    if (currentGame === 'neonMimic') {
+        NeonMimic.handleKey(e, true);
+        if (['Space', 'KeyJ', 'KeyK'].includes(e.code)) {
+            e.preventDefault();
+        }
+        return;
+    }
+
     if (e.code === 'Space') {
         e.preventDefault();
 
@@ -2232,15 +2223,31 @@ document.addEventListener('keydown', e => {
 
 document.addEventListener('keyup', e => {
     keys[e.code] = false;
-});
-
-canvas.addEventListener('click', () => {
-    if (currentGame === 'fastEagle') {
-        flap();
+    if (currentGame === 'neonMimic') {
+        NeonMimic.handleKey(e, false);
     }
 });
 
+canvas.addEventListener('contextmenu', e => {
+    if (currentGame === 'neonMimic') e.preventDefault();
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (currentGame === 'neonMimic') NeonMimic.handleMouseMove(e);
+});
+
+canvas.addEventListener('mousedown', e => {
+    if (currentGame === 'neonMimic') NeonMimic.handleMouseDown(e);
+    if (currentGame === 'fastEagle') flap();
+});
+
+canvas.addEventListener('mouseup', e => {
+    if (currentGame === 'neonMimic') NeonMimic.handleMouseUp(e);
+});
+
 tagZoneBtn.addEventListener('click', startTagZone);
+
+neonMimicBtn?.addEventListener('click', startNeonMimic);
 
 platformerBtn.addEventListener('click', startSpaceRunner);
 
