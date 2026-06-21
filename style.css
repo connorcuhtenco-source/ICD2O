@@ -1715,15 +1715,27 @@ body.water-royale-page #game {
     width: 100%;
 }
 
-body.water-royale-page .water-overlay,
-body.water-royale-page .water-message {
-    align-items: center;
+body.water-royale-page .water-overlay {
     background: rgba(11, 39, 47, 0.5);
     inset: 0;
     display: flex;
     justify-content: center;
-    padding: 18px;
+    padding: 20px 18px;
     position: absolute;
+    z-index: 8;
+}
+
+body.water-royale-page #menu.water-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    pointer-events: auto;
+}
+
+body.water-royale-page .water-message {
+    align-items: center;
+    overflow: visible;
 }
 
 body.water-royale-page .water-panel,
@@ -1740,6 +1752,8 @@ body.water-royale-page .water-panel {
     max-width: 650px;
     padding: 24px;
     width: min(650px, 100%);
+    margin: auto;
+    flex-shrink: 0;
 }
 
 body.water-royale-page .water-panel h2,

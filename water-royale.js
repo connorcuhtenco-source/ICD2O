@@ -44,43 +44,43 @@ const weaponStats = {
   rifle: { label: "Rifle", damage: 5, ammo: 3, reload: 1.1, fireRate: 0.09, speed: 760, size: 5, range: 560, color: "#16b8ff", burst: 8 }
 };
 
-// Preload weapon images from the GunSprites folder. Use a fallback if an image isn't available yet.
+// Sprite paths — use your uploaded filenames as-is (place PNGs in repo root)
 const weaponImages = {};
 const weaponImageFiles = {
-  pistol: 'pistol.png',
-  shotgun: 'shotgun.png',
-  sniper: 'sniper.png',
-  rifle: 'rifle.png'
+  pistol: 'water-gun-pistol-clour-palette_-white-gr-2.png',
+  shotgun: 'water-gun-shotgun-colour-palette-white-3.png',
+  sniper: 'water-gun_-sniper-clour-palette_-white-g-4.png',
+  rifle: 'water-gun-rifle-colour-palette-white--4.png'
 };
 for (const key in weaponImageFiles) {
   const img = new Image();
-  img.src = `GunSprites/${weaponImageFiles[key]}`;
+  img.src = weaponImageFiles[key];
   weaponImages[key] = img;
 }
 
 const juggernautSprite = new Image();
-juggernautSprite.src = 'PlayerSprites/juggernaut sprite (1).png';
+juggernautSprite.src = 'juggernaut_sprite_1.png';
 const juggernautSpriteFrame = { w: 24, h: 32, cols: 4, rows: 4 };
 const juggernautSpriteDisplay = { w: juggernautSpriteFrame.w * 4, h: juggernautSpriteFrame.h * 4 };
 
 const speedsterSprite = new Image();
-speedsterSprite.src = 'PlayerSprites/speedster sprite.png';
+speedsterSprite.src = 'speedster_sprite.png';
 const speedsterSpriteFrame = { w: 24, h: 32, cols: 4, rows: 4 };
 const speedsterSpriteDisplay = { w: speedsterSpriteFrame.w * 4, h: speedsterSpriteFrame.h * 4 };
 
 const defaultSprite = new Image();
-defaultSprite.src = 'PlayerSprites/deafult sprite.png';
+defaultSprite.src = 'deafult sprite.png';
 const defaultSpriteFrame = { w: 24, h: 32, cols: 4, rows: 4 };
 const defaultSpriteDisplay = { w: defaultSpriteFrame.w * 4, h: defaultSpriteFrame.h * 4 };
 
 const wallSprite = new Image();
-wallSprite.src = 'MapSprites/Wall.png';
+wallSprite.src = 'New_Piskel.png';
 
 const speedTileSprite = new Image();
-speedTileSprite.src = 'MapSprites/SpeedTile.png';
+speedTileSprite.src = 'New_Piskel_1.png';
 
 const bushSprite = new Image();
-bushSprite.src = 'MapSprites/Bush.png';
+bushSprite.src = 'New_Piskel_2.png';
 
 // Persistent lobby record (wins / losses) stored in localStorage
 const recordKey = 'waterroyale_record_v1';
