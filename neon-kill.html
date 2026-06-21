@@ -152,6 +152,40 @@
             z-index: 10;
         }
         .hidden { display: none !important; }
+        #bossHud {
+            position: fixed;
+            top: 72px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(520px, 72vw);
+            display: none;
+            pointer-events: none;
+            z-index: 8;
+            text-align: center;
+        }
+        #bossName {
+            font-size: 11px;
+            letter-spacing: 0.28em;
+            color: #ff2244;
+            text-shadow: 0 0 12px rgba(255, 34, 68, 0.65);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        #bossBarTrack {
+            width: 100%;
+            height: 10px;
+            background: rgba(0, 0, 0, 0.82);
+            border: 1px solid rgba(255, 34, 68, 0.45);
+            box-shadow: 0 0 18px rgba(255, 0, 60, 0.2);
+        }
+        #bossBarFill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff0033, #ff4477);
+            box-shadow: 0 0 14px rgba(255, 0, 51, 0.75);
+            transform-origin: left center;
+            transform: scaleX(1);
+        }
     </style>
 </head>
 <body>
@@ -164,6 +198,10 @@
             <span class="tick bottom"></span>
             <span class="tick left"></span>
             <span class="tick right"></span>
+        </div>
+        <div id="bossHud">
+            <div id="bossName">APEX SENTRY // PROTOCOL ACTIVATED</div>
+            <div id="bossBarTrack"><div id="bossBarFill"></div></div>
         </div>
         <div id="ui">
             <div class="ui-top">
@@ -226,7 +264,7 @@
             if (saved.slam) window.NeonKillSetup.enableSlamModule();
         } catch (_) {}
 
-        const ARENA = 48;
+        const ARENA = 40;
         const FLOOR_Y = 0;
         const EYE_HEIGHT = 1.65;
         const SLIDE_HEIGHT = EYE_HEIGHT * 0.5;
@@ -252,15 +290,23 @@
         let chargeLevel = 0;
         let parryBursts = [];
         let beamEffects = [];
+        let laserWalls = [];
         let enemies = [];
         let projectiles = [];
         let healParticles = [];
         let keys = {};
         let mouseDown = { left: false, right: false };
+        let isBossWave = false;
+        let activeBoss = null;
 
         const PLAYER_SHOT_DAMAGE = 25;
         const PARRY_SHOT_DAMAGE = PLAYER_SHOT_DAMAGE * 3;
         const PIERCE_DAMAGE = 55;
+        const BOSS_PRIMARY_DMG = 5;
+        const BOSS_PARRY_DMG = 95;
+        const BOSS_PIERCE_DMG = 140;
+        const CHASM_Y = -10;
+        const JUMP_PAD_VEL = 35;
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050008);
@@ -405,6 +451,9 @@
         scene.add(camera);
 
         const parryFlashEl = document.getElementById('parryFlash');
+        const bossHudEl = document.getElementById('bossHud');
+        const bossNameEl = document.getElementById('bossName');
+        const bossBarFillEl = document.getElementById('bossBarFill');
         const PARRY_WINDOW = 0.2;
         const PARRY_ANIM_MS = 150;
         const PARRY_FLASH_DECAY = 0.15;
@@ -504,33 +553,60 @@
         fill.position.set(-20, 8, 20);
         scene.add(fill);
 
-        const gridHelper = new THREE.GridHelper(ARENA * 2, 40, 0xff007f, 0x220044);
+        const gridHelper = new THREE.GridHelper(ARENA * 2, 32, 0xff007f, 0x220044);
         gridHelper.material.opacity = 0.45;
         gridHelper.material.transparent = true;
         scene.add(gridHelper);
 
         const floorGeo = new THREE.PlaneGeometry(ARENA * 2, ARENA * 2);
-        const floorMat = new THREE.MeshBasicMaterial({ color: 0x0a0018, transparent: true, opacity: 0.85 });
+        const floorMat = new THREE.MeshBasicMaterial({ color: 0x0a0018, transparent: true, opacity: 0.88 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
 
-        const wallMat = new THREE.LineBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.25 });
-        const box = new THREE.BoxGeometry(ARENA * 2, 20, ARENA * 2);
+        const wallMat = new THREE.LineBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.35 });
+        const box = new THREE.BoxGeometry(ARENA * 2, 16, ARENA * 2);
         const wallWire = new THREE.LineSegments(new THREE.EdgesGeometry(box), wallMat);
-        wallWire.position.y = 10;
+        wallWire.position.y = 8;
         scene.add(wallWire);
 
+        const jumpPads = [];
+        const padMat = new THREE.MeshBasicMaterial({ color: 0x44ff88, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+        const padEdge = new THREE.LineBasicMaterial({ color: 0x88ffaa });
+        const padCorners = [
+            [ARENA * 0.72, ARENA * 0.72],
+            [-ARENA * 0.72, ARENA * 0.72],
+            [ARENA * 0.72, -ARENA * 0.72],
+            [-ARENA * 0.72, -ARENA * 0.72]
+        ];
+        padCorners.forEach(([x, z]) => {
+            const geo = new THREE.ConeGeometry(2.4, 0.18, 3);
+            const pad = new THREE.Mesh(geo, padMat);
+            pad.rotation.x = -Math.PI / 2;
+            pad.position.set(x, 0.1, z);
+            const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), padEdge);
+            wire.rotation.copy(pad.rotation);
+            wire.position.copy(pad.position);
+            scene.add(pad, wire);
+            jumpPads.push({ x, z, radius: 2.2 });
+        });
+
         const pillars = [];
-        for (let i = 0; i < 6; i++) {
-            const h = 6 + Math.random() * 8;
-            const geo = new THREE.BoxGeometry(2, h, 2);
+        const pillarSpots = [
+            [ARENA * 0.35, ARENA * 0.35, 0],
+            [-ARENA * 0.35, ARENA * 0.35, 1.4],
+            [ARENA * 0.35, -ARENA * 0.35, 2.8],
+            [-ARENA * 0.35, -ARENA * 0.35, 4.2]
+        ];
+        pillarSpots.forEach(([x, z, phase]) => {
+            const h = 10;
+            const geo = new THREE.BoxGeometry(3, h, 3);
             const edges = new THREE.EdgesGeometry(geo);
             const mesh = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x00ffff }));
-            mesh.position.set((Math.random() - 0.5) * ARENA * 1.4, h / 2, (Math.random() - 0.5) * ARENA * 1.4);
+            mesh.position.set(x, h * 0.5, z);
             scene.add(mesh);
-            pillars.push({ x: mesh.position.x, z: mesh.position.z, half: 1.2, h });
-        }
+            pillars.push({ mesh, x, z, half: 1.7, h, phase, baseY: h * 0.5, amp: 3.5 });
+        });
 
         const playerPos = new THREE.Vector3(0, FLOOR_Y + EYE_HEIGHT, 0);
 
@@ -587,12 +663,170 @@
             });
         }
 
+        function updateBossBar() {
+            if (!activeBoss) {
+                bossHudEl.style.display = 'none';
+                return;
+            }
+            bossHudEl.style.display = 'block';
+            bossNameEl.textContent = activeBoss.label;
+            const pct = Math.max(0, activeBoss.hp / activeBoss.maxHp);
+            bossBarFillEl.style.transform = `scaleX(${pct})`;
+        }
+
+        function showBossHud() { updateBossBar(); }
+        function hideBossHud() { bossHudEl.style.display = 'none'; }
+
+        function clearLaserWalls() {
+            laserWalls.forEach(w => scene.remove(w.mesh));
+            laserWalls = [];
+        }
+
+        function spawnBoss() {
+            isBossWave = true;
+            enemies = [];
+            clearLaserWalls();
+
+            const geo = new THREE.DodecahedronGeometry(3.8, 0);
+            const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xff2244 }));
+            const core = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x440011, transparent: true, opacity: 0.85 }));
+            const mesh = new THREE.Group();
+            mesh.add(wire, core);
+            mesh.position.set(0, 8, 0);
+            scene.add(mesh);
+
+            activeBoss = {
+                name: 'APEX SENTRY',
+                label: 'APEX SENTRY // PROTOCOL ACTIVATED',
+                mesh,
+                hp: 1200,
+                maxHp: 1200,
+                mode: 'projectiles',
+                modeTimer: 7,
+                shootTimer: 0,
+                isBoss: true
+            };
+            showBossHud();
+        }
+
+        function bossShootAtPlayer() {
+            if (!activeBoss) return;
+            const dir = new THREE.Vector3().subVectors(playerPos, activeBoss.mesh.position).normalize();
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.26, 6, 6),
+                new THREE.MeshBasicMaterial({ color: 0xff1133 })
+            );
+            mesh.position.copy(activeBoss.mesh.position);
+            scene.add(mesh);
+            projectiles.push({ mesh, vel: dir.multiplyScalar(26), owner: 'enemy', life: 6, fromBoss: true });
+        }
+
+        function spawnBossLaserWall() {
+            const geo = new THREE.BoxGeometry(ARENA * 2.4, 0.28, 1.4);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.72 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(0, 1.05, -ARENA * 0.95);
+            scene.add(mesh);
+            laserWalls.push({ mesh, velZ: 24, life: 5 });
+        }
+
+        function updateLaserWalls(dt) {
+            laserWalls = laserWalls.filter(w => {
+                w.life -= dt;
+                w.mesh.position.z += w.velZ * dt;
+                if (Math.abs(playerPos.z - w.mesh.position.z) < 1.1 &&
+                    Math.abs(playerPos.y - w.mesh.position.y) < 1.2 &&
+                    Math.abs(playerPos.x) < ARENA * 0.95 && player.hp > 0) {
+                    player.hp -= 22 * dt;
+                    if (player.hp <= 0) gameOver();
+                }
+                if (w.life <= 0 || w.mesh.position.z > ARENA * 1.1) {
+                    scene.remove(w.mesh);
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        function updateBoss(dt) {
+            if (!activeBoss) return;
+            const b = activeBoss;
+            b.mesh.position.y = 8 + Math.sin(performance.now() * 0.0012) * 0.9;
+            b.mesh.rotation.x += dt * 0.25;
+            b.mesh.rotation.y += dt * 0.45;
+
+            b.modeTimer -= dt;
+            if (b.modeTimer <= 0) {
+                b.mode = b.mode === 'projectiles' ? 'laserwall' : 'projectiles';
+                b.modeTimer = 7.5;
+                if (b.mode === 'laserwall') spawnBossLaserWall();
+            }
+
+            if (b.mode === 'projectiles') {
+                b.shootTimer -= dt;
+                if (b.shootTimer <= 0) {
+                    bossShootAtPlayer();
+                    b.shootTimer = 0.11;
+                }
+            }
+
+            updateLaserWalls(dt);
+            updateBossBar();
+        }
+
+        function damageBoss(amt, source) {
+            if (!activeBoss) return;
+            let dmg = amt;
+            if (source === 'primary') dmg = BOSS_PRIMARY_DMG;
+            else if (source === 'parry') dmg = BOSS_PARRY_DMG;
+            else if (source === 'pierce') dmg = BOSS_PIERCE_DMG;
+            activeBoss.hp -= dmg;
+            updateBossBar();
+            if (activeBoss.hp <= 0) killBoss();
+        }
+
+        function killBoss() {
+            if (!activeBoss) return;
+            screenShake = 0.85;
+            styleMultiplier = Math.min(8, styleMultiplier + 1.0);
+            score += Math.floor(500 * styleMultiplier);
+            const pos = activeBoss.mesh.position.clone();
+            scene.remove(activeBoss.mesh);
+            activeBoss = null;
+            isBossWave = false;
+            hideBossHud();
+            clearLaserWalls();
+            for (let i = 0; i < 6; i++) {
+                const m = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.18, 6, 6),
+                    new THREE.MeshBasicMaterial({ color: 0x44ff88 })
+                );
+                m.position.copy(pos);
+                scene.add(m);
+                healParticles.push({ mesh: m, life: 4 });
+            }
+            wave += 1;
+            spawnWave();
+        }
+
         function spawnWave() {
+            enemies.forEach(e => scene.remove(e.mesh));
+            enemies = [];
+            clearLaserWalls();
+            activeBoss = null;
+            isBossWave = false;
+            hideBossHud();
+
+            if (wave % 5 === 0) {
+                spawnBoss();
+                return;
+            }
+
             const count = wave * 3;
             for (let i = 0; i < count; i++) {
                 const type = Math.random() < 0.45 ? 'drone' : 'husk';
                 const angle = Math.random() * Math.PI * 2;
-                const dist = 18 + Math.random() * 16;
+                const dist = 14 + Math.random() * (ARENA * 0.55);
                 spawnEnemy(type, Math.cos(angle) * dist, Math.sin(angle) * dist);
             }
         }
@@ -645,6 +879,9 @@
                 if (distPointToRay(enemy.mesh.position, origin, dir) < 1.8) hitSet.add(enemy);
             }
             hitSet.forEach(enemy => damageEnemy(enemy, PIERCE_DAMAGE, !onGround));
+            if (activeBoss && distPointToRay(activeBoss.mesh.position, origin, dir) < 4.5) {
+                damageBoss(BOSS_PIERCE_DMG, 'pierce');
+            }
         }
 
         function releaseLeftMouse() {
@@ -841,7 +1078,7 @@
                 scene.add(m);
                 healParticles.push({ mesh: m, life: 4 });
             }
-            if (!enemies.length) {
+            if (!isBossWave && !enemies.length) {
                 wave += 1;
                 spawnWave();
             }
@@ -882,6 +1119,11 @@
             parryBursts = [];
             beamEffects.forEach(b => scene.remove(b.mesh));
             beamEffects = [];
+            clearLaserWalls();
+            if (activeBoss) scene.remove(activeBoss.mesh);
+            activeBoss = null;
+            isBossWave = false;
+            hideBossHud();
             freezeTimer = 0;
             flashTimer = 0;
             screenShake = 0;
@@ -909,17 +1151,53 @@
         }
 
         function clampArena() {
-            playerPos.x = Math.max(-ARENA + 2, Math.min(ARENA - 2, playerPos.x));
-            playerPos.z = Math.max(-ARENA + 2, Math.min(ARENA - 2, playerPos.z));
+            const limit = ARENA + 8;
+            playerPos.x = Math.max(-limit, Math.min(limit, playerPos.x));
+            playerPos.z = Math.max(-limit, Math.min(limit, playerPos.z));
+        }
+
+        function onArenaFloor() {
+            return Math.abs(playerPos.x) < ARENA && Math.abs(playerPos.z) < ARENA;
+        }
+
+        function updateShiftingPillars() {
+            const t = performance.now() * 0.001;
+            for (const p of pillars) {
+                const y = p.baseY + Math.sin(t * 0.55 + p.phase) * p.amp;
+                p.mesh.position.y = y;
+            }
+        }
+
+        function checkJumpPads() {
+            for (const pad of jumpPads) {
+                const dx = playerPos.x - pad.x;
+                const dz = playerPos.z - pad.z;
+                if (dx * dx + dz * dz < pad.radius * pad.radius) {
+                    velY = JUMP_PAD_VEL;
+                    onGround = false;
+                }
+            }
+        }
+
+        function checkChasmFall() {
+            if (playerPos.y < CHASM_Y) {
+                player.hp -= 15;
+                playerPos.set(0, 2, 0);
+                velY = 0;
+                if (player.hp <= 0) gameOver();
+                else updateUI();
+            }
         }
 
         function pillarCollision() {
             for (const p of pillars) {
-                if (Math.abs(playerPos.x - p.x) < p.half + 0.4 && Math.abs(playerPos.z - p.z) < p.half + 0.4) {
-                    const dx = playerPos.x - p.x;
-                    const dz = playerPos.z - p.z;
-                    if (Math.abs(dx) > Math.abs(dz)) playerPos.x = p.x + Math.sign(dx) * (p.half + 0.45);
-                    else playerPos.z = p.z + Math.sign(dz) * (p.half + 0.45);
+                const px = p.mesh.position.x;
+                const pz = p.mesh.position.z;
+                if (Math.abs(playerPos.x - px) < p.half + 0.4 && Math.abs(playerPos.z - pz) < p.half + 0.4) {
+                    const dx = playerPos.x - px;
+                    const dz = playerPos.z - pz;
+                    if (Math.abs(dx) > Math.abs(dz)) playerPos.x = px + Math.sign(dx) * (p.half + 0.45);
+                    else playerPos.z = pz + Math.sign(dz) * (p.half + 0.45);
                 }
             }
         }
@@ -941,6 +1219,7 @@
             playerPos.z += move.z * speed * dt;
             clampArena();
             pillarCollision();
+            checkJumpPads();
 
             if (isSlamming) {
                 velY = -55;
@@ -951,15 +1230,17 @@
             playerPos.y += velY * dt;
             const groundY = FLOOR_Y + (player.isSliding ? SLIDE_HEIGHT : EYE_HEIGHT);
 
-            if (playerPos.y <= groundY) {
+            if (onArenaFloor() && playerPos.y <= groundY) {
                 if (!onGround && isSlamming) slamImpact();
                 playerPos.y = groundY;
                 velY = 0;
                 onGround = true;
                 isSlamming = false;
-            } else {
+            } else if (!onArenaFloor() || playerPos.y > groundY) {
                 onGround = false;
             }
+
+            checkChasmFall();
 
             if (parryTimer > 0) {
                 parryTimer -= dt;
@@ -976,6 +1257,10 @@
         }
 
         function updateEnemies(dt) {
+            if (activeBoss) {
+                updateBoss(dt);
+                return;
+            }
             for (const enemy of enemies) {
                 if (enemy.type === 'drone') {
                     enemy.mesh.position.y = 5 + Math.sin(performance.now() * 0.002 + enemy.mesh.id) * 0.5;
@@ -1017,6 +1302,7 @@
                             p.vel.negate().multiplyScalar(1.5);
                             p.owner = 'player';
                             p.damage = PARRY_SHOT_DAMAGE;
+                            if (p.fromBoss) p.bossParry = true;
                             triggerParrySuccess(impact);
                             return true;
                         }
@@ -1031,6 +1317,11 @@
                 }
 
                 if (p.owner === 'player') {
+                    if (activeBoss && p.mesh.position.distanceTo(activeBoss.mesh.position) < 4.2) {
+                        damageBoss(0, p.bossParry ? 'parry' : 'primary');
+                        scene.remove(p.mesh);
+                        return false;
+                    }
                     for (const enemy of enemies) {
                         if (p.mesh.position.distanceTo(enemy.mesh.position) < 1.5) {
                             damageEnemy(enemy, p.damage || PLAYER_SHOT_DAMAGE, !onGround);
@@ -1081,6 +1372,7 @@
 
             if (gameRunning) {
                 updateLeftMouse(rawDt);
+                updateShiftingPillars();
                 updatePlayer(dt);
                 applyScreenShake();
                 if (screenShake > 0) screenShake = Math.max(0, screenShake - rawDt * 2.2);
