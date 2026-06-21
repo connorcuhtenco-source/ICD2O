@@ -14,7 +14,7 @@ body {
     margin: 0;
     width: 100%;
     min-height: 100vh;
-    overflow: hidden;
+    overflow-x: hidden;
 }
 
 body {
@@ -630,6 +630,10 @@ body.theme-void {
     box-shadow: none;
     backdrop-filter: none;
     pointer-events: none;
+    width: 100%;
+    max-width: 100%;
+    padding: clamp(20px, 5vw, 32px) clamp(12px, 4vw, 24px);
+    box-sizing: border-box;
 }
 
 #menu .landing-card > * {
@@ -638,26 +642,31 @@ body.theme-void {
 
 .title-glitch-wrap {
     position: relative;
-    display: inline-block;
-    margin-bottom: 10px;
+    display: block;
+    width: min(100%, 920px);
+    max-width: 96vw;
+    margin: 0 auto 10px;
+    padding: 0 8px;
+    box-sizing: border-box;
 }
 
 .title-glitch-wrap::before,
 .title-glitch-wrap::after {
-    content: 'NEON KILL';
+    content: attr(data-title);
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
     width: max-content;
+    max-width: 96vw;
+    white-space: nowrap;
     font-family: 'Orbitron', 'Courier New', monospace;
     font-weight: 900;
-    font-size: clamp(2rem, 8vw, 4.2rem);
-    letter-spacing: 0.18em;
+    font-size: clamp(1.35rem, 5.8vw, 3.4rem);
+    letter-spacing: clamp(0.06em, 1.4vw, 0.14em);
     text-transform: uppercase;
     pointer-events: none;
     opacity: 0.45;
-    animation: chromaticDrift 3.2s ease-in-out infinite;
 }
 
 .title-glitch-wrap::before {
@@ -688,16 +697,20 @@ body.theme-void {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.1em;
-    margin: 0;
+    align-items: center;
+    gap: clamp(0.04em, 0.8vw, 0.1em);
+    margin: 0 auto;
+    max-width: 100%;
     font-family: 'Orbitron', 'Courier New', monospace;
     font-weight: 900;
-    font-size: clamp(2rem, 8vw, 4.2rem);
-    letter-spacing: 0.18em;
-    line-height: 1.1;
-    min-height: 1.1em;
+    font-size: clamp(1.35rem, 5.8vw, 3.4rem);
+    letter-spacing: clamp(0.06em, 1.4vw, 0.14em);
+    line-height: 1.15;
+    min-height: 1.15em;
     position: relative;
     z-index: 1;
+    text-align: center;
+    word-break: break-word;
 }
 
 .title-letter {
@@ -751,13 +764,17 @@ body.boot-sequence-active .title-letter {
 }
 
 .system-status {
-    margin: 0 0 32px;
-    font-size: 11px;
-    letter-spacing: 0.22em;
+    margin: 0 auto 32px;
+    padding: 0 12px;
+    max-width: 96vw;
+    font-size: clamp(9px, 2.4vw, 11px);
+    letter-spacing: clamp(0.08em, 1.6vw, 0.22em);
     text-transform: uppercase;
+    text-align: center;
     color: #ff2244;
     text-shadow: 0 0 10px rgba(255, 34, 68, 0.65);
     animation: statusBlink 1.1s step-end infinite;
+    box-sizing: border-box;
 }
 
 @keyframes statusBlink {
@@ -766,12 +783,17 @@ body.boot-sequence-active .title-letter {
 
 #menu .menuBtn-cyber {
     position: relative;
+    width: 100%;
     border-radius: 0;
     clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
     background: #121216;
     border: 1px solid rgba(0, 255, 255, 0.55);
     box-shadow: inset 0 0 0 1px rgba(0, 255, 255, 0.08);
     color: #00ffff;
+    padding: clamp(13px, 3.2vw, 16px) clamp(14px, 3.5vw, 22px);
+    font-size: clamp(11px, 2.8vw, 14px);
+    letter-spacing: clamp(0.1em, 1.8vw, 0.2em);
+    box-sizing: border-box;
     transition:
         background 0.06s linear,
         color 0.06s linear,
@@ -808,11 +830,6 @@ body.boot-sequence-active .title-letter {
 #menu .menuBtn-shop {
     background: #101014;
     border-color: rgba(0, 255, 255, 0.45);
-}
-
-#menu .menuBtn-achievements {
-    border-color: rgba(255, 230, 109, 0.45);
-    color: #ffe66d;
 }
 
 #menu .menuBtn-achievements:hover {
@@ -1050,9 +1067,77 @@ body.boot-sequence-active .landing-reveal {
 
 .landing-actions {
     display: grid;
-    gap: 14px;
-    width: min(90vw, 420px);
-    margin-bottom: 24px;
+    gap: clamp(10px, 2.5vw, 14px);
+    width: min(92vw, 420px);
+    margin: 0 auto 24px;
+    box-sizing: border-box;
+}
+
+#menu .menuBtn-achievements {
+    border-color: rgba(255, 230, 109, 0.45);
+    color: #ffe66d;
+}
+
+@media (max-width: 720px) {
+    .title-glitch-wrap::before,
+    .title-glitch-wrap::after {
+        display: none;
+    }
+
+    .title-glitch-wrap {
+        padding: 0 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    #menu .menuBtn-cyber {
+        clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    }
+
+    .menuBtn-weapon-preview {
+        gap: 8px;
+    }
+
+    .weapon-preview-lock {
+        min-width: 16px;
+        height: 16px;
+        font-size: 8px;
+    }
+}
+
+@media (max-height: 720px) {
+    #menu .landing-card {
+        justify-content: flex-start;
+        padding-top: 36px;
+        padding-bottom: 28px;
+        min-height: 100vh;
+        overflow-y: auto;
+    }
+
+    .system-status {
+        margin-bottom: 18px;
+    }
+
+    .landing-actions {
+        margin-bottom: 16px;
+    }
+}
+
+@media (min-width: 1100px) {
+    .title-glitch-wrap,
+    .landing-title {
+        font-size: 3.4rem;
+    }
+
+    .title-glitch-wrap::before,
+    .title-glitch-wrap::after {
+        font-size: 3.4rem;
+        letter-spacing: 0.14em;
+    }
+
+    .landing-title {
+        letter-spacing: 0.14em;
+    }
 }
 
 .menuBtn-primary {

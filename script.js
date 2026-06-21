@@ -2277,7 +2277,7 @@ window.ArcadeAchievements = {
 };
 
 const LandingEffects = (() => {
-    const TITLE_TEXT = 'NEON KILL';
+    const TITLE_TEXT = 'ARCADE ARENA';
     const LETTER_STAGGER_MS = 90;
     const REVEAL_STAGGER_MS = 120;
 
