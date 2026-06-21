@@ -14,10 +14,9 @@ const ArcadeMeta = (() => {
     const SHOP_ITEMS = [
         { id: 'tag-time-accel', category: 'upgrade', name: 'Time Acceleration', price: 250, desc: 'Move faster while the level timer speeds up until the wave ends.', preview: 'preview-time-accel', icon: '⏩' },
         { id: 'space-shield', category: 'upgrade', name: 'Neon Shield', price: 300, desc: 'Smash through 10 asteroids with a neon barrier.', preview: 'preview-space-shield', icon: '🛡' },
-        { id: 'mimic-emp', category: 'mimic-consumable', name: 'EMP Overload', price: 75, desc: 'Freezes all enemies for 4 seconds. Equip for Neon Mimic runs.', icon: '⚡' },
-        { id: 'mimic-tether-hack', category: 'mimic-consumable', name: 'Tether Hack', price: 75, desc: 'Resets tether cooldown and boosts tether range 50% for 8 seconds.', icon: '🔗' },
-        { id: 'mimic-overclock', category: 'mimic-consumable', name: 'Overclock Battery', price: 100, desc: 'Refills your power timer and doubles fire rate for that cycle.', icon: '🔋' },
-        { id: 'mimic-shield', category: 'mimic-consumable', name: 'Emergency Shield', price: 150, desc: 'Blocks the next hit. Auto-activates when you take damage.', icon: '🛡' },
+        { id: 'orbit-sticky-paddle', category: 'upgrade', name: 'Sticky Paddle', price: 120, desc: 'Catch the ball on your paddle so you can aim before launching.', icon: '🧲' },
+        { id: 'orbit-multi-ball', category: 'upgrade', name: 'Multi-Ball', price: 150, desc: 'Press Space to split active balls into three.', icon: '⚪' },
+        { id: 'orbit-laser-gate', category: 'upgrade', name: 'Laser Gate', price: 180, desc: 'One shield per run that saves a ball slipping past the paddle.', icon: '⌁' },
         { id: 'trail-cyan', category: 'trail', name: 'Neon Cyan Trail', price: 0, desc: 'Classic cyan and pink neon mouse trail.', preview: 'preview-trail-cyan' },
         { id: 'trail-pink', category: 'trail', name: 'Hot Pink Trail', price: 75, desc: 'Magenta streaks with gold sparks.', preview: 'preview-trail-pink' },
         { id: 'trail-gold', category: 'trail', name: 'Gold Rush Trail', price: 100, desc: 'Golden arcade streaks behind your cursor.', preview: 'preview-trail-gold' },
@@ -57,9 +56,10 @@ const ArcadeMeta = (() => {
                 theme: 'theme-default',
                 tagTimeAccel: false,
                 spaceShield: false,
-                mimicConsumable: null
+                orbitSticky: false,
+                orbitMultiball: false,
+                orbitLaserGate: false
             },
-            mimicCharges: {},
             daily: { date: '', quests: [] },
             playTimeAccumulator: 0,
             tagMatchCount: 0,
@@ -73,7 +73,6 @@ const ArcadeMeta = (() => {
             state = { ...defaultState(), ...saved };
             state.equipped = { ...defaultState().equipped, ...saved?.equipped };
             state.redeemedPromoCodes = Array.isArray(saved?.redeemedPromoCodes) ? saved.redeemedPromoCodes : [];
-            state.mimicCharges = saved?.mimicCharges && typeof saved.mimicCharges === 'object' ? saved.mimicCharges : {};
             ensureDailyQuests();
         } catch {
             state = defaultState();
@@ -86,6 +85,9 @@ const ArcadeMeta = (() => {
     function syncOwnedUpgrades() {
         if (isOwned('tag-time-accel')) state.equipped.tagTimeAccel = true;
         if (isOwned('space-shield')) state.equipped.spaceShield = true;
+        if (isOwned('orbit-sticky-paddle')) state.equipped.orbitSticky = true;
+        if (isOwned('orbit-multi-ball')) state.equipped.orbitMultiball = true;
+        if (isOwned('orbit-laser-gate')) state.equipped.orbitLaserGate = true;
     }
 
     function save() {
@@ -168,7 +170,9 @@ const ArcadeMeta = (() => {
         if (item.category === 'theme') return state.equipped.theme === id;
         if (id === 'tag-time-accel') return state.equipped.tagTimeAccel;
         if (id === 'space-shield') return state.equipped.spaceShield;
-        if (item.category === 'mimic-consumable') return state.equipped.mimicConsumable === id;
+        if (id === 'orbit-sticky-paddle') return state.equipped.orbitSticky;
+        if (id === 'orbit-multi-ball') return state.equipped.orbitMultiball;
+        if (id === 'orbit-laser-gate') return state.equipped.orbitLaserGate;
         return false;
     }
 
@@ -177,12 +181,7 @@ const ArcadeMeta = (() => {
     }
 
     function getPowerUpItems() {
-        return SHOP_ITEMS.filter(item => item.category === 'upgrade' || item.category === 'mimic-consumable');
-    }
-
-    function hasItemStock(item) {
-        if (item.category === 'mimic-consumable') return (state.mimicCharges[item.id] || 0) > 0;
-        return isOwned(item.id);
+        return SHOP_ITEMS.filter(item => item.category === 'upgrade');
     }
 
     function renderPreview(item) {
@@ -208,13 +207,6 @@ const ArcadeMeta = (() => {
                 : `<button class="shop-price-btn equip" data-equip="${item.id}">ENABLE</button>`;
         }
 
-        if (item.category === 'mimic-consumable') {
-            const charges = state.mimicCharges[item.id] || 0;
-            const canBuy = state.tokens >= item.price;
-            const stock = charges > 0 ? ` · ${charges} owned` : '';
-            return `<button class="shop-price-btn buy" data-buy="${item.id}" ${canBuy ? '' : 'disabled'}><span class="shop-coin">🪙</span>${item.price}${stock}</button>`;
-        }
-
         if (owned || item.price === 0) {
             return '<button class="shop-price-btn owned" disabled>OWNED</button>';
         }
@@ -232,13 +224,6 @@ const ArcadeMeta = (() => {
                 : `<button class="shop-price-btn equip" data-equip="${item.id}">EQUIP</button>`;
         }
 
-        if (item.category === 'mimic-consumable') {
-            const charges = state.mimicCharges[item.id] || 0;
-            return equipped
-                ? `<button class="shop-price-btn unequip" data-unequip="${item.id}">CLEAR LOADOUT</button>`
-                : `<button class="shop-price-btn equip" data-equip="${item.id}">LOADOUT (${charges})</button>`;
-        }
-
         return equipped
             ? `<button class="shop-price-btn unequip" data-unequip="${item.id}">DISABLE</button>`
             : `<button class="shop-price-btn equip" data-equip="${item.id}">ENABLE</button>`;
@@ -246,7 +231,7 @@ const ArcadeMeta = (() => {
 
     function renderShopCard(item) {
         return `
-            <article class="shop-card ${hasItemStock(item) ? 'owned' : ''} ${isEquipped(item.id) ? 'equipped' : ''}">
+            <article class="shop-card ${isOwned(item.id) ? 'owned' : ''} ${isEquipped(item.id) ? 'equipped' : ''}">
                 <h4 class="shop-card-name">${item.name.toUpperCase()}</h4>
                 <div class="shop-card-preview">${renderPreview(item)}</div>
                 <p class="shop-card-desc">${item.desc}</p>
@@ -289,10 +274,7 @@ const ArcadeMeta = (() => {
         const container = document.getElementById('inventoryPowerUps');
         if (!container) return;
 
-        const items = getPowerUpItems().filter(item => {
-            if (item.category === 'mimic-consumable') return (state.mimicCharges[item.id] || 0) > 0;
-            return isOwned(item.id) && item.price > 0;
-        });
+        const items = getPowerUpItems().filter(item => isOwned(item.id) && item.price > 0);
 
         if (!items.length) {
             container.innerHTML = '<p class="shop-empty-section">Nothing has been bought yet</p>';
@@ -316,10 +298,7 @@ const ArcadeMeta = (() => {
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        const items = getItemsByCategory(category).filter(item => {
-            if (category === 'mimic-consumable') return (state.mimicCharges[item.id] || 0) > 0;
-            return isOwned(item.id) && item.price > 0;
-        });
+        const items = getItemsByCategory(category).filter(item => isOwned(item.id) && item.price > 0);
 
         if (!items.length) {
             container.innerHTML = '<p class="shop-empty-section">Nothing has been bought yet</p>';
@@ -345,25 +324,17 @@ const ArcadeMeta = (() => {
 
     function buyItem(id) {
         const item = SHOP_ITEMS.find(i => i.id === id);
-        if (!item) return false;
+        if (!item || isOwned(id)) return false;
         if (state.tokens < item.price) return false;
 
-        if (item.category === 'mimic-consumable') {
-            state.tokens -= item.price;
-            state.mimicCharges[id] = (state.mimicCharges[id] || 0) + 1;
-            save();
-            renderShop();
-            renderInventory();
-            window.ArcadeSettings?.playSound('collect');
-            return true;
-        }
-
-        if (isOwned(id)) return false;
         state.tokens -= item.price;
         state.owned.push(id);
         if (item.category === 'upgrade') {
             if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
             else if (id === 'space-shield') state.equipped.spaceShield = true;
+            else if (id === 'orbit-sticky-paddle') state.equipped.orbitSticky = true;
+            else if (id === 'orbit-multi-ball') state.equipped.orbitMultiball = true;
+            else if (id === 'orbit-laser-gate') state.equipped.orbitLaserGate = true;
         }
         save();
         renderShop();
@@ -373,20 +344,9 @@ const ArcadeMeta = (() => {
     }
 
     function equipItem(id) {
+        if (!isOwned(id)) return false;
         const item = SHOP_ITEMS.find(i => i.id === id);
         if (!item) return false;
-
-        if (item.category === 'mimic-consumable') {
-            if ((state.mimicCharges[id] || 0) <= 0) return false;
-            state.equipped.mimicConsumable = id;
-            save();
-            renderShop();
-            renderInventory();
-            window.ArcadeSettings?.playSound('click');
-            return true;
-        }
-
-        if (!isOwned(id)) return false;
 
         if (item.category === 'trail') state.equipped.trail = id;
         else if (item.category === 'theme') {
@@ -394,6 +354,9 @@ const ArcadeMeta = (() => {
             applyTheme();
         } else if (id === 'tag-time-accel') state.equipped.tagTimeAccel = true;
         else if (id === 'space-shield') state.equipped.spaceShield = true;
+        else if (id === 'orbit-sticky-paddle') state.equipped.orbitSticky = true;
+        else if (id === 'orbit-multi-ball') state.equipped.orbitMultiball = true;
+        else if (id === 'orbit-laser-gate') state.equipped.orbitLaserGate = true;
 
         save();
         renderShop();
@@ -405,7 +368,9 @@ const ArcadeMeta = (() => {
     function unequipUpgrade(id) {
         if (id === 'tag-time-accel') state.equipped.tagTimeAccel = false;
         if (id === 'space-shield') state.equipped.spaceShield = false;
-        if (state.equipped.mimicConsumable === id) state.equipped.mimicConsumable = null;
+        if (id === 'orbit-sticky-paddle') state.equipped.orbitSticky = false;
+        if (id === 'orbit-multi-ball') state.equipped.orbitMultiball = false;
+        if (id === 'orbit-laser-gate') state.equipped.orbitLaserGate = false;
         save();
         renderInventory();
         renderShop();
@@ -508,34 +473,9 @@ const ArcadeMeta = (() => {
         };
     }
 
-    function getEquippedMimicConsumable() {
-        const id = state.equipped.mimicConsumable;
-        if (!id || (state.mimicCharges[id] || 0) <= 0) return null;
-        return id;
-    }
-
-    function getMimicCharges(id) {
-        return state.mimicCharges[id] || 0;
-    }
-
-    function useMimicCharge(id) {
-        if (state.equipped.mimicConsumable !== id) return false;
-        if ((state.mimicCharges[id] || 0) <= 0) return false;
-        state.mimicCharges[id] -= 1;
-        if (state.mimicCharges[id] <= 0) {
-            state.mimicCharges[id] = 0;
-            if (state.equipped.mimicConsumable === id) state.equipped.mimicConsumable = null;
-        }
-        save();
-        renderInventory();
-        return true;
-    }
-
-    function onNeonMimicEnd(runScore, shards, survivalTime) {
-        const tokenReward = Math.floor(shards / 2);
-        if (tokenReward > 0) addTokens(tokenReward, 'Neon Mimic shards');
-        if (runScore >= 1500) addTokens(8, 'Neon Mimic run');
-        if (survivalTime >= 120) addTokens(5, 'Neon Mimic survival');
+    function onNeonOrbitEnd(runScore, wave) {
+        if (runScore >= 500) addTokens(6, 'Neon Orbit run');
+        if (wave >= 5) addTokens(8, 'Neon Orbit wave clear');
     }
 
     function onTagZoneUpdate(survivalTime, level) {
@@ -619,6 +559,9 @@ const ArcadeMeta = (() => {
     function hasEquippedUpgrade(id) {
         if (id === 'tag-time-accel') return state.equipped.tagTimeAccel;
         if (id === 'space-shield') return state.equipped.spaceShield;
+        if (id === 'orbit-sticky-paddle') return state.equipped.orbitSticky;
+        if (id === 'orbit-multi-ball') return state.equipped.orbitMultiball;
+        if (id === 'orbit-laser-gate') return state.equipped.orbitLaserGate;
         return false;
     }
 
@@ -668,10 +611,7 @@ const ArcadeMeta = (() => {
         onTagLevelSurvived,
         onFastEagleEnd,
         onSpaceRunnerEnd,
-        onNeonMimicEnd,
-        getEquippedMimicConsumable,
-        getMimicCharges,
-        useMimicCharge,
+        onNeonOrbitEnd,
         getTrailStyle,
         hasEquippedUpgrade
     };

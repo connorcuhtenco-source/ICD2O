@@ -73,13 +73,13 @@
                     <button id="tagZoneBtn" class="menuBtn play-game-btn">Play</button>
                 </article>
 
-                <article class="game-tile game-tile-mimic">
+                <article class="game-tile game-tile-orbit">
                     <div class="game-tile-header">
-                        <h3>Neon Mimic</h3>
+                        <h3>Neon Orbit</h3>
                         <span class="difficulty difficulty-hard">Hard</span>
                     </div>
-                    <p class="game-desc">Start as a blank neon core. Data-tether enemy drones to steal their weapons for 10 seconds — hijack, mimic, survive.</p>
-                    <button id="neonMimicBtn" class="menuBtn play-game-btn">Play</button>
+                    <p class="game-desc">Spin a neon paddle around the arena rim. Deflect energy balls from the core to smash invading geometric blocks before they breach the perimeter.</p>
+                    <button id="neonOrbitBtn" class="menuBtn play-game-btn">Play</button>
                 </article>
 
                 <article class="game-tile game-tile-space">
@@ -199,12 +199,10 @@
             </div>
 
             <div class="keybind-group">
-                <h4>Neon Mimic</h4>
+                <h4>Neon Orbit</h4>
                 <ul>
-                    <li><kbd>W A S D</kbd> or <kbd>↑ ↓ ← →</kbd> — Move</li>
-                    <li><kbd>Left Click</kbd> or <kbd>J</kbd> — Fire weapon (when mimicking)</li>
-                    <li><kbd>Right Click</kbd> or <kbd>K</kbd> — Data-Tether (hold to steal)</li>
-                    <li><kbd>Space</kbd> — Core Burst (shop consumable)</li>
+                    <li><kbd>A</kbd> / <kbd>D</kbd> or <kbd>←</kbd> / <kbd>→</kbd> — Spin paddle</li>
+                    <li><kbd>Space</kbd> — Launch caught ball / Multi-Ball</li>
                 </ul>
             </div>
 
@@ -277,41 +275,32 @@
                     </div>
                 </div>
 
-                <div id="mimicHud" class="mimic-hud hidden">
+                <div id="orbitHud" class="orbit-hud hidden">
                     <div class="hud-box">
                         <span>Score</span>
-                        <strong id="mimicScore">0</strong>
+                        <strong id="orbitScore">0</strong>
                     </div>
                     <div class="hud-box">
-                        <span>Shards</span>
-                        <strong id="mimicShards">0</strong>
+                        <span>Lives</span>
+                        <strong id="orbitLives" class="hearts-display">♥♥♥</strong>
                     </div>
                     <div class="hud-box">
-                        <span>Form</span>
-                        <strong id="mimicPower">BLANK CORE</strong>
-                    </div>
-                    <div class="hud-box">
-                        <span>Tether</span>
-                        <strong id="mimicTether">READY</strong>
-                    </div>
-                    <div class="hud-box">
-                        <span>Core Burst</span>
-                        <strong id="mimicBurst">—</strong>
+                        <span>Wave</span>
+                        <strong id="orbitWave">1</strong>
                     </div>
                 </div>
 
-                <div id="mimicStartScreen" class="mimic-overlay hidden">
-                    <h3 class="mimic-overlay-title">NEON MIMIC</h3>
-                    <p id="mimicLoadout" class="mimic-loadout">No consumable equipped</p>
-                    <p class="mimic-hint">Hold <kbd>K</kbd> or Right Click to data-tether enemies and steal their power.</p>
-                    <button id="mimicStartBtn" class="menuBtn">Start Run</button>
+                <div id="orbitStartScreen" class="orbit-overlay hidden">
+                    <h3 class="orbit-overlay-title">NEON ORBIT</h3>
+                    <p class="orbit-hint">Spin the paddle, bounce core energy into geometric blocks, and clear each wave before blocks reach the rim.</p>
+                    <p id="orbitHighScore" class="orbit-highscore">Best: 0</p>
+                    <button id="orbitStartBtn" class="menuBtn">Start</button>
                 </div>
 
-                <div id="mimicGameOverScreen" class="mimic-overlay hidden">
-                    <h3 class="mimic-overlay-title">CORE DESTROYED</h3>
-                    <p id="mimicFinalScore"></p>
-                    <p id="mimicFinalShards"></p>
-                    <button id="mimicPlayAgainBtn" class="menuBtn">Play Again</button>
+                <div id="orbitGameOverScreen" class="orbit-overlay hidden">
+                    <h3 class="orbit-overlay-title">PERIMETER BREACHED</h3>
+                    <p id="orbitFinalScore"></p>
+                    <button id="orbitPlayAgainBtn" class="menuBtn">Play Again</button>
                 </div>
 
                 <div id="achievementToastHost" class="achievement-toast-host"></div>
@@ -345,7 +334,7 @@
     </script>
     <script src="1prompt.js"></script>
     <script src="arcade-meta.js"></script>
-    <script src="neon-mimic.js"></script>
+    <script src="neon-orbit.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
