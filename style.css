@@ -832,6 +832,21 @@ body.boot-sequence-active .title-letter {
     border-color: rgba(0, 255, 255, 0.45);
 }
 
+#menu .menuBtn-achievements.menuBtn-cyber {
+    width: auto;
+    min-width: 200px;
+    max-width: min(92vw, 420px);
+    align-self: center;
+    margin-top: 8px;
+    padding-left: clamp(28px, 8vw, 56px);
+    padding-right: clamp(28px, 8vw, 56px);
+}
+
+#menu .menuBtn-achievements {
+    border-color: rgba(255, 230, 109, 0.45);
+    color: #ffe66d;
+}
+
 #menu .menuBtn-achievements:hover {
     background: #aa44ff;
     color: #fff;
@@ -1071,11 +1086,6 @@ body.boot-sequence-active .landing-reveal {
     width: min(92vw, 420px);
     margin: 0 auto 24px;
     box-sizing: border-box;
-}
-
-#menu .menuBtn-achievements {
-    border-color: rgba(255, 230, 109, 0.45);
-    color: #ffe66d;
 }
 
 @media (max-width: 720px) {
