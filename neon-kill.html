@@ -72,23 +72,43 @@
             margin-top: 4px;
         }
         #crosshair {
-            position: absolute;
+            position: fixed;
             left: 50%;
             top: 50%;
-            width: 18px;
-            height: 18px;
-            margin: -9px 0 0 -9px;
-            border: 2px solid rgba(0, 255, 255, 0.8);
-            border-radius: 50%;
-            box-shadow: 0 0 8px #00ffff;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            pointer-events: none;
+            z-index: 6;
         }
-        #crosshair::before, #crosshair::after {
-            content: '';
+        #crosshair .dot {
             position: absolute;
-            background: rgba(0, 255, 255, 0.7);
+            width: 4px;
+            height: 4px;
+            left: -2px;
+            top: -2px;
+            background: #00ffcc;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00ffcc, 0 0 14px rgba(0, 255, 204, 0.45);
         }
-        #crosshair::before { width: 2px; height: 22px; left: 50%; top: 50%; transform: translate(-50%, -50%); }
-        #crosshair::after { width: 22px; height: 2px; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+        #crosshair .tick {
+            position: absolute;
+            background: rgba(0, 255, 204, 0.9);
+            box-shadow: 0 0 5px rgba(0, 255, 204, 0.7);
+        }
+        #crosshair .tick.top { width: 2px; height: 9px; left: -1px; top: -16px; }
+        #crosshair .tick.bottom { width: 2px; height: 9px; left: -1px; top: 7px; }
+        #crosshair .tick.left { width: 9px; height: 2px; left: -16px; top: -1px; }
+        #crosshair .tick.right { width: 9px; height: 2px; left: 7px; top: -1px; }
+        #parryFlash {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 7;
+            opacity: 0;
+            background: radial-gradient(circle at center, rgba(255, 255, 255, 0.95) 0%, rgba(0, 255, 255, 0.55) 45%, rgba(255, 255, 255, 0.15) 100%);
+            transition: opacity 0.05s linear;
+        }
         #startScreen, #gameOverScreen {
             position: absolute;
             inset: 0;
@@ -136,7 +156,14 @@
 <body>
     <div id="gameRoot">
         <button id="backHub" class="btn">← Hub</button>
-        <div id="crosshair"></div>
+        <div id="parryFlash"></div>
+        <div id="crosshair" aria-hidden="true">
+            <span class="dot"></span>
+            <span class="tick top"></span>
+            <span class="tick bottom"></span>
+            <span class="tick left"></span>
+            <span class="tick right"></span>
+        </div>
         <div id="ui">
             <div class="ui-top">
                 <div class="panel">
@@ -214,7 +241,12 @@
         let onGround = true;
         let isSlamming = false;
         let parryTimer = 0;
+        let parryAnimTimer = 0;
         let shootCooldown = 0;
+        let gunRecoil = 0;
+        let freezeTimer = 0;
+        let flashTimer = 0;
+        let parryBursts = [];
         let enemies = [];
         let projectiles = [];
         let healParticles = [];
@@ -226,6 +258,62 @@
         scene.fog = new THREE.Fog(0x050008, 20, 90);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+        const weaponRig = new THREE.Group();
+        camera.add(weaponRig);
+
+        const cyanSolid = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+        const cyanEdge = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.85 });
+        const pinkEdge = new THREE.LineBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.95 });
+
+        function addWireBox(w, h, d, mat, edgeMat) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, mat);
+            const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+            const g = new THREE.Group();
+            g.add(mesh);
+            g.add(wire);
+            return g;
+        }
+
+        const gunModel = new THREE.Group();
+        const grip = addWireBox(0.09, 0.24, 0.13, cyanSolid, cyanEdge);
+        grip.position.set(0, -0.1, 0);
+        const body = addWireBox(0.34, 0.13, 0.15, cyanSolid, cyanEdge);
+        body.position.set(0.04, 0.02, 0);
+        const topRail = addWireBox(0.22, 0.05, 0.08, cyanSolid, cyanEdge);
+        topRail.position.set(0.08, 0.1, 0);
+        const barrelGeo = new THREE.CylinderGeometry(0.034, 0.042, 0.32, 8);
+        const barrel = new THREE.Mesh(barrelGeo, cyanSolid);
+        barrel.rotation.z = Math.PI / 2;
+        barrel.position.set(0.3, 0.05, 0);
+        const barrelWire = new THREE.LineSegments(new THREE.EdgesGeometry(barrelGeo), cyanEdge);
+        barrelWire.rotation.z = Math.PI / 2;
+        barrelWire.position.copy(barrel.position);
+        const muzzleFlare = addWireBox(0.07, 0.07, 0.04, cyanSolid, cyanEdge);
+        muzzleFlare.position.set(0.48, 0.05, 0);
+        const muzzlePoint = new THREE.Object3D();
+        muzzlePoint.position.set(0.52, 0.05, 0);
+        gunModel.add(grip, body, topRail, barrel, barrelWire, muzzleFlare, muzzlePoint);
+        gunModel.position.set(0.38, -0.26, -0.62);
+        gunModel.rotation.set(-0.08, 0.06, 0.04);
+        weaponRig.add(gunModel);
+
+        const parryArm = new THREE.Group();
+        const forearm = addWireBox(0.14, 0.1, 0.14, new THREE.MeshBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.15 }), pinkEdge);
+        forearm.position.set(0, 0, -0.08);
+        const fist = addWireBox(0.2, 0.18, 0.16, new THREE.MeshBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.2 }), pinkEdge);
+        fist.position.set(0.12, 0.02, 0.02);
+        const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff007f }));
+        knuckle.position.set(0.22, 0.02, 0.04);
+        parryArm.add(forearm, fist, knuckle);
+        parryArm.visible = false;
+        weaponRig.add(parryArm);
+
+        const parryFlashEl = document.getElementById('parryFlash');
+        const PARRY_DURATION = 0.2;
+        const parryRestPos = new THREE.Vector3(-1.05, -0.55, -0.15);
+        const parryPunchPos = new THREE.Vector3(0.12, -0.12, -0.42);
+
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -270,6 +358,16 @@
         const playerPos = new THREE.Vector3(0, FLOOR_Y + EYE_HEIGHT, 0);
 
         function speedMult() { return hasOverclockCore ? 1.25 : 1; }
+
+        function getAimDirection() {
+            return new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+        }
+
+        function getMuzzleWorldPosition() {
+            const pos = new THREE.Vector3();
+            muzzlePoint.getWorldPosition(pos);
+            return pos;
+        }
 
         function updateStyleRank() {
             if (styleMultiplier >= 3.5) styleRank = 'SUPREME';
@@ -325,19 +423,16 @@
         function shootPlayer() {
             if (shootCooldown > 0) return;
             shootCooldown = 0.18;
-            const dir = new THREE.Vector3(
-                -Math.sin(yaw) * Math.cos(pitch),
-                Math.sin(pitch),
-                -Math.cos(yaw) * Math.cos(pitch)
-            ).normalize();
+            gunRecoil = 0.08;
+            const dir = getAimDirection();
             const speed = 55 * speedMult();
             const mesh = new THREE.Mesh(
                 new THREE.SphereGeometry(0.18, 6, 6),
                 new THREE.MeshBasicMaterial({ color: 0x00ffff })
             );
-            mesh.position.copy(playerPos).add(dir.clone().multiplyScalar(0.5));
+            mesh.position.copy(getMuzzleWorldPosition());
             scene.add(mesh);
-            projectiles.push({ mesh, vel: dir.multiplyScalar(speed), owner: 'player', life: 3 });
+            projectiles.push({ mesh, vel: dir.clone().multiplyScalar(speed), owner: 'player', life: 3 });
         }
 
         function enemyShoot(enemy) {
@@ -354,12 +449,94 @@
         function startParry() {
             if (player.isParrying) return;
             player.isParrying = true;
-            parryTimer = 0.2;
+            parryTimer = PARRY_DURATION;
+            parryAnimTimer = 0;
+            parryArm.visible = true;
+            parryArm.position.copy(parryRestPos);
+            parryArm.rotation.set(0, 0, 0);
         }
 
-        function getParryCenter() {
-            const dir = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-            return playerPos.clone().add(dir.multiplyScalar(1.2));
+        function getParryHitCenter() {
+            const center = new THREE.Vector3();
+            parryArm.getWorldPosition(center);
+            const forward = getAimDirection();
+            return center.add(forward.multiplyScalar(0.35));
+        }
+
+        function triggerParrySuccess(impactPos) {
+            freezeTimer = 0.1;
+            flashTimer = 0.15;
+            parryFlashEl.style.opacity = '1';
+            styleMultiplier = Math.min(8, styleMultiplier + 0.5);
+            for (let i = 0; i < 16; i++) {
+                const angle = (Math.PI * 2 / 16) * i + Math.random() * 0.4;
+                const mesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.08 + Math.random() * 0.06, 4, 4),
+                    new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffffff : 0x00ffff })
+                );
+                mesh.position.copy(impactPos);
+                scene.add(mesh);
+                const spread = new THREE.Vector3(
+                    Math.cos(angle) * (2 + Math.random() * 4),
+                    (Math.random() - 0.5) * 3,
+                    Math.sin(angle) * (2 + Math.random() * 4)
+                );
+                parryBursts.push({ mesh, vel: spread, life: 0.35 + Math.random() * 0.15 });
+            }
+        }
+
+        function updateParryArm(dt) {
+            if (player.isParrying) {
+                parryAnimTimer += dt;
+                const t = Math.min(1, parryAnimTimer / PARRY_DURATION);
+                if (t <= 0.45) {
+                    const p = t / 0.45;
+                    const eased = 1 - Math.pow(1 - p, 3);
+                    parryArm.position.lerpVectors(parryRestPos, parryPunchPos, eased);
+                    parryArm.rotation.set(-0.35 * eased, 0.25 * eased, -0.5 * eased);
+                } else {
+                    const p = (t - 0.45) / 0.55;
+                    const eased = p * p;
+                    parryArm.position.lerpVectors(parryPunchPos, parryRestPos, eased);
+                    parryArm.rotation.set(-0.35 * (1 - eased), 0.25 * (1 - eased), -0.5 * (1 - eased));
+                }
+            } else {
+                parryArm.visible = false;
+                parryArm.position.copy(parryRestPos);
+                parryArm.rotation.set(0, 0, 0);
+            }
+        }
+
+        function updateWeaponRig(dt) {
+            if (gunRecoil > 0) {
+                gunRecoil = Math.max(0, gunRecoil - dt * 0.55);
+                gunModel.position.z = -0.62 + gunRecoil * 0.35;
+                gunModel.rotation.x = -0.08 - gunRecoil * 0.6;
+            } else {
+                gunModel.position.z = -0.62;
+                gunModel.rotation.x = -0.08;
+            }
+            updateParryArm(dt);
+        }
+
+        function updateParryBursts(dt) {
+            parryBursts = parryBursts.filter(b => {
+                b.life -= dt;
+                b.mesh.position.add(b.vel.clone().multiplyScalar(dt));
+                b.vel.multiplyScalar(0.92);
+                if (b.life <= 0) {
+                    scene.remove(b.mesh);
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        function updateFlash(dt) {
+            if (flashTimer > 0) {
+                flashTimer = Math.max(0, flashTimer - dt);
+                parryFlashEl.style.opacity = String(Math.min(1, flashTimer / 0.15));
+            }
         }
 
         function damageEnemy(enemy, amt, midAir) {
@@ -421,6 +598,13 @@
             enemies.forEach(e => scene.remove(e.mesh));
             projectiles.forEach(p => scene.remove(p.mesh));
             healParticles.forEach(h => scene.remove(h.mesh));
+            parryBursts.forEach(b => scene.remove(b.mesh));
+            parryBursts = [];
+            freezeTimer = 0;
+            flashTimer = 0;
+            parryFlashEl.style.opacity = '0';
+            parryAnimTimer = 0;
+            gunRecoil = 0;
             enemies = [];
             projectiles = [];
             healParticles = [];
@@ -494,6 +678,8 @@
             }
             if (shootCooldown > 0) shootCooldown -= dt;
 
+            updateWeaponRig(dt);
+
             camera.position.copy(playerPos);
             camera.rotation.order = 'YXZ';
             camera.rotation.y = yaw;
@@ -529,18 +715,18 @@
         }
 
         function updateProjectiles(dt) {
-            const parryCenter = getParryCenter();
             projectiles = projectiles.filter(p => {
                 p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
                 p.life -= dt;
 
-                if (player.isParrying && p.owner === 'enemy') {
-                    const d = p.mesh.position.distanceTo(parryCenter);
-                    if (d < 1.6) {
+                if (player.isParrying && parryAnimTimer > 0.04 && parryAnimTimer < 0.14 && p.owner === 'enemy') {
+                    const d = p.mesh.position.distanceTo(getParryHitCenter());
+                    if (d < 1.4) {
+                        const impact = p.mesh.position.clone();
                         p.vel.negate();
                         p.owner = 'player';
                         p.vel.multiplyScalar(1.4);
-                        styleMultiplier = Math.min(8, styleMultiplier + 0.5);
+                        triggerParrySuccess(impact);
                         return true;
                     }
                 }
@@ -596,8 +782,10 @@
         let last = performance.now();
         function loop(now) {
             requestAnimationFrame(loop);
-            const dt = Math.min((now - last) / 1000, 0.05);
+            const rawDt = Math.min((now - last) / 1000, 0.05);
             last = now;
+            const dt = freezeTimer > 0 ? 0 : rawDt;
+            if (freezeTimer > 0) freezeTimer = Math.max(0, freezeTimer - rawDt);
 
             if (gameRunning) {
                 if (mouseDown.left) shootPlayer();
@@ -605,8 +793,13 @@
                 updateEnemies(dt);
                 updateProjectiles(dt);
                 updateHealParticles(dt);
+                updateParryBursts(rawDt);
+                updateFlash(rawDt);
                 updateStyle(dt);
                 updateUI();
+            } else {
+                updateFlash(rawDt);
+                updateParryBursts(rawDt);
             }
 
             renderer.render(scene, camera);
