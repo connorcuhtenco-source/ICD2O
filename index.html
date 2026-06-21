@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arcade Arena</title>
+    <title>Neon Kill — Terminal Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,29 +19,34 @@
 
     <div class="landing-bg" aria-hidden="true">
         <canvas id="landingCanvas"></canvas>
+        <div class="terminal-void-grid"></div>
         <div class="neon-grid-floor"></div>
-        <span class="orb orb-1"></span>
-        <span class="orb orb-2"></span>
-        <span class="orb orb-3"></span>
     </div>
 
     <canvas id="mouseTrailCanvas" class="mouse-trail-canvas" aria-hidden="true"></canvas>
 
     <div id="menu">
         <div class="menu-card landing-card">
-            <p class="landing-kicker landing-reveal" data-reveal-order="0">Welcome to</p>
-            <h1 class="landing-title" id="landingTitle" aria-label="Arcade Arena">ARCADE ARENA</h1>
-            <p class="subtitle landing-reveal" data-reveal-order="1">Neon classics. One hub. Endless runs.</p>
+            <div class="title-glitch-wrap landing-reveal" data-reveal-order="0">
+                <h1 class="landing-title glitch-title" id="landingTitle" aria-label="Neon Kill">NEON KILL</h1>
+            </div>
+            <p class="system-status landing-reveal" data-reveal-order="1">// SYSTEM STATUS: COMPROMISED</p>
 
             <div class="landing-actions">
-                <button id="ourGamesBtn" class="menuBtn menuBtn-primary landing-reveal landing-btn" data-reveal-order="2">Our Games</button>
-                <button id="shopBtn" class="menuBtn menuBtn-shop landing-reveal landing-btn" data-reveal-order="3">Shop</button>
-                <button id="inventoryBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="4">Inventory</button>
-                <button id="settingsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="5">Settings</button>
-                <button id="keybindsBtn" class="menuBtn menuBtn-accent landing-reveal landing-btn" data-reveal-order="6">Keybinds</button>
+                <button id="ourGamesBtn" class="menuBtn menuBtn-primary menuBtn-cyber landing-reveal landing-btn" data-reveal-order="2">Our Games</button>
+                <button id="shopBtn" class="menuBtn menuBtn-shop menuBtn-cyber menuBtn-weapon-preview landing-reveal landing-btn" data-reveal-order="3">
+                    <span class="btn-label">Shop</span>
+                    <span class="weapon-preview-lock" title="Weapon classes unlock here">G</span>
+                </button>
+                <button id="inventoryBtn" class="menuBtn menuBtn-accent menuBtn-cyber menuBtn-weapon-preview landing-reveal landing-btn" data-reveal-order="4">
+                    <span class="btn-label">Inventory</span>
+                    <span class="weapon-preview-lock" title="Equip Cyber Revolver &amp; Shotgun">G</span>
+                </button>
+                <button id="settingsBtn" class="menuBtn menuBtn-accent menuBtn-cyber landing-reveal landing-btn" data-reveal-order="5">Settings</button>
+                <button id="keybindsBtn" class="menuBtn menuBtn-accent menuBtn-cyber landing-reveal landing-btn" data-reveal-order="6">Keybinds</button>
             </div>
 
-            <button id="achievementsBtn" class="menuBtn menuBtn-achievements landing-reveal landing-btn" data-reveal-order="7">Achievements</button>
+            <button id="achievementsBtn" class="menuBtn menuBtn-achievements menuBtn-cyber landing-reveal landing-btn" data-reveal-order="7">Achievements</button>
         </div>
     </div>
 

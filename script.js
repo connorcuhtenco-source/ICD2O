@@ -411,6 +411,31 @@ function playUiSound(type = 'click') {
         oscillator.stop(now + 0.08);
     }
 
+    if (type === 'menuHover') {
+        const click = audioContext.createOscillator();
+        const clickGain = audioContext.createGain();
+        click.type = 'square';
+        click.frequency.setValueAtTime(1800, now);
+        click.frequency.exponentialRampToValueAtTime(620, now + 0.025);
+        clickGain.gain.setValueAtTime(0.0001, now);
+        clickGain.gain.exponentialRampToValueAtTime(0.09 * volume, now + 0.004);
+        clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+        click.connect(clickGain);
+        clickGain.connect(audioContext.destination);
+        click.start(now);
+        click.stop(now + 0.05);
+
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(240, now);
+        oscillator.frequency.exponentialRampToValueAtTime(120, now + 0.04);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.05 * volume, now + 0.006);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+        oscillator.start(now);
+        oscillator.stop(now + 0.065);
+        return;
+    }
+
     if (type === 'powerOn') {
         oscillator.type = 'triangle';
         oscillator.frequency.setValueAtTime(90, now);
@@ -516,6 +541,7 @@ function setupHubControls() {
         updateSettingsLabels();
         saveSettings();
         playUiSound('click');
+        LandingEffects.setDroneVolume();
     });
 }
 
@@ -2251,7 +2277,7 @@ window.ArcadeAchievements = {
 };
 
 const LandingEffects = (() => {
-    const TITLE_TEXT = 'ARCADE ARENA';
+    const TITLE_TEXT = 'NEON KILL';
     const LETTER_STAGGER_MS = 90;
     const REVEAL_STAGGER_MS = 120;
 
@@ -2261,13 +2287,16 @@ const LandingEffects = (() => {
     let trailCtx;
     let bootOverlay;
     let landingTitle;
+    let terminalGrid;
     let landingAnimationId = null;
     let landingPlaySound = () => {};
     let bootPlayed = false;
     let mouse = { x: -1000, y: -1000 };
+    let gridGlitchTimer = 2.5;
+    let droneMaster = null;
+    let droneStarted = false;
 
-    const stars = [];
-    const particles = [];
+    const shards = [];
     const trail = [];
 
     function isLandingVisible() {
@@ -2289,33 +2318,97 @@ const LandingEffects = (() => {
         });
     }
 
-    function initStars() {
-        stars.length = 0;
-        const count = Math.floor((window.innerWidth * window.innerHeight) / 9000);
-        for (let i = 0; i < count; i++) {
-            stars.push({
+    function initShards() {
+        shards.length = 0;
+        const count = 34;
+        for (let i = 0; i < count; i += 1) {
+            const verts = 3 + Math.floor(Math.random() * 2);
+            const points = [];
+            for (let v = 0; v < verts; v += 1) {
+                const angle = (Math.PI * 2 / verts) * v + Math.random() * 0.35;
+                const radius = 4 + Math.random() * 11;
+                points.push({
+                    x: Math.cos(angle) * radius,
+                    y: Math.sin(angle) * radius
+                });
+            }
+            const purple = Math.random() > 0.45;
+            shards.push({
                 x: Math.random() * window.innerWidth,
                 y: Math.random() * window.innerHeight,
-                size: Math.random() * 1.8 + 0.4,
-                speed: Math.random() * 0.18 + 0.04,
-                alpha: Math.random() * 0.5 + 0.2,
-                twinkle: Math.random() * Math.PI * 2
+                vx: (Math.random() - 0.5) * 0.28,
+                vy: (Math.random() - 0.5) * 0.22,
+                rot: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.01,
+                points,
+                fill: purple ? 'rgba(18, 8, 24, 0.55)' : 'rgba(6, 12, 18, 0.55)',
+                stroke: purple ? 'rgba(170, 68, 255, 0.75)' : 'rgba(0, 255, 255, 0.65)'
             });
         }
     }
 
-    function initParticles() {
-        particles.length = 0;
-        for (let i = 0; i < 42; i++) {
-            particles.push({
-                x: Math.random() * window.innerWidth,
-                y: Math.random() * window.innerHeight,
-                vx: (Math.random() - 0.5) * 0.35,
-                vy: (Math.random() - 0.5) * 0.35,
-                radius: Math.random() * 2.2 + 1,
-                hue: Math.random() < 0.5 ? 168 : 330
-            });
+    function triggerGridGlitch() {
+        if (!terminalGrid) return;
+        terminalGrid.classList.add('glitching');
+        window.setTimeout(() => terminalGrid.classList.remove('glitching'), 120 + Math.random() * 180);
+    }
+
+    function updateGridGlitch(dt) {
+        gridGlitchTimer -= dt;
+        if (gridGlitchTimer <= 0) {
+            triggerGridGlitch();
+            gridGlitchTimer = 2.2 + Math.random() * 4.5;
         }
+    }
+
+    function startAmbientDrone() {
+        if (droneStarted || settings.sound <= 0) return;
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+
+        droneMaster = audioContext.createGain();
+        droneMaster.gain.setValueAtTime(0.0001, audioContext.currentTime);
+        droneMaster.connect(audioContext.destination);
+
+        [
+            { freq: 52, type: 'sine', level: 0.55 },
+            { freq: 78, type: 'triangle', level: 0.22 },
+            { freq: 104, type: 'sine', level: 0.14 },
+            { freq: 156, type: 'triangle', level: 0.08 }
+        ].forEach(cfg => {
+            const osc = audioContext.createOscillator();
+            osc.type = cfg.type;
+            osc.frequency.setValueAtTime(cfg.freq, audioContext.currentTime);
+            const gain = audioContext.createGain();
+            gain.gain.value = cfg.level;
+            osc.connect(gain);
+            gain.connect(droneMaster);
+            osc.start();
+        });
+
+        const lfo = audioContext.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.07;
+        const lfoGain = audioContext.createGain();
+        lfoGain.gain.value = 0.018;
+        lfo.connect(lfoGain);
+        lfoGain.connect(droneMaster.gain);
+        lfo.start();
+
+        droneStarted = true;
+        setDroneVolume(true);
+    }
+
+    function setDroneVolume(forceOn) {
+        if (!droneMaster || !audioContext) return;
+        const target = (forceOn || isLandingVisible()) && settings.sound > 0
+            ? 0.032 * getSoundVolume()
+            : 0.0001;
+        droneMaster.gain.setTargetAtTime(target, audioContext.currentTime, 0.35);
     }
 
     function buildTitleLetters() {
@@ -2387,66 +2480,35 @@ const LandingEffects = (() => {
         });
     }
 
-    function drawStars(time) {
-        stars.forEach(star => {
-            star.y += star.speed;
-            if (star.y > window.innerHeight + 4) {
-                star.y = -4;
-                star.x = Math.random() * window.innerWidth;
-            }
-            const twinkle = 0.45 + Math.sin(time * 0.002 + star.twinkle) * 0.35;
-            landingCtx.fillStyle = `rgba(220, 245, 255, ${star.alpha * twinkle})`;
-            landingCtx.beginPath();
-            landingCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-            landingCtx.fill();
-        });
-    }
-
-    function drawParticles() {
+    function drawShards() {
         const width = window.innerWidth;
         const height = window.innerHeight;
-        const linkDistance = 130;
 
-        particles.forEach(particle => {
-            particle.x += particle.vx;
-            particle.y += particle.vy;
-            if (particle.x < 0 || particle.x > width) particle.vx *= -1;
-            if (particle.y < 0 || particle.y > height) particle.vy *= -1;
+        shards.forEach(shard => {
+            shard.x += shard.vx;
+            shard.y += shard.vy;
+            shard.rot += shard.rotSpeed;
 
-            const dx = mouse.x - particle.x;
-            const dy = mouse.y - particle.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < 140 && dist > 0) {
-                particle.x += (dx / dist) * 0.08;
-                particle.y += (dy / dist) * 0.08;
-            }
-        });
+            if (shard.x < -40) shard.x = width + 40;
+            if (shard.x > width + 40) shard.x = -40;
+            if (shard.y < -40) shard.y = height + 40;
+            if (shard.y > height + 40) shard.y = -40;
 
-        for (let i = 0; i < particles.length; i++) {
-            for (let j = i + 1; j < particles.length; j++) {
-                const a = particles[i];
-                const b = particles[j];
-                const distance = Math.hypot(a.x - b.x, a.y - b.y);
-                if (distance < linkDistance) {
-                    const alpha = (1 - distance / linkDistance) * 0.28;
-                    landingCtx.strokeStyle = `rgba(0, 255, 204, ${alpha})`;
-                    landingCtx.lineWidth = 1;
-                    landingCtx.beginPath();
-                    landingCtx.moveTo(a.x, a.y);
-                    landingCtx.lineTo(b.x, b.y);
-                    landingCtx.stroke();
-                }
-            }
-        }
-
-        particles.forEach(particle => {
-            landingCtx.fillStyle = `hsla(${particle.hue}, 90%, 68%, 0.75)`;
-            landingCtx.shadowColor = `hsla(${particle.hue}, 90%, 60%, 0.8)`;
-            landingCtx.shadowBlur = 10;
+            landingCtx.save();
+            landingCtx.translate(shard.x, shard.y);
+            landingCtx.rotate(shard.rot);
             landingCtx.beginPath();
-            landingCtx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+            shard.points.forEach((point, index) => {
+                if (index === 0) landingCtx.moveTo(point.x, point.y);
+                else landingCtx.lineTo(point.x, point.y);
+            });
+            landingCtx.closePath();
+            landingCtx.fillStyle = shard.fill;
             landingCtx.fill();
-            landingCtx.shadowBlur = 0;
+            landingCtx.strokeStyle = shard.stroke;
+            landingCtx.lineWidth = 1;
+            landingCtx.stroke();
+            landingCtx.restore();
         });
     }
 
@@ -2499,14 +2561,20 @@ const LandingEffects = (() => {
         }
     }
 
+    let lastLandingTime = performance.now();
+
     function animateLanding(time) {
+        const dt = Math.min((time - lastLandingTime) / 1000, 0.05);
+        lastLandingTime = time;
         if (isLandingVisible()) {
             landingCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-            drawStars(time);
-            drawParticles();
+            drawShards();
+            updateGridGlitch(dt);
+            setDroneVolume();
             drawMouseTrail();
         } else {
             clearMouseTrail();
+            setDroneVolume();
             if (landingCtx) {
                 landingCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
             }
@@ -2516,11 +2584,11 @@ const LandingEffects = (() => {
 
     function setupButtonHovers() {
         let lastHoverSound = 0;
-        document.querySelectorAll('.landing-btn').forEach(button => {
+        document.querySelectorAll('#menu .landing-btn').forEach(button => {
             button.addEventListener('mouseenter', () => {
                 const now = Date.now();
-                if (now - lastHoverSound > 120) {
-                    landingPlaySound('hover');
+                if (now - lastHoverSound > 100) {
+                    landingPlaySound('menuHover');
                     lastHoverSound = now;
                 }
             });
@@ -2532,6 +2600,7 @@ const LandingEffects = (() => {
         trailCanvas = document.getElementById('mouseTrailCanvas');
         bootOverlay = document.getElementById('bootOverlay');
         landingTitle = document.getElementById('landingTitle');
+        terminalGrid = document.querySelector('.terminal-void-grid');
 
         if (!landingCanvas || !trailCanvas || !bootOverlay || !landingTitle) {
             finishBoot();
@@ -2544,15 +2613,14 @@ const LandingEffects = (() => {
             trailCtx = trailCanvas.getContext('2d');
             buildTitleLetters();
             resizeCanvases();
-            initStars();
-            initParticles();
+            initShards();
             setupButtonHovers();
             runBootSequence();
+            startAmbientDrone();
 
             window.addEventListener('resize', () => {
                 resizeCanvases();
-                initStars();
-                initParticles();
+                initShards();
             });
 
             window.addEventListener('mousemove', event => {
@@ -2575,7 +2643,7 @@ const LandingEffects = (() => {
         }
     }
 
-    return { init, clearMouseTrail };
+    return { init, clearMouseTrail, setDroneVolume };
 })();
 
 loadSettings();
