@@ -382,6 +382,11 @@
         let voidDetachedShards = [];
         let voidMeleeSlashes = [];
         let voidDecoys = [];
+        let voidShadowClones = [];
+        let voidStalkerTrails = [];
+        let voidSparkTrails = [];
+        let voidDashWake = [];
+        let isDialogueActive = false;
         let voidTransformActive = false;
         let voidTransformPhase = 'idle';
         let voidTransformTimer = 0;
@@ -809,6 +814,84 @@
             nGain.connect(master);
             noise.start(t);
             noise.stop(t + 1.8);
+        }
+
+        function playVoidTeleportClang() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.85, t);
+            master.connect(ctx.destination);
+
+            const clang = ctx.createOscillator();
+            clang.type = 'square';
+            clang.frequency.setValueAtTime(88, t);
+            clang.frequency.exponentialRampToValueAtTime(32, t + 0.35);
+            const clangGain = ctx.createGain();
+            clangGain.gain.setValueAtTime(0.55, t);
+            clangGain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+            clang.connect(clangGain);
+            clangGain.connect(master);
+            clang.start(t);
+            clang.stop(t + 0.42);
+
+            const hit = ctx.createOscillator();
+            hit.type = 'sawtooth';
+            hit.frequency.setValueAtTime(140, t);
+            hit.frequency.exponentialRampToValueAtTime(48, t + 0.12);
+            const hitGain = ctx.createGain();
+            hitGain.gain.setValueAtTime(0.48, t);
+            hitGain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+            hit.connect(hitGain);
+            hitGain.connect(master);
+            hit.start(t);
+            hit.stop(t + 0.2);
+
+            const nLen = Math.floor(ctx.sampleRate * 0.22);
+            const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+            const nd = nBuf.getChannelData(0);
+            for (let i = 0; i < nLen; i += 1) nd[i] = (Math.random() * 2 - 1) * (1 - i / nLen);
+            const noise = ctx.createBufferSource();
+            noise.buffer = nBuf;
+            const nGain = ctx.createGain();
+            nGain.gain.setValueAtTime(0.42, t);
+            nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+            noise.connect(nGain);
+            nGain.connect(master);
+            noise.start(t);
+            noise.stop(t + 0.24);
+        }
+
+        function playVoidDashScrape() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.001, t);
+            master.gain.linearRampToValueAtTime(0.38, t + 0.08);
+            master.gain.exponentialRampToValueAtTime(0.001, t + 1.15);
+            master.connect(ctx.destination);
+
+            const scrape = ctx.createOscillator();
+            scrape.type = 'sawtooth';
+            scrape.frequency.setValueAtTime(62, t);
+            scrape.frequency.linearRampToValueAtTime(38, t + 1.1);
+            const sGain = ctx.createGain();
+            sGain.gain.setValueAtTime(0.32, t);
+            scrape.connect(sGain);
+            sGain.connect(master);
+            scrape.start(t);
+            scrape.stop(t + 1.15);
+
+            const metal = ctx.createOscillator();
+            metal.type = 'square';
+            metal.frequency.setValueAtTime(210, t);
+            metal.frequency.exponentialRampToValueAtTime(90, t + 1);
+            const mGain = ctx.createGain();
+            mGain.gain.setValueAtTime(0.12, t);
+            metal.connect(mGain);
+            mGain.connect(master);
+            metal.start(t);
+            metal.stop(t + 1.05);
         }
 
         function playVoidStaticCrush() {
@@ -1325,13 +1408,19 @@
             bossDialogueTextEl.textContent = '';
         }
 
+        function syncDialogueLock() {
+            isDialogueActive = bossIntroActive || cinematicDialogueActive;
+        }
+
         function hideBossDialogue() {
             bossDialogueEl.classList.remove('visible', 'done');
             bossDialogueTextEl.textContent = '';
+            syncDialogueLock();
         }
 
         function startBossIntro(boss) {
             bossIntroActive = true;
+            syncDialogueLock();
             introHoldTimer = 5;
             typewriterChars = 0;
             typewriterDone = false;
@@ -1343,6 +1432,7 @@
 
         function startCinematicDialogue(line, useGlitch, onComplete) {
             cinematicDialogueActive = true;
+            syncDialogueLock();
             cinematicDialogueLine = line;
             cinematicDialogueChars = 0;
             cinematicDialogueDone = false;
@@ -1375,6 +1465,7 @@
             if (shown.length >= cinematicDialogueLine.length) {
                 cinematicDialogueDone = true;
                 cinematicDialogueActive = false;
+                syncDialogueLock();
                 bossDialogueEl.classList.add('done');
                 const done = cinematicDialogueOnComplete;
                 cinematicDialogueOnComplete = null;
@@ -1405,6 +1496,7 @@
             introHoldTimer = Math.max(0, introHoldTimer - rawDt);
             if (introHoldTimer <= 0) {
                 bossIntroActive = false;
+                syncDialogueLock();
                 hideBossDialogue();
             }
         }
@@ -1465,6 +1557,14 @@
             voidMeleeSlashes = [];
             voidDecoys.forEach(d => scene.remove(d.mesh));
             voidDecoys = [];
+            voidShadowClones.forEach(c => scene.remove(c.mesh));
+            voidShadowClones = [];
+            voidStalkerTrails.forEach(t => scene.remove(t.mesh));
+            voidStalkerTrails = [];
+            voidSparkTrails.forEach(t => scene.remove(t.mesh));
+            voidSparkTrails = [];
+            voidDashWake.forEach(w => scene.remove(w.mesh));
+            voidDashWake = [];
         }
 
         function clearBossExtras() {
@@ -1585,23 +1685,41 @@
             });
         }
 
+        function buildExecutionerBlade(side) {
+            const group = new THREE.Group();
+            const segments = [];
+            const baseMat = new THREE.LineBasicMaterial({ color: 0xcc66ff, transparent: true, opacity: 0.98 });
+            for (let i = 0; i < 9; i += 1) {
+                const geo = new THREE.BoxGeometry(0.07, 0.52, 0.07);
+                const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), baseMat.clone());
+                wire.position.set(side * i * 0.04, -i * 0.46, i * 0.09);
+                wire.rotation.z = side * (0.12 + i * 0.02);
+                group.add(wire);
+                segments.push({ wire, mat: wire.material });
+            }
+            group.position.set(side * 0.58, 0.65, 0.28);
+            group.rotation.set(0.62, side * 0.18, side * 0.48);
+            return { group, segments };
+        }
+
         function buildVoidPhantomGroup() {
             const mesh = new THREE.Group();
-            const shardMat = new THREE.MeshBasicMaterial({ color: 0x120818, transparent: true, opacity: 0.9 });
-            const shardEdge = new THREE.LineBasicMaterial({ color: 0x6644aa, transparent: true, opacity: 0.95 });
+            const glassMat = new THREE.MeshBasicMaterial({ color: 0x08060c, transparent: true, opacity: 0.93 });
+            const glassEdge = new THREE.LineBasicMaterial({ color: 0x443366, transparent: true, opacity: 0.92 });
             const shards = [];
             const shardConfigs = [
-                [0.55, 0.85, 0.32, 0, 1.05, 0.05, 0.1, 0, 0],
-                [0.42, 0.7, 0.28, -0.28, 0.95, 0.08, -0.15, 0.1, 0.2],
-                [0.4, 0.65, 0.26, 0.3, 0.92, -0.05, 0.18, -0.08, -0.15],
-                [0.35, 0.55, 0.22, -0.12, 1.35, 0.12, 0.08, 0.25, 0.1],
-                [0.32, 0.5, 0.2, 0.14, 1.28, -0.1, -0.12, 0.18, 0.12],
-                [0.48, 0.45, 0.3, -0.38, 0.55, -0.08, 0.35, -0.1, 0.05]
+                [0.62, 1.05, 0.22, 0, 1.02, 0.04, 0.18, 0.08, 0.05],
+                [0.48, 0.82, 0.2, -0.22, 0.92, 0.1, -0.28, 0.15, 0.32],
+                [0.44, 0.78, 0.18, 0.24, 0.88, -0.06, 0.22, -0.12, -0.28],
+                [0.38, 0.62, 0.16, -0.1, 1.28, 0.14, 0.12, 0.32, 0.18],
+                [0.34, 0.58, 0.14, 0.12, 1.22, -0.08, -0.18, 0.22, 0.14],
+                [0.52, 0.48, 0.24, -0.32, 0.58, -0.1, 0.42, -0.08, 0.08],
+                [0.28, 0.42, 0.12, 0.05, 1.48, 0.02, 0.05, -0.05, 0.38]
             ];
             shardConfigs.forEach(([w, h, d, x, y, z, rx, ry, rz]) => {
                 const geo = new THREE.BoxGeometry(w, h, d);
-                const part = new THREE.Mesh(geo, shardMat);
-                const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), shardEdge);
+                const part = new THREE.Mesh(geo, glassMat.clone());
+                const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), glassEdge.clone());
                 part.position.set(x, y, z);
                 wire.position.copy(part.position);
                 part.rotation.set(rx, ry, rz);
@@ -1610,33 +1728,21 @@
                 shards.push({ mesh: part, wire, base: { x, y, z, rx, ry, rz } });
             });
 
-            const core = new THREE.Mesh(
-                new THREE.SphereGeometry(0.28, 10, 10),
-                new THREE.MeshBasicMaterial({ color: 0xcc55ff, transparent: true, opacity: 0.95 })
+            const visor = new THREE.Mesh(
+                new THREE.BoxGeometry(0.92, 0.07, 0.14),
+                new THREE.MeshBasicMaterial({ color: 0xff66ff, transparent: true, opacity: 0.98 })
             );
-            core.position.set(0, 1.05, 0.18);
-            const coreWire = new THREE.LineSegments(
-                new THREE.EdgesGeometry(new THREE.SphereGeometry(0.34, 8, 8)),
-                new THREE.LineBasicMaterial({ color: 0xee99ff, transparent: true, opacity: 0.85 })
+            visor.position.set(0, 1.44, 0.24);
+            const visorGlow = new THREE.Mesh(
+                new THREE.BoxGeometry(1.05, 0.04, 0.08),
+                new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
             );
-            coreWire.position.copy(core.position);
+            visorGlow.position.copy(visor.position);
 
-            const bladeMat = new THREE.LineBasicMaterial({ color: 0xdd66ff, transparent: true, opacity: 0.98 });
-            const bladeL = new THREE.LineSegments(
-                new THREE.EdgesGeometry(new THREE.BoxGeometry(0.08, 2.2, 0.08)),
-                bladeMat
-            );
-            bladeL.position.set(-0.62, 0.85, 0.22);
-            bladeL.rotation.set(0.45, 0, 0.5);
-            const bladeR = new THREE.LineSegments(
-                new THREE.EdgesGeometry(new THREE.BoxGeometry(0.07, 2.0, 0.07)),
-                bladeMat
-            );
-            bladeR.position.set(0.68, 0.88, -0.12);
-            bladeR.rotation.set(0.35, 0.12, -0.42);
-
-            mesh.add(core, coreWire, bladeL, bladeR);
-            return { mesh, core, coreWire, shards, bladeL, bladeR };
+            const bladeL = buildExecutionerBlade(-1);
+            const bladeR = buildExecutionerBlade(1);
+            mesh.add(visor, visorGlow, bladeL.group, bladeR.group);
+            return { mesh, visor, visorGlow, shards, bladeL, bladeR };
         }
 
         function buildVoidTitanGroup() {
@@ -1832,16 +1938,334 @@
         function updateVoidPhantomShards(b, time) {
             (b.shards || []).forEach((shard, i) => {
                 shard.mesh.position.set(
-                    shard.base.x + Math.sin(time * 2 + i) * 0.04,
-                    shard.base.y + Math.cos(time * 1.8 + i) * 0.035,
-                    shard.base.z + Math.sin(time * 1.5 + i) * 0.04
+                    shard.base.x + Math.sin(time * 2.2 + i) * 0.05,
+                    shard.base.y + Math.cos(time * 1.9 + i) * 0.04,
+                    shard.base.z + Math.sin(time * 1.6 + i) * 0.05
                 );
                 shard.wire.position.copy(shard.mesh.position);
             });
-            if (b.core) b.core.material.opacity = 0.7 + Math.sin(time * 4) * 0.25;
+            if (b.visor) {
+                b.visor.material.opacity = 0.75 + Math.sin(time * 5) * 0.25;
+                if (b.visorGlow) b.visorGlow.material.opacity = 0.35 + Math.sin(time * 7) * 0.25;
+            }
         }
 
-        function voidPhantomTeleportNearPlayer() {
+        function setExecutionerBladeColor(b, hex, edgeHex) {
+            [b.bladeL, b.bladeR].forEach(blade => {
+                (blade.segments || []).forEach(seg => {
+                    seg.mat.color.setHex(hex);
+                    if (edgeHex) seg.mat.opacity = 1;
+                });
+            });
+        }
+
+        function spawnVoidStalkerTrail(x, y, z) {
+            for (let i = 0; i < 3; i += 1) {
+                const geo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(x, y, z),
+                    new THREE.Vector3(
+                        x + (Math.random() - 0.5) * 2.2,
+                        y + (Math.random() - 0.5) * 2.5,
+                        z + (Math.random() - 0.5) * 2.2
+                    )
+                ]);
+                const mesh = new THREE.Line(
+                    geo,
+                    new THREE.LineBasicMaterial({
+                        color: Math.random() > 0.5 ? 0x110818 : 0x6644aa,
+                        transparent: true,
+                        opacity: 0.7
+                    })
+                );
+                scene.add(mesh);
+                voidStalkerTrails.push({ mesh, life: 0.35 + Math.random() * 0.2 });
+            }
+        }
+
+        function spawnVoidSparkTrail(x, z) {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.12, 4, 4),
+                new THREE.MeshBasicMaterial({ color: 0xcc66ff, transparent: true, opacity: 0.85 })
+            );
+            mesh.position.set(x, FLOOR_Y + 0.1, z);
+            scene.add(mesh);
+            voidSparkTrails.push({ mesh, life: 0.45 });
+        }
+
+        function spawnVoidShadowClone(pos) {
+            const geo = new THREE.BoxGeometry(0.9, 1.8, 0.45);
+            const mesh = new THREE.LineSegments(
+                new THREE.EdgesGeometry(geo),
+                new THREE.LineBasicMaterial({ color: 0x220818, transparent: true, opacity: 0.75 })
+            );
+            mesh.position.copy(pos);
+            scene.add(mesh);
+            voidShadowClones.push({ mesh, life: 1.4 });
+        }
+
+        function spawnVoidDashWake(x, z, dirX, dirZ) {
+            const geo = new THREE.PlaneGeometry(2.2, 6);
+            geo.rotateX(-Math.PI / 2);
+            const mesh = new THREE.Mesh(
+                geo,
+                new THREE.MeshBasicMaterial({
+                    color: 0xbb44ff,
+                    transparent: true,
+                    opacity: 0.55,
+                    side: THREE.DoubleSide
+                })
+            );
+            mesh.position.set(x, FLOOR_Y + 0.07, z);
+            mesh.rotation.y = Math.atan2(dirX, dirZ);
+            scene.add(mesh);
+            voidDashWake.push({ mesh, life: 0.7 });
+        }
+
+        function updateVoidPhantomTrails(dt) {
+            voidStalkerTrails = voidStalkerTrails.filter(t => {
+                t.life -= dt;
+                t.mesh.material.opacity = Math.max(0, t.life / 0.4) * 0.7;
+                if (t.life <= 0) { scene.remove(t.mesh); return false; }
+                return true;
+            });
+            voidSparkTrails = voidSparkTrails.filter(t => {
+                t.life -= dt;
+                t.mesh.material.opacity = Math.max(0, t.life / 0.45) * 0.85;
+                t.mesh.scale.multiplyScalar(0.97);
+                if (t.life <= 0) { scene.remove(t.mesh); return false; }
+                return true;
+            });
+            voidShadowClones = voidShadowClones.filter(c => {
+                c.life -= dt;
+                c.mesh.material.opacity = Math.max(0, c.life / 1.4) * 0.75;
+                if (c.life <= 0) { scene.remove(c.mesh); return false; }
+                return true;
+            });
+            voidDashWake = voidDashWake.filter(w => {
+                w.life -= dt;
+                w.mesh.material.opacity = Math.max(0, w.life / 0.7) * 0.55;
+                if (w.life <= 0) { scene.remove(w.mesh); return false; }
+                return true;
+            });
+        }
+
+        function voidExecutionerTeleportInFace() {
+            const b = activeBoss;
+            const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+            b.mesh.position.copy(playerPos).add(forward.multiplyScalar(1.65));
+            b.mesh.position.y = FLOOR_Y + 2.55;
+            clampBossPos(b.mesh.position);
+            b.mesh.lookAt(playerPos.x, b.mesh.position.y, playerPos.z);
+        }
+
+        function spawnVoidReaperXSlash(fromPos) {
+            const slashGeo = new THREE.BoxGeometry(3.2, 0.22, 3.2);
+            const mesh = new THREE.Mesh(
+                slashGeo,
+                new THREE.MeshBasicMaterial({ color: 0xff1133, transparent: true, opacity: 0.88 })
+            );
+            mesh.position.copy(fromPos);
+            mesh.rotation.y = Math.PI / 4;
+            scene.add(mesh);
+            const mesh2 = mesh.clone();
+            mesh2.rotation.y = -Math.PI / 4;
+            scene.add(mesh2);
+            voidMeleeSlashes.push({
+                mesh,
+                mesh2,
+                life: 0.28,
+                width: 2.1,
+                hit: false,
+                reaperX: true,
+                active: false
+            });
+        }
+
+        function beginVoidReaperBlink() {
+            const b = activeBoss;
+            b.movePhase = 'reaper';
+            b.reaperPhase = 'vanish';
+            b.reaperTimer = 0;
+            spawnVoidShadowClone(b.mesh.position.clone());
+            playVoidTeleportClang();
+            screenShake = 0.55;
+            b.mesh.visible = false;
+        }
+
+        function beginVoidDecapitationDash() {
+            const b = activeBoss;
+            b.movePhase = 'decap';
+            b.decapTimer = 0;
+            b.decapDuration = 1.15;
+            b.dashDir = new THREE.Vector3().subVectors(
+                new THREE.Vector3(playerPos.x, b.mesh.position.y, playerPos.z),
+                b.mesh.position
+            );
+            b.dashDir.y = 0;
+            if (b.dashDir.lengthSq() < 0.01) b.dashDir.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+            b.dashDir.normalize();
+            b.dashSpeed = 54;
+            b.decapHit = false;
+            playVoidDashScrape();
+            setExecutionerBladeColor(b, 0xff66ff);
+        }
+
+        function updateVoidMeleeSlashes(dt) {
+            voidMeleeSlashes = voidMeleeSlashes.filter(slash => {
+                slash.life -= dt;
+                if (slash.reaperX && !slash.active && slash.life < 0.12) {
+                    slash.active = true;
+                }
+                if (slash.mesh2) {
+                    slash.mesh2.material.opacity = slash.mesh.material.opacity;
+                }
+
+                if (slash.active && player.isParrying && !slash.parryHandled) {
+                    const ms = parryAnimTimer * 1000;
+                    if (ms >= 31 && ms <= 70 && slash.mesh.position.distanceTo(getParryHitCenter()) < slash.width) {
+                        slash.parryHandled = true;
+                        triggerParrySuccess(slash.mesh.position.clone());
+                        if (activeBoss && activeBoss.voidPhase === 1) {
+                            activeBoss.stunTimer = 1.2;
+                            damageBoss(0, 'parry');
+                        }
+                        scene.remove(slash.mesh);
+                        if (slash.mesh2) scene.remove(slash.mesh2);
+                        return false;
+                    }
+                }
+
+                if (slash.active && !slash.hit && slash.mesh.position.distanceTo(playerPos) < slash.width && player.hp > 0) {
+                    slash.hit = true;
+                    player.hp -= 34;
+                    triggerDirectionalHitFlash(slash.mesh.position);
+                    screenShake = 0.75;
+                    if (player.hp <= 0) gameOver();
+                    else updateUI();
+                }
+
+                if (slash.life <= 0) {
+                    scene.remove(slash.mesh);
+                    if (slash.mesh2) scene.remove(slash.mesh2);
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        function updateVoidPhantomBoss(dt) {
+            const b = activeBoss;
+            const time = performance.now() * 0.001;
+            const prevPos = b.lastPos ? b.lastPos.clone() : b.mesh.position.clone();
+
+            if (b.stunTimer > 0) {
+                b.stunTimer -= dt;
+                if (b.stunTimer <= 0) {
+                    b.movePhase = 'idle';
+                    setExecutionerBladeColor(b, 0xcc66ff);
+                }
+            }
+
+            updateVoidPhantomShards(b, time);
+            updateVoidPhantomTrails(dt);
+            updateVoidMeleeSlashes(dt);
+            b.mesh.lookAt(playerPos.x, b.mesh.position.y, playerPos.z);
+
+            if (b.movePhase === 'reaper') {
+                b.reaperTimer += dt;
+                if (b.reaperPhase === 'vanish' && b.reaperTimer >= 0.12) {
+                    voidExecutionerTeleportInFace();
+                    b.mesh.visible = true;
+                    b.reaperPhase = 'telegraph';
+                    b.reaperTimer = 0;
+                    setExecutionerBladeColor(b, 0xff1133);
+                    playVoidTeleportClang();
+                    spawnVoidStalkerTrail(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z);
+                } else if (b.reaperPhase === 'telegraph' && b.reaperTimer >= 0.4) {
+                    b.reaperPhase = 'strike';
+                    b.reaperTimer = 0;
+                    const wp = new THREE.Vector3();
+                    b.mesh.getWorldPosition(wp);
+                    spawnVoidReaperXSlash(wp.clone().add(new THREE.Vector3(0, 0.2, 0.6)));
+                } else if (b.reaperPhase === 'strike' && b.reaperTimer >= 0.35) {
+                    setExecutionerBladeColor(b, 0xcc66ff);
+                    b.movePhase = 'idle';
+                    b.attackTimer = 4.5;
+                }
+                return;
+            }
+
+            if (b.movePhase === 'decap') {
+                b.decapTimer += dt;
+                b.mesh.position.add(b.dashDir.clone().multiplyScalar(b.dashSpeed * dt));
+                clampBossPos(b.mesh.position);
+                spawnVoidDashWake(b.mesh.position.x, b.mesh.position.z, b.dashDir.x, b.dashDir.z);
+                spawnVoidSparkTrail(b.mesh.position.x, b.mesh.position.z);
+                spawnVoidStalkerTrail(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z);
+                b.bladeL.group.rotation.x = 0.95;
+                b.bladeR.group.rotation.x = 0.95;
+
+                const lateral = Math.abs(
+                    (playerPos.x - b.mesh.position.x) * b.dashDir.z -
+                    (playerPos.z - b.mesh.position.z) * b.dashDir.x
+                );
+                if (!b.decapHit && lateral < 1.35 && playerPos.y < FLOOR_Y + 2.6 &&
+                    Math.abs(playerPos.x - b.mesh.position.x) < 2.2) {
+                    b.decapHit = true;
+                    player.hp -= 40;
+                    triggerDirectionalHitFlash(b.mesh.position);
+                    screenShake = 0.9;
+                    if (player.hp <= 0) gameOver();
+                    else updateUI();
+                }
+
+                if (b.decapTimer >= b.decapDuration) {
+                    b.movePhase = 'idle';
+                    b.bladeL.group.rotation.x = 0.62;
+                    b.bladeR.group.rotation.x = 0.62;
+                    setExecutionerBladeColor(b, 0xcc66ff);
+                    b.attackTimer = 4.5;
+                }
+                return;
+            }
+
+            if (b.movePhase === 'idle' && b.mesh.visible) {
+                const moved = b.mesh.position.distanceToSquared(prevPos) > 0.02;
+                if (moved) {
+                    spawnVoidStalkerTrail(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z);
+                    spawnVoidSparkTrail(b.mesh.position.x, b.mesh.position.z);
+                }
+                b.teleportTimer = (b.teleportTimer || 0) - dt;
+                if (b.teleportTimer <= 0) {
+                    spawnVoidShadowClone(b.mesh.position.clone());
+                    playVoidTeleportClang();
+                    voidExecutionerTeleportNearPlayer();
+                    b.teleportTimer = 1.6 + Math.random() * 0.9;
+                    spawnVoidStalkerTrail(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z);
+                }
+            }
+
+            b.lastPos = b.mesh.position.clone();
+
+            b.attackTimer -= dt;
+            if (b.attackTimer <= 0.55 && b.attackTimer > 0 && !b.attackWarned) {
+                playVoidAttackWarning();
+                b.attackWarned = true;
+            }
+            if (b.attackTimer > 0.6) b.attackWarned = false;
+
+            if (b.attackTimer <= 0 && b.movePhase === 'idle') {
+                if (b.attackMode === 'reaper') {
+                    beginVoidReaperBlink();
+                    b.attackMode = 'decap';
+                } else {
+                    beginVoidDecapitationDash();
+                    b.attackMode = 'reaper';
+                }
+            }
+        }
+
+        function voidExecutionerTeleportNearPlayer() {
             const b = activeBoss;
             const side = Math.random() > 0.5 ? 1 : -1;
             const back = Math.random() > 0.45;
@@ -1853,191 +2277,6 @@
                 playerPos.z + Math.cos(angle) * dist
             );
             clampBossPos(b.mesh.position);
-        }
-
-        function spawnVoidMeleeSlash(fromPos, dir) {
-            const mesh = new THREE.Mesh(
-                new THREE.BoxGeometry(2.8, 0.18, 0.55),
-                new THREE.MeshBasicMaterial({ color: 0xff1133, transparent: true, opacity: 0.82 })
-            );
-            mesh.position.copy(fromPos);
-            mesh.lookAt(fromPos.clone().add(dir));
-            scene.add(mesh);
-            voidMeleeSlashes.push({
-                mesh,
-                vel: dir.clone().multiplyScalar(34),
-                life: 0.42,
-                width: 1.6,
-                hit: false
-            });
-        }
-
-        function beginVoidBlinkStrike() {
-            const b = activeBoss;
-            b.movePhase = 'blink';
-            b.blinkPhase = 'charge';
-            b.blinkTimer = 0;
-            (b.shards || []).forEach(s => { s.mesh.material.color.setHex(0xff1133); });
-        }
-
-        function beginVoidMirrorDash() {
-            const b = activeBoss;
-            b.movePhase = 'mirror';
-            b.mirrorTimer = 0;
-            b.mirrorThrust = false;
-            const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-            const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-            voidDecoys = [];
-            [-1, 1].forEach(side => {
-                const geo = new THREE.BoxGeometry(0.7, 1.6, 0.35);
-                const wire = new THREE.LineSegments(
-                    new THREE.EdgesGeometry(geo),
-                    new THREE.LineBasicMaterial({ color: 0xaa55ff, transparent: true, opacity: 0.55 })
-                );
-                wire.position.copy(b.mesh.position);
-                scene.add(wire);
-                voidDecoys.push({
-                    mesh: wire,
-                    vel: forward.clone().multiplyScalar(28).add(right.clone().multiplyScalar(side * 14)),
-                    life: 0.9
-                });
-            });
-            const flank = right.clone().multiplyScalar(Math.random() > 0.5 ? 10 : -10);
-            b.mesh.position.add(flank);
-            clampBossPos(b.mesh.position);
-        }
-
-        function updateVoidMeleeSlashes(dt) {
-            voidMeleeSlashes = voidMeleeSlashes.filter(slash => {
-                slash.mesh.position.add(slash.vel.clone().multiplyScalar(dt));
-                slash.life -= dt;
-
-                if (player.isParrying && !slash.parryHandled) {
-                    const ms = parryAnimTimer * 1000;
-                    if (ms >= 31 && ms <= 70 && slash.mesh.position.distanceTo(getParryHitCenter()) < slash.width) {
-                        slash.parryHandled = true;
-                        triggerParrySuccess(slash.mesh.position.clone());
-                        if (activeBoss && activeBoss.voidPhase === 1) {
-                            activeBoss.stunTimer = 1;
-                            damageBoss(0, 'parry');
-                        }
-                        scene.remove(slash.mesh);
-                        return false;
-                    }
-                }
-
-                if (!slash.hit && slash.mesh.position.distanceTo(playerPos) < slash.width && player.hp > 0) {
-                    slash.hit = true;
-                    player.hp -= 28;
-                    triggerDirectionalHitFlash(slash.mesh.position);
-                    if (player.hp <= 0) gameOver();
-                    else updateUI();
-                }
-
-                if (slash.life <= 0) {
-                    scene.remove(slash.mesh);
-                    return false;
-                }
-                return true;
-            });
-        }
-
-        function updateVoidDecoys(dt) {
-            voidDecoys = voidDecoys.filter(d => {
-                d.mesh.position.add(d.vel.clone().multiplyScalar(dt));
-                d.life -= dt;
-                d.mesh.material.opacity = Math.max(0, d.life) * 0.55;
-                if (d.life <= 0) {
-                    scene.remove(d.mesh);
-                    return false;
-                }
-                return true;
-            });
-        }
-
-        function updateVoidPhantomBoss(dt) {
-            const b = activeBoss;
-            const time = performance.now() * 0.001;
-
-            if (b.stunTimer > 0) {
-                b.stunTimer -= dt;
-                if (b.stunTimer <= 0) b.movePhase = 'idle';
-            }
-
-            updateVoidPhantomShards(b, time);
-            b.mesh.lookAt(playerPos.x, b.mesh.position.y, playerPos.z);
-            updateVoidMeleeSlashes(dt);
-            updateVoidDecoys(dt);
-
-            if (b.movePhase === 'blink') {
-                b.blinkTimer += dt;
-                if (b.blinkPhase === 'charge' && b.blinkTimer >= 0.35) {
-                    voidPhantomTeleportNearPlayer();
-                    b.blinkPhase = 'slash';
-                    b.blinkTimer = 0;
-                    const slashDir = new THREE.Vector3().subVectors(playerPos, b.mesh.position);
-                    slashDir.y = 0;
-                    slashDir.normalize();
-                    spawnVoidMeleeSlash(b.mesh.position.clone().add(new THREE.Vector3(0, 0.6, 0)), slashDir);
-                } else if (b.blinkPhase === 'slash' && b.blinkTimer >= 0.55) {
-                    (b.shards || []).forEach(s => { s.mesh.material.color.setHex(0x120818); });
-                    b.movePhase = 'idle';
-                    b.attackTimer = 4.5;
-                }
-                return;
-            }
-
-            if (b.movePhase === 'mirror') {
-                b.mirrorTimer += dt;
-                if (b.mirrorTimer >= 0.75 && !b.mirrorThrust) {
-                    b.mirrorThrust = true;
-                    const dir = new THREE.Vector3().subVectors(playerPos, b.mesh.position).normalize();
-                    const mesh = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.35, 0.35, 1.6),
-                        new THREE.MeshBasicMaterial({ color: 0xcc44ff, transparent: true, opacity: 0.9 })
-                    );
-                    mesh.position.copy(b.mesh.position);
-                    scene.add(mesh);
-                    projectiles.push({
-                        mesh,
-                        vel: dir.multiplyScalar(48),
-                        owner: 'enemy',
-                        life: 1.2,
-                        fromBoss: true
-                    });
-                }
-                if (b.mirrorTimer >= 1.4) {
-                    b.movePhase = 'idle';
-                    b.mirrorThrust = false;
-                    voidDecoys.forEach(d => scene.remove(d.mesh));
-                    voidDecoys = [];
-                    b.attackTimer = 4.5;
-                }
-                return;
-            }
-
-            b.teleportTimer = (b.teleportTimer || 0) - dt;
-            if (b.teleportTimer <= 0 && b.movePhase === 'idle') {
-                voidPhantomTeleportNearPlayer();
-                b.teleportTimer = 1.4 + Math.random() * 0.8;
-            }
-
-            b.attackTimer -= dt;
-            if (b.attackTimer <= 0.55 && b.attackTimer > 0 && !b.attackWarned) {
-                playVoidAttackWarning();
-                b.attackWarned = true;
-            }
-            if (b.attackTimer > 0.6) b.attackWarned = false;
-
-            if (b.attackTimer <= 0 && b.movePhase === 'idle') {
-                if (b.attackMode === 'blink') {
-                    beginVoidBlinkStrike();
-                    b.attackMode = 'mirror';
-                } else {
-                    beginVoidMirrorDash();
-                    b.attackMode = 'blink';
-                }
-            }
         }
 
         function spawnVoidOblivion() {
@@ -2054,20 +2293,23 @@
                 transformDialogue: 'IMPUDENT BUG... YOU MERELY TESTED MY SHELL. NOW, BEHOLD THE TRUE HORIZON!',
                 dyingMessage: 'THE LIGHT FADES... BUT THE MACHINE NEVER SLEEPS... YOU WILL PAY!...',
                 mesh: phantom.mesh,
-                core: phantom.core,
-                coreWire: phantom.coreWire,
+                visor: phantom.visor,
+                visorGlow: phantom.visorGlow,
                 shards: phantom.shards,
                 bladeL: phantom.bladeL,
                 bladeR: phantom.bladeR,
-                floatY: 13,
+                floatY: 2.1,
                 movePhase: 'idle',
-                attackMode: 'blink',
+                attackMode: 'reaper',
                 attackTimer: 5,
                 attackWarned: false,
                 stunTimer: 0,
-                blinkTimer: 0,
-                blinkPhase: 'idle',
-                mirrorTimer: 0,
+                reaperPhase: 'idle',
+                reaperTimer: 0,
+                decapTimer: 0,
+                decapDuration: 1.15,
+                decapHit: false,
+                lastPos: null,
                 teleportTimer: 1.2,
                 hp: 850,
                 maxHp: 850,
@@ -2720,35 +2962,37 @@
 
             if (activeBoss.type === 'void') {
                 if (activeBoss.voidPhase === 1) {
-                    if (activeBoss.core) pieces.push({ mesh: activeBoss.core, isCore: true });
-                    if (activeBoss.coreWire) pieces.push({ mesh: activeBoss.coreWire });
+                    if (activeBoss.visor) pieces.push({ mesh: activeBoss.visor, isCore: true });
+                    if (activeBoss.visorGlow) pieces.push({ mesh: activeBoss.visorGlow });
                     (activeBoss.shards || []).forEach(s => {
                         pieces.push({ mesh: s.mesh });
                         pieces.push({ mesh: s.wire });
                     });
-                    if (activeBoss.bladeL) pieces.push({ mesh: activeBoss.bladeL });
-                    if (activeBoss.bladeR) pieces.push({ mesh: activeBoss.bladeR });
+                    [activeBoss.bladeL, activeBoss.bladeR].forEach(blade => {
+                        if (!blade) return;
+                        (blade.segments || []).forEach(seg => pieces.push({ mesh: seg.wire }));
+                    });
                 } else {
                 if (activeBoss.core) pieces.push({ mesh: activeBoss.core, isCore: true });
                 if (activeBoss.coreWire) pieces.push({ mesh: activeBoss.coreWire });
                 (activeBoss.plates || []).forEach(p => {
-                    pieces.push({ mesh: p.mesh });
-                    pieces.push({ mesh: p.wire });
+                    pieces.push({ mesh: p.mesh, parent: activeBoss.mesh });
+                    pieces.push({ mesh: p.wire, parent: activeBoss.mesh });
                     const wp = new THREE.Vector3();
                     p.mesh.getWorldPosition(wp);
                     addVoidFragmentBurst(wp, 0x120818, 14);
                 });
                 (activeBoss.orbitals || []).forEach(o => {
                     if (o.wire) {
-                        pieces.push({ mesh: o.wire });
+                        pieces.push({ mesh: o.wire, parent: activeBoss.mesh });
                         const wp = new THREE.Vector3();
                         o.wire.getWorldPosition(wp);
                         addVoidFragmentBurst(wp, 0xcc55ff, 18);
                     }
                 });
                 (activeBoss.energyPillars || []).forEach(p => {
-                    pieces.push({ mesh: p.mesh });
-                    pieces.push({ mesh: p.wire });
+                    pieces.push({ mesh: p.mesh, parent: activeBoss.mesh });
+                    pieces.push({ mesh: p.wire, parent: activeBoss.mesh });
                     const wp = new THREE.Vector3();
                     p.mesh.getWorldPosition(wp);
                     addVoidFragmentBurst(wp, 0xbb44ff, 10);
@@ -2811,7 +3055,8 @@
 
         function getVoidBossCoreWorld() {
             const pos = new THREE.Vector3();
-            if (activeBoss.core) activeBoss.core.getWorldPosition(pos);
+            if (activeBoss.voidPhase === 1 && activeBoss.visor) activeBoss.visor.getWorldPosition(pos);
+            else if (activeBoss.core) activeBoss.core.getWorldPosition(pos);
             else activeBoss.mesh.getWorldPosition(pos);
             return pos;
         }
@@ -2985,6 +3230,7 @@
         }
 
         function shootPlayer() {
+            if (isDialogueActive) return;
             if (shootCooldown > 0) return;
             shootCooldown = 0.18;
             gunRecoil = 0.08;
@@ -3012,6 +3258,7 @@
         }
 
         function firePierceShot() {
+            if (isDialogueActive) return;
             const origin = getMuzzleWorldPosition();
             const dir = getAimDirection();
             const maxDist = 90;
@@ -3044,6 +3291,7 @@
         }
 
         function releaseLeftMouse() {
+            if (isDialogueActive) return;
             if (chargeCommitted || leftHoldTime >= TAP_HOLD_THRESHOLD) {
                 if (chargeLevel >= 100) firePierceShot();
             } else {
@@ -3058,6 +3306,7 @@
         }
 
         function updateLeftMouse(dt) {
+            if (isDialogueActive) return;
             if (!mouseDown.left || !gameRunning || player.isParrying) return;
             leftHoldTime += dt;
             if (leftHoldTime >= TAP_HOLD_THRESHOLD) {
@@ -3085,6 +3334,7 @@
         }
 
         function startParry() {
+            if (isDialogueActive) return;
             if (player.isParrying || isCharging) return;
             player.isParrying = true;
             parryTimer = PARRY_WINDOW;
@@ -3164,6 +3414,26 @@
         }
 
         function updateWeaponRig(dt) {
+            if (isDialogueActive) {
+                gunRecoil = 0;
+                isCharging = false;
+                chargeLevel = 0;
+                chargeCommitted = false;
+                chargeWasFull = false;
+                leftHoldTime = 0;
+                drawBatteryHUD();
+                cyberRevolver.position.set(REVOLVER_BASE.x, REVOLVER_BASE.y, REVOLVER_BASE.z);
+                cyberRevolver.rotation.x = -0.1;
+                batteryHUD.scale.set(1, 1, 1);
+                if (player.isParrying) {
+                    player.isParrying = false;
+                    parryAnimTimer = 0;
+                }
+                armGroup.visible = false;
+                armGroup.position.copy(parryRestPos);
+                armGroup.rotation.set(0, 0, 0);
+                return;
+            }
             if (gunRecoil > 0) {
                 gunRecoil = Math.max(0, gunRecoil - dt * 0.55);
                 cyberRevolver.position.z = REVOLVER_BASE.z + gunRecoil * 0.35;
@@ -3308,6 +3578,7 @@
             voidTransformPhase = 'idle';
             cinematicDialogueActive = false;
             lastDialogueCharCount = 0;
+            syncDialogueLock();
             hideBossHud();
             hideBossDialogue();
             hitFlashTimer = 0;
