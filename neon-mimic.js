@@ -4,6 +4,8 @@ const NeonMimic = (() => {
     const WORLD_H = 620;
     const PLAYER_R = 18;
     const PLAYER_SPEED = 300;
+    const GRID_SIZE = 40;
+    const ARENA_PAD = 28;
     const POWER_DURATION = 10;
     const TETHER_RANGE = 140;
     const TETHER_LOCK_TIME = 0.75;
@@ -11,11 +13,12 @@ const NeonMimic = (() => {
     const CORE_BURST_COOLDOWN = 20;
     const TETHER_HACK_RANGE_MULT = 1.5;
     const TETHER_HACK_DURATION = 8;
+    const HAZARD_SLOW_MULT = 0.4;
 
     const ENEMY_DEFS = {
-        blaster: { hp: 2, speed: 95, radius: 22, color: '#00ffcc', glow: '#00ffcc', label: 'Blaster Drone', power: 'blaster', weight: 0.55 },
-        laser: { hp: 4, speed: 68, radius: 28, color: '#ff44aa', glow: '#ff66cc', label: 'Laser Sentinel', power: 'laser', weight: 0.30 },
-        orbit: { hp: 6, speed: 52, radius: 32, color: '#ffaa22', glow: '#ffcc44', label: 'Orbit Bot', power: 'orbit', weight: 0.15 }
+        blaster: { hp: 2, speed: 95, radius: 22, color: '#39ff14', glow: '#39ff14', wire: 'rgba(57, 255, 20, 0.55)', label: 'Blaster Drone', power: 'blaster', weight: 0.55 },
+        laser: { hp: 4, speed: 48, radius: 28, color: '#00eeff', glow: '#00eeff', wire: 'rgba(0, 238, 255, 0.55)', label: 'Laser Sentinel', power: 'laser', weight: 0.30 },
+        orbit: { hp: 6, speed: 52, radius: 32, color: '#ff44cc', glow: '#ff66dd', wire: 'rgba(255, 68, 204, 0.55)', label: 'Orbit Bot', power: 'orbit', weight: 0.15 }
     };
 
     let canvas;
@@ -53,6 +56,11 @@ const NeonMimic = (() => {
     let laserFireTimer;
     let fireRateMult;
     let overclockActive;
+    let gridTime = 0;
+    let ripples = [];
+    let hazards = [];
+    let hazardSpawnTimer = 6;
+    let borderSparks = [];
 
     const mimicHud = document.getElementById('mimicHud');
     const mimicScoreEl = document.getElementById('mimicScore');
@@ -98,6 +106,103 @@ const NeonMimic = (() => {
         laserFireTimer = 0;
         fireRateMult = 1;
         overclockActive = false;
+        gridTime = 0;
+        ripples = [];
+        hazards = [];
+        hazardSpawnTimer = 6;
+        borderSparks = [];
+    }
+
+    function arenaMinX() { return ARENA_PAD + PLAYER_R; }
+    function arenaMaxX() { return WORLD_W - ARENA_PAD - PLAYER_R; }
+    function arenaMinY() { return ARENA_PAD + PLAYER_R; }
+    function arenaMaxY() { return WORLD_H - ARENA_PAD - PLAYER_R; }
+
+    function spawnBorderSpark(x, y) {
+        borderSparks.push({ x, y, life: 0.35 });
+    }
+
+    function applyArenaBounds() {
+        const minX = arenaMinX();
+        const maxX = arenaMaxX();
+        const minY = arenaMinY();
+        const maxY = arenaMaxY();
+
+        if (player.x < minX) {
+            player.x = minX;
+            spawnBorderSpark(player.x - PLAYER_R, player.y);
+        } else if (player.x > maxX) {
+            player.x = maxX;
+            spawnBorderSpark(player.x + PLAYER_R, player.y);
+        }
+        if (player.y < minY) {
+            player.y = minY;
+            spawnBorderSpark(player.x, player.y - PLAYER_R);
+        } else if (player.y > maxY) {
+            player.y = maxY;
+            spawnBorderSpark(player.x, player.y + PLAYER_R);
+        }
+    }
+
+    function getHazardSlowMultiplier() {
+        for (const hazard of hazards) {
+            if (hazard.phase !== 'active') continue;
+            if (player.x >= hazard.x && player.x <= hazard.x + hazard.w
+                && player.y >= hazard.y && player.y <= hazard.y + hazard.h) {
+                return HAZARD_SLOW_MULT;
+            }
+        }
+        return 1;
+    }
+
+    function maybeSpawnHazard() {
+        hazards.push({
+            x: 70 + Math.random() * (WORLD_W - 220),
+            y: 70 + Math.random() * (WORLD_H - 180),
+            w: 72 + Math.random() * 56,
+            h: 56 + Math.random() * 48,
+            phase: 'warning',
+            timer: 2.4
+        });
+    }
+
+    function updateHazards(delta) {
+        hazardSpawnTimer -= delta;
+        if (hazardSpawnTimer <= 0) {
+            maybeSpawnHazard();
+            hazardSpawnTimer = 11 + Math.random() * 9;
+        }
+
+        hazards = hazards.filter(hazard => {
+            hazard.timer -= delta;
+            if (hazard.phase === 'warning' && hazard.timer <= 0) {
+                hazard.phase = 'active';
+                hazard.timer = 5.5;
+            } else if (hazard.phase === 'active' && hazard.timer <= 0) {
+                return false;
+            }
+            return true;
+        });
+    }
+
+    function updateRipples(delta) {
+        ripples = ripples.filter(ripple => {
+            ripple.life -= delta;
+            return ripple.life > 0;
+        });
+        borderSparks = borderSparks.filter(spark => {
+            spark.life -= delta;
+            return spark.life > 0;
+        });
+    }
+
+    function addMovementRipple() {
+        const tileX = Math.floor(player.x / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2;
+        const tileY = Math.floor(player.y / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2;
+        const existing = ripples.find(r => r.x === tileX && r.y === tileY && r.life > 0.7);
+        if (!existing) {
+            ripples.push({ x: tileX, y: tileY, life: 1 });
+        }
     }
 
     function getTetherRange() {
@@ -158,7 +263,11 @@ const NeonMimic = (() => {
             hp: def.hp + Math.floor(wave / 3),
             maxHp: def.hp + Math.floor(wave / 3),
             shootTimer: 1 + Math.random() * 2,
-            orbitAngle: Math.random() * Math.PI * 2,
+            spinAngle: Math.random() * Math.PI * 2,
+            ringAngle1: Math.random() * Math.PI * 2,
+            ringAngle2: Math.random() * Math.PI * 2,
+            spikeAngle: Math.random() * Math.PI * 2,
+            charging: false,
             frozen: false
         });
     }
@@ -213,7 +322,7 @@ const NeonMimic = (() => {
                     vy: Math.sin(angle) * 520,
                     life: 1.4,
                     damage: 1,
-                    color: '#00ffcc'
+                    color: '#39ff14'
                 });
             }
             fireCooldown = 0.15 / fireRateMult;
@@ -315,8 +424,15 @@ const NeonMimic = (() => {
         }
 
         if (!tethering) {
-            player.x = clamp(player.x + dx * PLAYER_SPEED * speedMult * delta, PLAYER_R, WORLD_W - PLAYER_R);
-            player.y = clamp(player.y + dy * PLAYER_SPEED * speedMult * delta, PLAYER_R, WORLD_H - PLAYER_R);
+            const hazardMult = getHazardSlowMultiplier();
+            const prevX = player.x;
+            const prevY = player.y;
+            player.x += dx * PLAYER_SPEED * speedMult * hazardMult * delta;
+            player.y += dy * PLAYER_SPEED * speedMult * hazardMult * delta;
+            applyArenaBounds();
+            if (Math.hypot(player.x - prevX, player.y - prevY) > 0.5) {
+                addMovementRipple();
+            }
         }
 
         if (player.powerTimer > 0) {
@@ -377,25 +493,48 @@ const NeonMimic = (() => {
             enemy.y += (dy / dist) * def.speed * delta;
 
             enemy.shootTimer -= delta;
+            if (enemy.type === 'blaster') {
+                enemy.spinAngle += delta * 2.8;
+                enemy.charging = enemy.shootTimer < 0.35;
+            }
+            if (enemy.type === 'laser') {
+                enemy.charging = enemy.shootTimer < 0.55;
+            }
+            if (enemy.type === 'orbit') {
+                enemy.ringAngle1 += delta * 3.4;
+                enemy.ringAngle2 -= delta * 2.6;
+                enemy.spikeAngle += delta * 2.1;
+            }
+
             if (enemy.shootTimer <= 0) {
                 enemy.shootTimer = 1.8 + Math.random() * 1.5;
                 if (enemy.type === 'blaster' && dist < 420) {
                     const angle = Math.atan2(dy, dx);
                     bullets.push({
-                        x: enemy.x,
-                        y: enemy.y,
+                        x: enemy.x + Math.cos(angle) * def.radius,
+                        y: enemy.y + Math.sin(angle) * def.radius,
                         vx: Math.cos(angle) * 280,
                         vy: Math.sin(angle) * 280,
                         life: 2.5,
                         damage: 1,
-                        color: '#ff6688',
+                        color: '#39ff14',
                         hostile: true
                     });
                 }
-            }
-
-            if (enemy.type === 'orbit') {
-                enemy.orbitAngle += delta * 2.2;
+                if (enemy.type === 'laser' && dist < 500) {
+                    const angle = Math.atan2(dy, dx);
+                    bullets.push({
+                        x: enemy.x,
+                        y: enemy.y,
+                        vx: Math.cos(angle) * 340,
+                        vy: Math.sin(angle) * 340,
+                        life: 1.6,
+                        damage: 1,
+                        color: '#00eeff',
+                        hostile: true,
+                        beam: true
+                    });
+                }
             }
 
             const touchDist = def.radius + PLAYER_R;
@@ -516,69 +655,273 @@ const NeonMimic = (() => {
     }
 
     function drawBackground() {
-        const grd = ctx.createLinearGradient(0, 0, 0, WORLD_H);
-        grd.addColorStop(0, '#0a0a18');
-        grd.addColorStop(1, '#12082a');
-        ctx.fillStyle = grd;
+        const floor = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+        floor.addColorStop(0, '#06040e');
+        floor.addColorStop(0.55, '#0a0614');
+        floor.addColorStop(1, '#120820');
+        ctx.fillStyle = floor;
         ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-        ctx.strokeStyle = 'rgba(0, 255, 204, 0.06)';
+        ctx.fillStyle = 'rgba(8, 4, 16, 0.55)';
+        for (let y = 0; y < WORLD_H; y += GRID_SIZE) {
+            for (let x = 0; x < WORLD_W; x += GRID_SIZE) {
+                if (((x / GRID_SIZE) + (y / GRID_SIZE)) % 2 === 0) {
+                    ctx.fillRect(x, y, GRID_SIZE, GRID_SIZE);
+                }
+            }
+        }
+
+        const pulse = 0.45 + Math.sin(gridTime * 2.4) * 0.2;
+        ctx.strokeStyle = `rgba(168, 72, 255, ${0.22 + pulse * 0.18})`;
         ctx.lineWidth = 1;
-        for (let x = 0; x < WORLD_W; x += 40) {
+        for (let x = 0; x <= WORLD_W; x += GRID_SIZE) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, WORLD_H);
             ctx.stroke();
         }
-        for (let y = 0; y < WORLD_H; y += 40) {
+        for (let y = 0; y <= WORLD_H; y += GRID_SIZE) {
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(WORLD_W, y);
             ctx.stroke();
         }
+
+        ctx.fillStyle = 'rgba(120, 40, 200, 0.04)';
+        ctx.fillRect(ARENA_PAD, ARENA_PAD, WORLD_W - ARENA_PAD * 2, WORLD_H - ARENA_PAD * 2);
+    }
+
+    function drawRipples() {
+        for (const ripple of ripples) {
+            const alpha = ripple.life * 0.35;
+            const size = (1 - ripple.life) * GRID_SIZE * 0.55 + GRID_SIZE * 0.2;
+            ctx.strokeStyle = `rgba(190, 110, 255, ${alpha})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(ripple.x, ripple.y, size, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+
+    function drawHazards() {
+        for (const hazard of hazards) {
+            if (hazard.phase === 'warning') {
+                const flash = Math.sin(hazard.timer * 14) > 0;
+                ctx.fillStyle = flash ? 'rgba(255, 60, 120, 0.22)' : 'rgba(255, 200, 60, 0.12)';
+                ctx.strokeStyle = flash ? 'rgba(255, 90, 140, 0.85)' : 'rgba(255, 220, 80, 0.55)';
+            } else {
+                ctx.fillStyle = 'rgba(90, 40, 140, 0.35)';
+                ctx.strokeStyle = 'rgba(170, 90, 255, 0.45)';
+            }
+            ctx.lineWidth = 2;
+            ctx.fillRect(hazard.x, hazard.y, hazard.w, hazard.h);
+            ctx.strokeRect(hazard.x, hazard.y, hazard.w, hazard.h);
+
+            if (hazard.phase === 'active') {
+                ctx.fillStyle = 'rgba(200, 180, 255, 0.08)';
+                for (let i = 0; i < 8; i++) {
+                    const sx = hazard.x + ((i * 37) % hazard.w);
+                    const sy = hazard.y + ((i * 53) % hazard.h);
+                    ctx.fillRect(sx, sy, 2, 2);
+                }
+            }
+        }
+    }
+
+    function drawBorders() {
+        const beat = 0.55 + Math.sin(gridTime * 3.2) * 0.45;
+        const colors = [
+            `rgba(180, 80, 255, ${0.35 + beat * 0.35})`,
+            `rgba(255, 77, 200, ${0.25 + beat * 0.3})`
+        ];
+
+        const drawBarrier = (x1, y1, x2, y2) => {
+            const grd = ctx.createLinearGradient(x1, y1, x2, y2);
+            grd.addColorStop(0, colors[0]);
+            grd.addColorStop(1, colors[1]);
+            ctx.strokeStyle = grd;
+            ctx.lineWidth = 5 + beat * 3;
+            ctx.shadowColor = '#b84cff';
+            ctx.shadowBlur = 16 + beat * 12;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        };
+
+        const p = ARENA_PAD;
+        drawBarrier(p, p, WORLD_W - p, p);
+        drawBarrier(WORLD_W - p, p, WORLD_W - p, WORLD_H - p);
+        drawBarrier(WORLD_W - p, WORLD_H - p, p, WORLD_H - p);
+        drawBarrier(p, WORLD_H - p, p, p);
+
+        for (const spark of borderSparks) {
+            const a = spark.life / 0.35;
+            ctx.strokeStyle = `rgba(220, 240, 255, ${a})`;
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 4; i++) {
+                const angle = (Math.PI / 2) * i + gridTime * 8;
+                ctx.beginPath();
+                ctx.moveTo(spark.x, spark.y);
+                ctx.lineTo(spark.x + Math.cos(angle) * 14 * a, spark.y + Math.sin(angle) * 14 * a);
+                ctx.stroke();
+            }
+        }
+    }
+
+    function drawEnemyCore(color, size, shape = 'circle') {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = color;
+        if (shape === 'square') {
+            ctx.fillRect(-size / 2, -size / 2, size, size);
+        } else if (shape === 'star') {
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                const a = (Math.PI * 2 / 5) * i - Math.PI / 2;
+                const r = i % 2 === 0 ? size : size * 0.45;
+                const px = Math.cos(a) * r;
+                const py = Math.sin(a) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+    }
+
+    function drawBlasterDrone(enemy, def) {
+        const r = def.radius;
+        const spin = enemy.spinAngle;
+        ctx.rotate(spin);
+
+        ctx.strokeStyle = def.wire;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(r, 0);
+        ctx.lineTo(-r * 0.65, r * 0.75);
+        ctx.lineTo(-r * 0.65, -r * 0.75);
+        ctx.closePath();
+        ctx.stroke();
+
+        const verts = [
+            [r, 0],
+            [-r * 0.65, r * 0.75],
+            [-r * 0.65, -r * 0.75]
+        ];
+        verts.forEach(([vx, vy], i) => {
+            const orbGlow = enemy.charging ? 1 : 0.55 + Math.sin(gridTime * 5 + i) * 0.2;
+            ctx.fillStyle = `rgba(57, 255, 20, ${orbGlow})`;
+            ctx.shadowColor = '#39ff14';
+            ctx.shadowBlur = enemy.charging ? 18 : 8;
+            ctx.beginPath();
+            ctx.arc(vx, vy, enemy.charging ? 7 : 5, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.shadowBlur = 0;
+
+        const corePulse = 0.75 + Math.sin(gridTime * 6) * 0.25;
+        drawEnemyCore(`rgba(57, 255, 20, ${corePulse})`, 6);
+    }
+
+    function drawLaserSentinel(enemy, def, distToPlayer) {
+        const r = def.radius;
+        const scale = enemy.charging ? 1.12 : 1;
+        ctx.scale(scale, scale);
+        const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+
+        ctx.strokeStyle = def.wire;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -r);
+        ctx.lineTo(r, 0);
+        ctx.lineTo(0, r);
+        ctx.lineTo(-r, 0);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.save();
+        ctx.rotate(angle);
+        ctx.strokeStyle = enemy.charging ? 'rgba(0, 238, 255, 0.9)' : 'rgba(0, 238, 255, 0.35)';
+        ctx.lineWidth = enemy.charging ? 3 : 1.5;
+        ctx.beginPath();
+        ctx.moveTo(r * 0.2, 0);
+        ctx.lineTo(r + Math.min(distToPlayer, 320), 0);
+        ctx.stroke();
+        if (enemy.charging) {
+            ctx.fillStyle = 'rgba(0, 238, 255, 0.85)';
+            ctx.fillRect(r * 0.55, -5, r * 0.45, 10);
+        }
+        ctx.restore();
+
+        drawEnemyCore('#00eeff', 7, 'square');
+    }
+
+    function drawOrbitBot(enemy, def) {
+        const r = def.radius * 0.55;
+        ctx.strokeStyle = def.wire;
+        ctx.lineWidth = 2;
+
+        ctx.save();
+        ctx.rotate(enemy.ringAngle1);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 1.35, r * 0.75, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.rotate(enemy.ringAngle2);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 1.1, r * 0.95, Math.PI / 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+        ctx.stroke();
+
+        for (let i = 0; i < 3; i++) {
+            const a = enemy.spikeAngle + (Math.PI * 2 / 3) * i;
+            const sx = Math.cos(a) * r * 1.25;
+            const sy = Math.sin(a) * r * 1.25;
+            ctx.strokeStyle = '#ff66dd';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7);
+            ctx.lineTo(sx, sy);
+            ctx.stroke();
+            ctx.fillStyle = '#ff44cc';
+            ctx.beginPath();
+            ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const flicker = 0.65 + Math.sin(gridTime * 12 + enemy.spikeAngle) * 0.35;
+        drawEnemyCore(`rgba(255, 100, 220, ${flicker})`, 6, 'star');
     }
 
     function drawEnemies() {
         for (const enemy of enemies) {
             const def = ENEMY_DEFS[enemy.type];
+            const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
             ctx.save();
             ctx.translate(enemy.x, enemy.y);
-            ctx.shadowColor = def.glow;
-            ctx.shadowBlur = 16;
 
-            if (enemy.type === 'blaster') {
-                ctx.fillStyle = def.color;
-                ctx.beginPath();
-                ctx.moveTo(def.radius, 0);
-                ctx.lineTo(-def.radius * 0.6, def.radius * 0.7);
-                ctx.lineTo(-def.radius * 0.6, -def.radius * 0.7);
-                ctx.closePath();
-                ctx.fill();
-            } else if (enemy.type === 'laser') {
-                ctx.fillStyle = def.color;
-                ctx.fillRect(-def.radius, -def.radius * 0.6, def.radius * 2, def.radius * 1.2);
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(def.radius * 0.3, -4, def.radius * 0.5, 8);
-            } else {
-                ctx.strokeStyle = def.color;
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.arc(0, 0, def.radius * 0.65, 0, Math.PI * 2);
-                ctx.stroke();
-                for (let i = 0; i < 3; i++) {
-                    const a = enemy.orbitAngle + (Math.PI * 2 / 3) * i;
-                    ctx.beginPath();
-                    ctx.moveTo(Math.cos(a) * def.radius * 0.4, Math.sin(a) * def.radius * 0.4);
-                    ctx.lineTo(Math.cos(a) * def.radius * 1.1, Math.sin(a) * def.radius * 1.1);
-                    ctx.stroke();
-                }
-            }
+            if (enemy.type === 'blaster') drawBlasterDrone(enemy, def);
+            else if (enemy.type === 'laser') drawLaserSentinel(enemy, def, distToPlayer);
+            else drawOrbitBot(enemy, def);
 
             if (enemy.frozen) {
                 ctx.strokeStyle = 'rgba(180, 220, 255, 0.8)';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(0, 0, def.radius + 6, 0, Math.PI * 2);
+                ctx.arc(0, 0, def.radius + 8, 0, Math.PI * 2);
                 ctx.stroke();
             }
 
@@ -590,10 +933,14 @@ const NeonMimic = (() => {
         for (const b of bullets) {
             ctx.fillStyle = b.color;
             ctx.shadowColor = b.color;
-            ctx.shadowBlur = 10;
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, b.hostile ? 5 : 4, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.shadowBlur = b.beam ? 16 : 10;
+            if (b.beam) {
+                ctx.fillRect(b.x - 3, b.y - 2, 18, 4);
+            } else {
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.hostile ? 5 : 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
             ctx.shadowBlur = 0;
         }
     }
@@ -604,10 +951,10 @@ const NeonMimic = (() => {
             ctx.translate(player.x, player.y);
             ctx.rotate(beam.angle);
             const grd = ctx.createLinearGradient(0, 0, 700, 0);
-            grd.addColorStop(0, 'rgba(255, 68, 170, 0.9)');
-            grd.addColorStop(1, 'rgba(255, 68, 170, 0)');
+            grd.addColorStop(0, 'rgba(0, 238, 255, 0.95)');
+            grd.addColorStop(1, 'rgba(0, 238, 255, 0)');
             ctx.fillStyle = grd;
-            ctx.fillRect(0, -6, 700, 12);
+            ctx.fillRect(0, -7, 700, 14);
             ctx.restore();
         }
     }
@@ -615,9 +962,9 @@ const NeonMimic = (() => {
     function drawOrbitSpikes() {
         if (player.power !== 'orbit') return;
         const orbitRadius = 55;
-        ctx.strokeStyle = '#ffcc44';
+        ctx.strokeStyle = '#ff66dd';
         ctx.lineWidth = 4;
-        ctx.shadowColor = '#ffaa22';
+        ctx.shadowColor = '#ff44cc';
         ctx.shadowBlur = 14;
         for (const angle of orbitSpikes) {
             const sx = player.x + Math.cos(angle) * orbitRadius;
@@ -628,7 +975,7 @@ const NeonMimic = (() => {
             ctx.stroke();
             ctx.beginPath();
             ctx.arc(sx, sy, 8, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffcc44';
+            ctx.fillStyle = '#ff44cc';
             ctx.fill();
         }
         ctx.shadowBlur = 0;
@@ -656,9 +1003,9 @@ const NeonMimic = (() => {
         }
 
         const powerColors = {
-            blaster: '#00ffcc',
-            laser: '#ff44aa',
-            orbit: '#ffcc44'
+            blaster: '#39ff14',
+            laser: '#00eeff',
+            orbit: '#ff44cc'
         };
         const coreColor = player.power ? powerColors[player.power] : 'rgba(200, 200, 255, 0.5)';
         ctx.shadowColor = coreColor;
@@ -693,6 +1040,9 @@ const NeonMimic = (() => {
     function draw() {
         ctx.clearRect(0, 0, WORLD_W, WORLD_H);
         drawBackground();
+        drawHazards();
+        drawRipples();
+        drawBorders();
         drawBullets();
         drawBeams();
         drawEnemies();
@@ -703,6 +1053,7 @@ const NeonMimic = (() => {
     function update(delta) {
         if (gameState !== 'playing') return;
 
+        gridTime += delta;
         survivalTime += delta;
         score += Math.floor(delta * 10);
         spawnTimer -= delta;
@@ -715,6 +1066,8 @@ const NeonMimic = (() => {
 
         if (fireCooldown > 0) fireCooldown -= delta;
 
+        updateHazards(delta);
+        updateRipples(delta);
         updatePlayer(delta);
         updateTether(delta);
         updateEnemies(delta);

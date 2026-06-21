@@ -176,6 +176,15 @@ const ArcadeMeta = (() => {
         return SHOP_ITEMS.filter(item => item.category === category);
     }
 
+    function getPowerUpItems() {
+        return SHOP_ITEMS.filter(item => item.category === 'upgrade' || item.category === 'mimic-consumable');
+    }
+
+    function hasItemStock(item) {
+        if (item.category === 'mimic-consumable') return (state.mimicCharges[item.id] || 0) > 0;
+        return isOwned(item.id);
+    }
+
     function renderPreview(item) {
         if (item.icon) {
             return `<span class="shop-preview-icon">${item.icon}</span>`;
@@ -226,7 +235,7 @@ const ArcadeMeta = (() => {
         if (item.category === 'mimic-consumable') {
             const charges = state.mimicCharges[item.id] || 0;
             return equipped
-                ? `<button class="shop-price-btn equipped" disabled>LOADOUT (${charges})</button>`
+                ? `<button class="shop-price-btn unequip" data-unequip="${item.id}">CLEAR LOADOUT</button>`
                 : `<button class="shop-price-btn equip" data-equip="${item.id}">LOADOUT (${charges})</button>`;
         }
 
@@ -237,7 +246,7 @@ const ArcadeMeta = (() => {
 
     function renderShopCard(item) {
         return `
-            <article class="shop-card ${isOwned(item.id) ? 'owned' : ''} ${isEquipped(item.id) ? 'equipped' : ''}">
+            <article class="shop-card ${hasItemStock(item) ? 'owned' : ''} ${isEquipped(item.id) ? 'equipped' : ''}">
                 <h4 class="shop-card-name">${item.name.toUpperCase()}</h4>
                 <div class="shop-card-preview">${renderPreview(item)}</div>
                 <p class="shop-card-desc">${item.desc}</p>
@@ -269,6 +278,31 @@ const ArcadeMeta = (() => {
         });
     }
 
+    function renderShopPowerUps() {
+        const container = document.getElementById('shopPowerUps');
+        if (!container) return;
+        container.innerHTML = getPowerUpItems().map(renderShopCard).join('');
+        bindShopActions(container);
+    }
+
+    function renderInventoryPowerUps() {
+        const container = document.getElementById('inventoryPowerUps');
+        if (!container) return;
+
+        const items = getPowerUpItems().filter(item => {
+            if (item.category === 'mimic-consumable') return (state.mimicCharges[item.id] || 0) > 0;
+            return isOwned(item.id) && item.price > 0;
+        });
+
+        if (!items.length) {
+            container.innerHTML = '<p class="shop-empty-section">Nothing has been bought yet</p>';
+            return;
+        }
+
+        container.innerHTML = items.map(renderInventoryCard).join('');
+        bindShopActions(container);
+    }
+
     function renderShopSection(containerId, category) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -297,16 +331,14 @@ const ArcadeMeta = (() => {
     }
 
     function renderShop() {
-        renderShopSection('shopPowerUps', 'upgrade');
-        renderShopSection('shopMimicConsumables', 'mimic-consumable');
+        renderShopPowerUps();
         renderShopSection('shopTrails', 'trail');
         renderShopSection('shopBackgrounds', 'theme');
         updateTokenDisplays();
     }
 
     function renderInventory() {
-        renderInventorySection('inventoryPowerUps', 'upgrade');
-        renderInventorySection('inventoryMimicConsumables', 'mimic-consumable');
+        renderInventoryPowerUps();
         renderInventorySection('inventoryTrails', 'trail');
         renderInventorySection('inventoryBackgrounds', 'theme');
     }
