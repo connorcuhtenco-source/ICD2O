@@ -1547,6 +1547,10 @@
                 const y = p.baseY + Math.sin(t * 0.55 + p.phase) * p.amp;
                 p.mesh.position.y = y;
             }
+            const pulse = 0.5 + Math.sin(t * 4) * 0.08;
+            jumpPads.forEach(pad => {
+                if (pad.pad) pad.pad.material.opacity = pulse;
+            });
         }
 
         function checkJumpPads() {
