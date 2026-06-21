@@ -377,6 +377,9 @@
         let shockwaves = [];
         let voidSlamZones = [];
         let voidEventHorizon = null;
+        let voidOverdrive = null;
+        let voidOrbitTrails = [];
+        let voidDetachedShards = [];
         let voidMeleeSlashes = [];
         let voidDecoys = [];
         let voidTransformActive = false;
@@ -712,6 +715,100 @@
                 if (ch === ' ') continue;
                 playDialogueTypewriterBlip(ch);
             }
+        }
+
+        function playVoidTransitionScream() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.001, t);
+            master.gain.linearRampToValueAtTime(0.95, t + 0.08);
+            master.gain.exponentialRampToValueAtTime(0.001, t + 3.1);
+            master.connect(ctx.destination);
+
+            const sub = ctx.createOscillator();
+            sub.type = 'sine';
+            sub.frequency.setValueAtTime(28, t);
+            sub.frequency.exponentialRampToValueAtTime(14, t + 2.8);
+            const subGain = ctx.createGain();
+            subGain.gain.setValueAtTime(0.72, t);
+            subGain.gain.exponentialRampToValueAtTime(0.001, t + 3);
+            sub.connect(subGain);
+            subGain.connect(master);
+            sub.start(t);
+            sub.stop(t + 3.05);
+
+            const saw = ctx.createOscillator();
+            saw.type = 'sawtooth';
+            saw.frequency.setValueAtTime(52, t);
+            saw.frequency.exponentialRampToValueAtTime(22, t + 2.5);
+            const sawGain = ctx.createGain();
+            sawGain.gain.setValueAtTime(0.35, t);
+            sawGain.gain.exponentialRampToValueAtTime(0.001, t + 2.6);
+            saw.connect(sawGain);
+            sawGain.connect(master);
+            saw.start(t);
+            saw.stop(t + 2.65);
+
+            const nLen = Math.floor(ctx.sampleRate * 1.2);
+            const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+            const nd = nBuf.getChannelData(0);
+            for (let i = 0; i < nLen; i += 1) nd[i] = (Math.random() * 2 - 1) * (1 - i / nLen) * 0.5;
+            const noise = ctx.createBufferSource();
+            noise.buffer = nBuf;
+            const nGain = ctx.createGain();
+            nGain.gain.setValueAtTime(0.45, t);
+            nGain.gain.exponentialRampToValueAtTime(0.001, t + 2.8);
+            noise.connect(nGain);
+            nGain.connect(master);
+            noise.start(t);
+            noise.stop(t + 2.85);
+        }
+
+        function playVoidDeathCataclysm() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.95, t);
+            master.connect(ctx.destination);
+
+            const low = ctx.createOscillator();
+            low.type = 'sawtooth';
+            low.frequency.setValueAtTime(220, t);
+            low.frequency.exponentialRampToValueAtTime(18, t + 2);
+            const lowGain = ctx.createGain();
+            lowGain.gain.setValueAtTime(0.55, t);
+            lowGain.gain.exponentialRampToValueAtTime(0.001, t + 2.05);
+            low.connect(lowGain);
+            lowGain.connect(master);
+            low.start(t);
+            low.stop(t + 2.1);
+
+            const high = ctx.createOscillator();
+            high.type = 'square';
+            high.frequency.setValueAtTime(1400, t);
+            high.frequency.exponentialRampToValueAtTime(90, t + 1.8);
+            const highGain = ctx.createGain();
+            highGain.gain.setValueAtTime(0.32, t);
+            highGain.gain.exponentialRampToValueAtTime(0.001, t + 1.85);
+            high.connect(highGain);
+            highGain.connect(master);
+            high.start(t);
+            high.stop(t + 1.9);
+
+            const nLen = Math.floor(ctx.sampleRate * 1.8);
+            const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+            const nd = nBuf.getChannelData(0);
+            for (let i = 0; i < nLen; i += 1) nd[i] = (Math.random() * 2 - 1) * (1 - i / nLen);
+            const noise = ctx.createBufferSource();
+            noise.buffer = nBuf;
+            const nGain = ctx.createGain();
+            nGain.gain.setValueAtTime(0.62, t);
+            nGain.gain.exponentialRampToValueAtTime(0.001, t + 1.75);
+            noise.connect(nGain);
+            nGain.connect(master);
+            noise.start(t);
+            noise.stop(t + 1.8);
         }
 
         function playVoidStaticCrush() {
@@ -1330,6 +1427,27 @@
             voidSlamZones = [];
         }
 
+        function clearVoidOverdrive() {
+            if (!voidOverdrive) return;
+            if (voidOverdrive.cylinder) scene.remove(voidOverdrive.cylinder);
+            if (voidOverdrive.beam) scene.remove(voidOverdrive.beam);
+            if (voidOverdrive.lockRing) scene.remove(voidOverdrive.lockRing);
+            voidOverdrive = null;
+        }
+
+        function clearVoidDetachedShards() {
+            voidDetachedShards.forEach(s => {
+                if (s.mesh) scene.remove(s.mesh);
+                if (s.wire) scene.remove(s.wire);
+            });
+            voidDetachedShards = [];
+        }
+
+        function clearVoidOrbitTrails() {
+            voidOrbitTrails.forEach(t => scene.remove(t.mesh));
+            voidOrbitTrails = [];
+        }
+
         function clearVoidEventHorizon() {
             if (!voidEventHorizon) return;
             if (voidEventHorizon.mesh) scene.remove(voidEventHorizon.mesh);
@@ -1354,6 +1472,9 @@
             clearShockwaves();
             clearVoidSlamZones();
             clearVoidEventHorizon();
+            clearVoidOverdrive();
+            clearVoidDetachedShards();
+            clearVoidOrbitTrails();
             clearVoidPhantomExtras();
         }
 
@@ -1520,46 +1641,35 @@
 
         function buildVoidTitanGroup() {
             const mesh = new THREE.Group();
-            const floatY = 13;
+            const floatY = 24;
 
             const core = new THREE.Mesh(
-                new THREE.SphereGeometry(1.15, 14, 14),
-                new THREE.MeshBasicMaterial({ color: 0xcc44ff, transparent: true, opacity: 0.92 })
+                new THREE.BoxGeometry(6.5, 30, 6.5),
+                new THREE.MeshBasicMaterial({ color: 0xcc44ff, transparent: true, opacity: 0.88 })
             );
-            core.position.set(0, 0.5, 0);
+            core.position.set(0, 0, 0);
             const coreWire = new THREE.LineSegments(
-                new THREE.EdgesGeometry(new THREE.SphereGeometry(1.28, 10, 10)),
-                new THREE.LineBasicMaterial({ color: 0xee99ff, transparent: true, opacity: 0.8 })
+                new THREE.EdgesGeometry(new THREE.BoxGeometry(7, 31, 7)),
+                new THREE.LineBasicMaterial({ color: 0xff99ff, transparent: true, opacity: 0.75 })
             );
             coreWire.position.copy(core.position);
 
-            const pyramidShell = new THREE.Mesh(
-                new THREE.ConeGeometry(3.6, 5.5, 4),
-                new THREE.MeshBasicMaterial({ color: 0x08040c, transparent: true, opacity: 0.55 })
-            );
-            pyramidShell.rotation.x = Math.PI;
-            pyramidShell.position.y = 1.2;
-
-            const plateMat = new THREE.MeshBasicMaterial({ color: 0x1a1028, transparent: true, opacity: 0.88 });
-            const plateEdge = new THREE.LineBasicMaterial({ color: 0x7755bb, transparent: true, opacity: 0.95 });
+            const plateMat = new THREE.MeshBasicMaterial({ color: 0x06040a, transparent: true, opacity: 0.94 });
+            const plateEdge = new THREE.LineBasicMaterial({ color: 0x5533aa, transparent: true, opacity: 0.92 });
             const plates = [];
-            const plateConfigs = [
-                { pos: [0, 2.4, 2.0], rot: [0.55, 0, 0], norm: [0, 0, 1] },
-                { pos: [0, 2.4, -2.0], rot: [-0.55, 0, 0], norm: [0, 0, -1] },
-                { pos: [2.0, 2.4, 0], rot: [0, 0, -0.55], norm: [1, 0, 0] },
-                { pos: [-2.0, 2.4, 0], rot: [0, 0, 0.55], norm: [-1, 0, 0] },
-                { pos: [1.4, 3.6, 1.4], rot: [0.35, 0.45, 0], norm: [0.6, 0.2, 0.6] },
-                { pos: [-1.4, 3.6, 1.4], rot: [0.35, -0.45, 0], norm: [-0.6, 0.2, 0.6] },
-                { pos: [1.4, 3.6, -1.4], rot: [-0.35, 0.45, 0], norm: [0.6, 0.2, -0.6] },
-                { pos: [-1.4, 3.6, -1.4], rot: [-0.35, -0.45, 0], norm: [-0.6, 0.2, -0.6] }
-            ];
-            plateConfigs.forEach(cfg => {
-                const geo = new THREE.BoxGeometry(1.6, 1.1, 0.18);
-                const part = new THREE.Mesh(geo, plateMat);
-                const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), plateEdge);
-                part.position.set(...cfg.pos);
+            const plateCount = 10;
+            for (let i = 0; i < plateCount; i += 1) {
+                const angle = (Math.PI * 2 / plateCount) * i;
+                const w = 4.2;
+                const h = 34;
+                const d = 0.55;
+                const geo = new THREE.BoxGeometry(w, h, d);
+                const part = new THREE.Mesh(geo, plateMat.clone());
+                const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), plateEdge.clone());
+                const radius = 5.4;
+                part.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
                 wire.position.copy(part.position);
-                part.rotation.set(...cfg.rot);
+                part.rotation.y = -angle;
                 wire.rotation.copy(part.rotation);
                 mesh.add(part, wire);
                 plates.push({
@@ -1567,39 +1677,56 @@
                     wire,
                     base: part.position.clone(),
                     baseRot: part.rotation.clone(),
-                    normal: new THREE.Vector3(...cfg.norm).normalize()
+                    normal: new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)),
+                    isOuter: i % 2 === 0,
+                    detached: false
+                });
+            }
+
+            const orbitals = [];
+            const orbitalConfigs = [
+                { radius: 14, tube: 0.38, color: 0xcc55ff, speed: [1.6, 0.5, 0.3], tilt: [0.9, 0.2, 0] },
+                { radius: 19, tube: 0.32, color: 0xaa44ee, speed: [-1.1, 1.4, 0.6], tilt: [0.3, 1.2, 0.4] },
+                { radius: 24, tube: 0.28, color: 0x8833cc, speed: [0.8, -1.2, 1.1], tilt: [1.4, 0.6, 0.8] }
+            ];
+            orbitalConfigs.forEach(cfg => {
+                const ringGeo = new THREE.TorusGeometry(cfg.radius, cfg.tube, 8, 72);
+                const ringWire = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(ringGeo),
+                    new THREE.LineBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.95 })
+                );
+                ringWire.rotation.set(cfg.tilt[0], cfg.tilt[1], cfg.tilt[2]);
+                mesh.add(ringWire);
+                orbitals.push({ wire: ringWire, speed: cfg.speed, radius: cfg.radius, visible: true });
+            });
+
+            const energyPillars = [];
+            const pillarPositions = [[-13, -9], [13, -9], [-13, 9], [13, 9]];
+            pillarPositions.forEach(([x, z], i) => {
+                const geo = new THREE.CylinderGeometry(0.55, 0.85, 22, 8);
+                const pillar = new THREE.Mesh(
+                    geo,
+                    new THREE.MeshBasicMaterial({ color: 0xbb44ff, transparent: true, opacity: 0.78 })
+                );
+                const pWire = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(geo),
+                    new THREE.LineBasicMaterial({ color: 0xee88ff, transparent: true, opacity: 0.9 })
+                );
+                pillar.position.set(x, -6, z);
+                pWire.position.copy(pillar.position);
+                mesh.add(pillar, pWire);
+                energyPillars.push({
+                    mesh: pillar,
+                    wire: pWire,
+                    baseY: -6,
+                    slamY: -14,
+                    phase: i * 0.7
                 });
             });
 
-            const tentacles = [];
-            for (let i = 0; i < 6; i += 1) {
-                const angle = (Math.PI * 2 / 6) * i + 0.2;
-                const built = buildVoidTentacle(9, 0xaa55ff);
-                built.group.position.set(Math.cos(angle) * 2.8, -0.5, Math.sin(angle) * 2.8);
-                built.group.rotation.y = angle + Math.PI;
-                built.baseAngle = angle;
-                built.charged = false;
-                mesh.add(built.group);
-                tentacles.push(built);
-            }
-
-            const ringFill = new THREE.Mesh(
-                new THREE.TorusGeometry(7.8, 0.22, 8, 64),
-                new THREE.MeshBasicMaterial({ color: 0x220838, transparent: true, opacity: 0.72 })
-            );
-            const ringWire = new THREE.LineSegments(
-                new THREE.EdgesGeometry(new THREE.TorusGeometry(7.85, 0.26, 6, 48)),
-                new THREE.LineBasicMaterial({ color: 0xcc55ff, transparent: true, opacity: 0.95 })
-            );
-            ringFill.rotation.x = Math.PI / 2;
-            ringWire.rotation.copy(ringFill.rotation);
-            const horizonRing = new THREE.Group();
-            horizonRing.add(ringFill, ringWire);
-
-            mesh.add(pyramidShell, core, coreWire, horizonRing);
+            mesh.add(core, coreWire);
             return {
-                mesh, core, coreWire, pyramidShell, plates, tentacles,
-                horizonRing, ringFill, ringWire, floatY
+                mesh, core, coreWire, plates, orbitals, energyPillars, floatY
             };
         }
 
@@ -1625,29 +1752,20 @@
                 mesh: titan.mesh,
                 core: titan.core,
                 coreWire: titan.coreWire,
-                pyramidShell: titan.pyramidShell,
                 plates: titan.plates,
-                tentacles: titan.tentacles,
-                horizonRing: titan.horizonRing,
-                ringFill: titan.ringFill,
-                ringWire: titan.ringWire,
+                orbitals: titan.orbitals,
+                energyPillars: titan.energyPillars,
                 floatY: titan.floatY,
                 voidPhase: 2,
                 titanReady: true,
-                hp: 2400,
-                maxHp: 2400,
+                hp: 2800,
+                maxHp: 2800,
                 movePhase: 'idle',
-                attackMode: 'slam',
+                attackMode: 'overdrive',
                 attackTimer: 4,
                 coreExposed: false,
-                slamIndex: 0,
-                slamTimer: 0,
-                slamPhase: 'telegraph',
-                slamZones: ['left', 'center', 'right'],
-                slamTentacles: [1, 2, 4],
-                barrageTimer: 0,
-                barrageShotTimer: 0,
-                barrageAngle: 0
+                shardIndex: 0,
+                shardTimer: 0
             });
             delete b.shards;
             delete b.bladeL;
@@ -1666,6 +1784,8 @@
             enemies.forEach(e => scene.remove(e.mesh));
             enemies = [];
             startCinematicDialogue(activeBoss.transformDialogue, true, () => {
+                playVoidTransitionScream();
+                screenShake = 2.8;
                 voidTransformPhase = 'ascend';
                 voidTransformTimer = 3;
             });
@@ -1691,7 +1811,10 @@
                     activeBoss.floatY,
                     rawDt * 0.9
                 );
-                activeBoss.mesh.scale.setScalar(THREE.MathUtils.lerp(0.18, 1, Math.min(1, progress * 1.25)));
+                activeBoss.mesh.scale.setScalar(THREE.MathUtils.lerp(0.12, 1, Math.min(1, progress * 1.2)));
+                if (voidTransformPhase === 'ascend') {
+                    screenShake = Math.max(screenShake, (1 - voidTransformTimer / 3) * 2.2);
+                }
             }
 
             if (voidTransformTimer <= 0) {
@@ -2059,152 +2182,281 @@
             laserWalls.push({ mesh, velZ: 24, life: 5 });
         }
 
-        function shuffleSlamZones() {
-            const zones = ['left', 'center', 'right'];
-            for (let i = zones.length - 1; i > 0; i -= 1) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [zones[i], zones[j]] = [zones[j], zones[i]];
-            }
-            return zones;
+        function spawnVoidOrbitTrail(x, y, z) {
+            const geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(x, y, z),
+                new THREE.Vector3(x + (Math.random() - 0.5) * 3, y + (Math.random() - 0.5) * 3, z + (Math.random() - 0.5) * 3)
+            ]);
+            const mesh = new THREE.Line(
+                geo,
+                new THREE.LineBasicMaterial({
+                    color: Math.random() > 0.5 ? 0x8844cc : 0xcc66ff,
+                    transparent: true,
+                    opacity: 0.75
+                })
+            );
+            scene.add(mesh);
+            voidOrbitTrails.push({ mesh, life: 0.45 + Math.random() * 0.2 });
         }
 
-        function beginVoidSlam() {
-            if (!activeBoss || activeBoss.type !== 'void') return;
-            const b = activeBoss;
-            b.movePhase = 'slam';
-            b.slamIndex = 0;
-            b.slamTimer = 0;
-            b.slamPhase = 'telegraph';
-            b.slamZones = shuffleSlamZones();
-            b.slamTentacles = [1, 2, 4];
-            setTentacleCharge(b.tentacles, b.slamTentacles, true);
-            playVoidAttackWarning();
-            spawnSlamIndicator(b.slamZones[0]);
-        }
-
-        function resolveVoidSlamImpact(b, zone) {
-            if (playerInSlamZone(zone)) {
-                player.hp -= 38;
-                const pos = getSlamZonePos(zone);
-                triggerDirectionalHitFlash(new THREE.Vector3(pos.x, playerPos.y, pos.z));
-                screenShake = 0.65;
-                if (player.hp <= 0) gameOver();
-                else updateUI();
-            }
-            voidSlamZones.forEach(z => {
-                if (z.mesh) scene.remove(z.mesh);
-                if (z.glow) scene.remove(z.glow);
+        function updateVoidOrbitTrails(dt) {
+            voidOrbitTrails = voidOrbitTrails.filter(t => {
+                t.life -= dt;
+                t.mesh.material.opacity = Math.max(0, t.life / 0.5) * 0.75;
+                if (t.life <= 0) {
+                    scene.remove(t.mesh);
+                    return false;
+                }
+                return true;
             });
-            voidSlamZones = [];
         }
 
-        function updateVoidSlam(dt) {
-            const b = activeBoss;
-            b.slamTimer += dt;
-            const zone = b.slamZones[b.slamIndex];
-            const tentacle = b.tentacles[b.slamTentacles[b.slamIndex]];
+        function updateVoidMonolithVisuals(b, time, dt) {
+            const open = b.coreExposed ? 1.35 : 0;
+            (b.plates || []).forEach((plate, i) => {
+                if (plate.detached) return;
+                const drift = Math.sin(time * 0.6 + i) * 0.06;
+                plate.mesh.position.copy(plate.base).add(plate.normal.clone().multiplyScalar(open + drift));
+                plate.wire.position.copy(plate.mesh.position);
+            });
+            if (b.core) {
+                const pulse = b.coreExposed
+                    ? 0.82 + Math.sin(time * 6) * 0.18
+                    : 0.58 + Math.sin(time * 2.5) * 0.2;
+                b.core.material.opacity = pulse;
+                b.core.scale.set(1, 1 + pulse * 0.06, 1);
+            }
+            (b.orbitals || []).forEach((orb, i) => {
+                if (!orb.visible || !orb.wire) return;
+                orb.wire.rotation.x += orb.speed[0] * dt;
+                orb.wire.rotation.y += orb.speed[1] * dt;
+                orb.wire.rotation.z += orb.speed[2] * dt;
+                if (Math.random() < 0.08) {
+                    const wp = new THREE.Vector3();
+                    orb.wire.getWorldPosition(wp);
+                    spawnVoidOrbitTrail(wp.x, wp.y, wp.z);
+                }
+            });
+            (b.energyPillars || []).forEach(p => {
+                const slam = b.movePhase !== 'idle' ? 1 : 0;
+                const targetY = p.baseY - slam * 8 + Math.sin(time * 2 + p.phase) * 0.6;
+                p.mesh.position.y = THREE.MathUtils.lerp(p.mesh.position.y, targetY, dt * 4);
+                p.wire.position.copy(p.mesh.position);
+                p.mesh.material.opacity = 0.65 + slam * 0.2;
+            });
+        }
 
-            if (b.slamPhase === 'telegraph') {
-                animateTentacleSlam(tentacle, zone, false);
-                voidSlamZones.forEach(z => {
-                    z.mesh.material.opacity = 0.35 + Math.sin(performance.now() * 0.02) * 0.25;
-                    z.glow.material.opacity = 0.22 + Math.sin(performance.now() * 0.018) * 0.18;
-                });
-                if (b.slamTimer >= 0.65) {
-                    b.slamPhase = 'impact';
-                    b.slamTimer = 0;
-                    animateTentacleSlam(tentacle, zone, true);
-                    resolveVoidSlamImpact(b, zone);
+        function spawnVoidShockRing(x, z) {
+            const innerR = 0.8;
+            const outerR = 2.2;
+            const geo = new THREE.RingGeometry(innerR, outerR, 48);
+            geo.rotateX(-Math.PI / 2);
+            const mesh = new THREE.Mesh(
+                geo,
+                new THREE.MeshBasicMaterial({
+                    color: 0xff2288,
+                    transparent: true,
+                    opacity: 0.98,
+                    side: THREE.DoubleSide
+                })
+            );
+            mesh.position.set(x, FLOOR_Y + 0.15, z);
+            scene.add(mesh);
+            shockwaves.push({
+                mesh,
+                glow: null,
+                radius: outerR,
+                baseOuter: outerR,
+                width: 1.6,
+                life: 5,
+                voidPulse: true
+            });
+        }
+
+        function beginVoidOverdrive() {
+            if (!activeBoss || activeBoss.type !== 'void' || activeBoss.voidPhase !== 2) return;
+            const b = activeBoss;
+            b.movePhase = 'overdrive';
+            b.coreExposed = true;
+            b.overdriveTimer = 0;
+            b.overdrivePhase = 'charge';
+            b.overdriveX = playerPos.x;
+            b.overdriveZ = playerPos.z;
+            b.overdriveRadius = 14;
+            playVoidStaticCrush();
+
+            (b.orbitals || []).forEach(orb => { if (orb.wire) orb.wire.visible = false; });
+            const lockGeo = new THREE.TorusGeometry(12, 0.35, 6, 64);
+            lockGeo.rotateX(Math.PI / 2);
+            const lockRing = new THREE.Mesh(
+                lockGeo,
+                new THREE.MeshBasicMaterial({ color: 0xcc66ff, transparent: true, opacity: 0.72 })
+            );
+            lockRing.position.set(b.overdriveX, FLOOR_Y + 28, b.overdriveZ);
+            scene.add(lockRing);
+
+            const cylGeo = new THREE.CylinderGeometry(b.overdriveRadius, b.overdriveRadius, 0.25, 40);
+            const cylinder = new THREE.Mesh(
+                cylGeo,
+                new THREE.MeshBasicMaterial({ color: 0xaa44ff, transparent: true, opacity: 0.35 })
+            );
+            cylinder.position.set(b.overdriveX, FLOOR_Y + 0.12, b.overdriveZ);
+            scene.add(cylinder);
+
+            voidOverdrive = { cylinder, lockRing, phase: 'charge', timer: 2, x: b.overdriveX, z: b.overdriveZ, radius: b.overdriveRadius };
+        }
+
+        function updateVoidOverdrive(dt) {
+            if (!voidOverdrive) return false;
+            const o = voidOverdrive;
+            o.timer -= dt;
+            const pulse = 0.35 + Math.sin(performance.now() * 0.012) * 0.2;
+            if (o.cylinder) o.cylinder.material.opacity = pulse;
+            if (o.lockRing) {
+                o.lockRing.material.opacity = 0.55 + pulse * 0.25;
+                o.lockRing.rotation.z += dt * 2.2;
+            }
+
+            if (o.phase === 'charge') {
+                if (o.timer <= 0) {
+                    o.phase = 'fire';
+                    o.timer = 0.35;
+                    if (o.cylinder) scene.remove(o.cylinder);
+                    o.cylinder = null;
+                    const beamGeo = new THREE.CylinderGeometry(o.radius * 0.85, o.radius * 0.85, 42, 32);
+                    const beam = new THREE.Mesh(
+                        beamGeo,
+                        new THREE.MeshBasicMaterial({ color: 0xee66ff, transparent: true, opacity: 0.92 })
+                    );
+                    beam.position.set(o.x, FLOOR_Y + 21, o.z);
+                    scene.add(beam);
+                    o.beam = beam;
+                    screenShake = 1.8;
+                    const dx = playerPos.x - o.x;
+                    const dz = playerPos.z - o.z;
+                    if (Math.hypot(dx, dz) < o.radius && playerPos.y < FLOOR_Y + 4) {
+                        player.hp -= 55;
+                        triggerDirectionalHitFlash(new THREE.Vector3(o.x, playerPos.y, o.z));
+                        if (player.hp <= 0) gameOver();
+                        else updateUI();
+                    }
                 }
                 return false;
             }
 
-            if (b.slamPhase === 'impact') {
-                if (b.slamTimer >= 0.18) {
-                    b.slamIndex += 1;
-                    b.slamTimer = 0;
-                    if (b.slamIndex >= 3) return true;
-                    b.slamPhase = 'telegraph';
-                    spawnSlamIndicator(b.slamZones[b.slamIndex]);
+            if (o.phase === 'fire') {
+                if (o.beam) o.beam.material.opacity = Math.max(0, o.timer / 0.35) * 0.92;
+                if (o.timer <= 0) {
+                    clearVoidOverdrive();
+                    if (activeBoss) {
+                        (activeBoss.orbitals || []).forEach(orb => { if (orb.wire) orb.wire.visible = true; });
+                    }
+                    return true;
                 }
             }
             return false;
         }
 
-        function fireVoidBarrageProjectile() {
-            if (!activeBoss || activeBoss.type !== 'void') return;
+        function beginVoidShardSlam() {
+            if (!activeBoss || activeBoss.type !== 'void' || activeBoss.voidPhase !== 2) return;
             const b = activeBoss;
-            const corePos = getVoidBossCoreWorld();
-            b.barrageAngle += 0.55;
-            const spawn = corePos.clone().add(new THREE.Vector3(
-                Math.cos(b.barrageAngle) * 2.4,
-                2.2 + Math.sin(b.barrageAngle * 2) * 0.8,
-                Math.sin(b.barrageAngle) * 2.4
-            ));
-            const target = new THREE.Vector3(playerPos.x, spawn.y - 1.5, playerPos.z);
-            const dir = new THREE.Vector3().subVectors(target, spawn).normalize();
-            const mesh = new THREE.Mesh(
-                new THREE.SphereGeometry(0.28, 6, 6),
-                new THREE.MeshBasicMaterial({ color: 0x220818, transparent: true, opacity: 0.95 })
-            );
-            mesh.position.copy(spawn);
-            scene.add(mesh);
-            projectiles.push({
-                mesh,
-                vel: dir.multiplyScalar(16).add(new THREE.Vector3(0, 10, 0)),
-                owner: 'enemy',
-                life: 7,
-                fromBoss: true,
-                voidBarrage: true,
-                gravity: 14
+            b.movePhase = 'shards';
+            b.shardTimer = 0;
+            b.shardIndex = 0;
+            b.shardPhase = 'charge';
+            const outerPlates = (b.plates || []).filter(p => p.isOuter);
+            outerPlates.forEach((plate, i) => {
+                plate.detached = true;
+                plate.impacted = false;
+                plate.floatHeight = 22 + i * 1.8;
+                plate.slamBase = plate.base.clone();
             });
+            b.shardTargets = outerPlates;
         }
 
-        function beginVoidBarrage() {
-            if (!activeBoss || activeBoss.type !== 'void') return;
+        function updateVoidShardSlam(dt) {
             const b = activeBoss;
-            b.movePhase = 'barrage';
-            b.coreExposed = true;
-            b.barrageTimer = 6.5;
-            b.barrageShotTimer = 0.15;
-            b.barrageAngle = 0;
-            playVoidStaticCrush();
-        }
+            b.shardTimer += dt;
+            const targets = b.shardTargets || [];
+            const chargePer = 3 / Math.max(1, targets.length);
 
-        function updateVoidBarrage(dt) {
-            const b = activeBoss;
-            b.barrageTimer -= dt;
-            b.barrageShotTimer -= dt;
-            if (b.core) {
-                const pulse = 0.75 + Math.sin(performance.now() * 0.012) * 0.25;
-                b.core.material.opacity = pulse;
-                b.core.scale.setScalar(1.1 + pulse * 0.15);
+            if (b.shardPhase === 'charge') {
+                targets.forEach((plate, i) => {
+                    if (b.shardTimer >= chargePer * i) {
+                        plate.mesh.material.color.setHex(0xff1133);
+                        plate.wire.material.color.setHex(0xff4466);
+                    }
+                    plate.mesh.position.copy(plate.slamBase).add(plate.normal.clone().multiplyScalar(2.2));
+                    plate.mesh.position.y = plate.floatHeight + Math.sin(performance.now() * 0.002 + i) * 1.2;
+                    plate.mesh.rotation.x = THREE.MathUtils.lerp(plate.mesh.rotation.x, -0.55, dt * 3);
+                    plate.wire.position.copy(plate.mesh.position);
+                    plate.wire.rotation.copy(plate.mesh.rotation);
+                });
+                if (b.shardTimer >= 3) {
+                    b.shardPhase = 'slam';
+                    b.shardTimer = 0;
+                    b.shardIndex = 0;
+                }
+                return false;
             }
-            if (b.barrageShotTimer <= 0) {
-                fireVoidBarrageProjectile();
-                b.barrageShotTimer = 0.22;
+
+            const plate = targets[b.shardIndex];
+            if (plate && !plate.impacted) {
+                plate.mesh.position.y = THREE.MathUtils.lerp(plate.mesh.position.y, plate.slamBase.y - 8, dt * 16);
+                plate.wire.position.copy(plate.mesh.position);
+                if (plate.mesh.position.y < plate.slamBase.y - 6) {
+                    plate.impacted = true;
+                    plate.mesh.material.color.setHex(0x06040a);
+                    screenShake = 0.85;
+                    const wp = new THREE.Vector3();
+                    plate.mesh.getWorldPosition(wp);
+                    spawnVoidShockRing(wp.x, wp.z);
+                    if (Math.hypot(playerPos.x - wp.x, playerPos.z - wp.z) < 8 && onGround && playerPos.y < FLOOR_Y + 3.5) {
+                        player.hp -= 32;
+                        triggerDirectionalHitFlash(wp);
+                        if (player.hp <= 0) gameOver();
+                        else updateUI();
+                    }
+                    b.shardTimer = 0;
+                }
+            } else if (plate && plate.impacted && b.shardTimer > 0.5) {
+                b.shardIndex += 1;
+                b.shardTimer = 0;
+                if (b.shardIndex >= targets.length) {
+                    targets.forEach(p => {
+                        p.detached = false;
+                        p.impacted = false;
+                        p.mesh.position.copy(p.base);
+                        p.mesh.rotation.copy(p.baseRot);
+                        p.mesh.material.color.setHex(0x06040a);
+                        p.wire.material.color.setHex(0x5533aa);
+                        p.wire.position.copy(p.mesh.position);
+                        p.wire.rotation.copy(p.mesh.rotation);
+                    });
+                    return true;
+                }
             }
-            return b.barrageTimer <= 0;
+            return false;
         }
 
-        function beginVoidEventHorizon() {
-            if (!activeBoss || activeBoss.type !== 'void') return;
+        function beginVoidOrbitCollapse() {
+            if (!activeBoss || activeBoss.type !== 'void' || activeBoss.voidPhase !== 2) return;
             const b = activeBoss;
-            b.movePhase = 'horizon';
+            b.movePhase = 'orbit';
             playEventHorizonSiren();
-            b.horizonRing.visible = false;
+            if (b.orbitals && b.orbitals[2]) b.orbitals[2].visible = false;
 
             const mesh = new THREE.Mesh(
-                new THREE.TorusGeometry(1, 0.28, 8, 64),
-                new THREE.MeshBasicMaterial({ color: 0xbb44ff, transparent: true, opacity: 0.82 })
+                new THREE.TorusGeometry(1, 0.32, 8, 64),
+                new THREE.MeshBasicMaterial({ color: 0xbb44ff, transparent: true, opacity: 0.78 })
             );
             const wire = new THREE.LineSegments(
-                new THREE.EdgesGeometry(new THREE.TorusGeometry(1.05, 0.32, 6, 48)),
-                new THREE.LineBasicMaterial({ color: 0xff88ff, transparent: true, opacity: 0.95 })
+                new THREE.EdgesGeometry(new THREE.TorusGeometry(1.05, 0.36, 6, 48)),
+                new THREE.LineBasicMaterial({ color: 0xff88ff, transparent: true, opacity: 0.92 })
             );
             mesh.rotation.x = Math.PI / 2;
             wire.rotation.copy(mesh.rotation);
-            mesh.position.set(0, 8, 0);
+            mesh.position.set(0, 10, 0);
             wire.position.copy(mesh.position);
             scene.add(mesh, wire);
 
@@ -2212,34 +2464,44 @@
                 mesh,
                 wire,
                 phase: 'expand',
-                timer: 0.6,
+                timer: 0.7,
                 collapseTimer: 6,
-                radius: 6,
-                maxRadius: ARENA * 0.96
+                radius: 8,
+                maxRadius: ARENA * 1.08,
+                spawnTimer: 0
             };
         }
 
-        function updateVoidEventHorizon(dt) {
+        function updateVoidOrbitCollapse(dt) {
             if (!voidEventHorizon) return false;
             const h = voidEventHorizon;
 
             if (h.phase === 'expand') {
                 h.timer -= dt;
-                h.radius = THREE.MathUtils.lerp(6, h.maxRadius, 1 - h.timer / 0.6);
+                h.radius = THREE.MathUtils.lerp(8, h.maxRadius, 1 - h.timer / 0.7);
                 if (h.timer <= 0) {
                     h.phase = 'collapse';
                     h.radius = h.maxRadius;
                 }
             } else {
                 h.collapseTimer -= dt;
-                h.radius = Math.max(2, h.maxRadius * (h.collapseTimer / 6));
+                h.radius = Math.max(3, h.maxRadius * (h.collapseTimer / 6));
                 const dist = Math.hypot(playerPos.x, playerPos.z);
-                if (dist > h.radius - 0.8) {
-                    applyBossDamage(36, dt, new THREE.Vector3(playerPos.x, 0, playerPos.z));
+                if (dist > h.radius - 1.2) {
+                    applyBossDamage(40, dt, new THREE.Vector3(playerPos.x, 0, playerPos.z));
+                }
+                h.spawnTimer -= dt;
+                if (h.spawnTimer <= 0 && enemies.length < 4) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = h.radius * 0.55;
+                    spawnEnemy(Math.random() < 0.5 ? 'drone' : 'husk', Math.cos(angle) * r, Math.sin(angle) * r);
+                    h.spawnTimer = 1.8;
                 }
                 if (h.collapseTimer <= 0) {
                     clearVoidEventHorizon();
-                    if (activeBoss) activeBoss.horizonRing.visible = true;
+                    if (activeBoss && activeBoss.orbitals && activeBoss.orbitals[2]) {
+                        activeBoss.orbitals[2].visible = true;
+                    }
                     return true;
                 }
             }
@@ -2247,7 +2509,7 @@
             const scale = h.radius;
             h.mesh.scale.set(scale, scale, scale);
             h.wire.scale.copy(h.mesh.scale);
-            h.mesh.material.opacity = 0.55 + Math.sin(performance.now() * 0.008) * 0.25;
+            h.mesh.material.opacity = 0.5 + Math.sin(performance.now() * 0.009) * 0.28;
             return false;
         }
 
@@ -2330,15 +2592,13 @@
         function finishVoidAttack(b) {
             b.movePhase = 'idle';
             b.coreExposed = false;
-            setTentacleCharge(b.tentacles, b.slamTentacles || [1, 2, 4], false);
-            (b.tentacles || []).forEach(t => {
-                t.group.rotation.x = 0;
-                t.group.position.y = 0;
-            });
+            clearVoidOverdrive();
+            clearVoidDetachedShards();
             clearVoidSlamZones();
-            if (b.attackMode === 'slam') b.attackMode = 'barrage';
-            else if (b.attackMode === 'barrage') b.attackMode = 'horizon';
-            else b.attackMode = 'slam';
+            (b.plates || []).forEach(p => { p.detached = false; p.impacted = false; });
+            if (b.attackMode === 'overdrive') b.attackMode = 'shards';
+            else if (b.attackMode === 'shards') b.attackMode = 'orbit';
+            else b.attackMode = 'overdrive';
             b.attackTimer = 5.5;
         }
 
@@ -2346,36 +2606,27 @@
             const b = activeBoss;
             const time = performance.now() * 0.001;
 
-            b.mesh.position.set(0, b.floatY + Math.sin(time * 0.9) * 0.35, 0);
-            b.mesh.lookAt(playerPos.x, b.mesh.position.y, playerPos.z);
+            b.mesh.position.set(0, b.floatY + Math.sin(time * 0.5) * 0.5, 0);
+            b.mesh.rotation.y = Math.sin(time * 0.25) * 0.12;
 
-            if (b.horizonRing && b.horizonRing.visible) {
-                b.horizonRing.rotation.y += dt * 0.35;
-                b.horizonRing.rotation.z = Math.sin(time * 0.6) * 0.08;
-            }
-            if (b.core && !b.coreExposed) {
-                const pulse = 0.62 + Math.sin(time * 3.5) * 0.22;
-                b.core.material.opacity = pulse;
-                b.core.rotation.y += dt * 1.2;
-            }
-            updateVoidPlates(b, time);
+            updateVoidMonolithVisuals(b, time, dt);
+            updateVoidOrbitTrails(dt);
 
-            if (b.movePhase === 'slam') {
-                if (updateVoidSlam(dt)) finishVoidAttack(b);
+            if (b.movePhase === 'overdrive') {
+                if (updateVoidOverdrive(dt)) finishVoidAttack(b);
+                updateShockwaves(dt);
                 return;
             }
-            if (b.movePhase === 'barrage') {
-                (b.tentacles || []).forEach(t => updateVoidTentacleIdle(t, dt, time));
-                if (updateVoidBarrage(dt)) finishVoidAttack(b);
+            if (b.movePhase === 'shards') {
+                if (updateVoidShardSlam(dt)) finishVoidAttack(b);
+                updateShockwaves(dt);
                 return;
             }
-            if (b.movePhase === 'horizon') {
-                (b.tentacles || []).forEach(t => updateVoidTentacleIdle(t, dt, time));
-                if (updateVoidEventHorizon(dt)) finishVoidAttack(b);
+            if (b.movePhase === 'orbit') {
+                if (updateVoidOrbitCollapse(dt)) finishVoidAttack(b);
+                updateShockwaves(dt);
                 return;
             }
-
-            (b.tentacles || []).forEach(t => updateVoidTentacleIdle(t, dt, time));
 
             b.attackTimer -= dt;
             if (b.attackTimer <= 0.6 && b.attackTimer > 0 && !b.attackWarned) {
@@ -2385,10 +2636,11 @@
             if (b.attackTimer > 0.65) b.attackWarned = false;
 
             if (b.attackTimer <= 0) {
-                if (b.attackMode === 'slam') beginVoidSlam();
-                else if (b.attackMode === 'barrage') beginVoidBarrage();
-                else beginVoidEventHorizon();
+                if (b.attackMode === 'overdrive') beginVoidOverdrive();
+                else if (b.attackMode === 'shards') beginVoidShardSlam();
+                else beginVoidOrbitCollapse();
             }
+            updateShockwaves(dt);
         }
 
         function updateLaserWalls(dt) {
@@ -2430,6 +2682,36 @@
             obj.scale.copy(ws);
         }
 
+        function addVoidFragmentBurst(origin, color, count) {
+            for (let i = 0; i < count; i += 1) {
+                const geo = new THREE.BoxGeometry(0.35 + Math.random() * 0.8, 0.25 + Math.random() * 0.6, 0.2 + Math.random() * 0.5);
+                const mesh = new THREE.Mesh(
+                    geo,
+                    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })
+                );
+                mesh.position.copy(origin).add(new THREE.Vector3(
+                    (Math.random() - 0.5) * 8,
+                    (Math.random() - 0.5) * 6,
+                    (Math.random() - 0.5) * 8
+                ));
+                scene.add(mesh);
+                bossDebris.push({
+                    mesh,
+                    vel: new THREE.Vector3(
+                        (Math.random() - 0.5) * 24,
+                        8 + Math.random() * 28,
+                        (Math.random() - 0.5) * 24
+                    ),
+                    life: 1.8 + Math.random() * 0.8,
+                    spin: new THREE.Vector3(
+                        (Math.random() - 0.5) * 12,
+                        (Math.random() - 0.5) * 12,
+                        (Math.random() - 0.5) * 12
+                    )
+                });
+            }
+        }
+
         function collectBossDebris() {
             bossDebris = [];
             if (!activeBoss) return;
@@ -2449,18 +2731,28 @@
                 } else {
                 if (activeBoss.core) pieces.push({ mesh: activeBoss.core, isCore: true });
                 if (activeBoss.coreWire) pieces.push({ mesh: activeBoss.coreWire });
-                if (activeBoss.pyramidShell) pieces.push({ mesh: activeBoss.pyramidShell });
                 (activeBoss.plates || []).forEach(p => {
                     pieces.push({ mesh: p.mesh });
                     pieces.push({ mesh: p.wire });
+                    const wp = new THREE.Vector3();
+                    p.mesh.getWorldPosition(wp);
+                    addVoidFragmentBurst(wp, 0x120818, 14);
                 });
-                (activeBoss.tentacles || []).forEach(t => {
-                    t.segments.forEach(seg => pieces.push({ mesh: seg.wire, parent: t.group }));
+                (activeBoss.orbitals || []).forEach(o => {
+                    if (o.wire) {
+                        pieces.push({ mesh: o.wire });
+                        const wp = new THREE.Vector3();
+                        o.wire.getWorldPosition(wp);
+                        addVoidFragmentBurst(wp, 0xcc55ff, 18);
+                    }
                 });
-                if (activeBoss.horizonRing && activeBoss.horizonRing.visible) {
-                    if (activeBoss.ringFill) pieces.push({ mesh: activeBoss.ringFill, parent: activeBoss.horizonRing });
-                    if (activeBoss.ringWire) pieces.push({ mesh: activeBoss.ringWire, parent: activeBoss.horizonRing });
-                }
+                (activeBoss.energyPillars || []).forEach(p => {
+                    pieces.push({ mesh: p.mesh });
+                    pieces.push({ mesh: p.wire });
+                    const wp = new THREE.Vector3();
+                    p.mesh.getWorldPosition(wp);
+                    addVoidFragmentBurst(wp, 0xbb44ff, 10);
+                });
                 }
             } else if (activeBoss.type === 'apex') {
                 if (activeBoss.core) pieces.push({ mesh: activeBoss.core, isCore: true });
@@ -2592,8 +2884,10 @@
 
         function triggerBossExplosion() {
             hideBossDialogue();
-            playBossDeathScream();
-            screenShake = 2.2;
+            const wasVoidTitan = activeBoss && activeBoss.type === 'void' && activeBoss.voidPhase === 2;
+            if (wasVoidTitan) playVoidDeathCataclysm();
+            else playBossDeathScream();
+            screenShake = wasVoidTitan ? 3.2 : 2.2;
             collectBossDebris();
             scene.remove(activeBoss.mesh);
             activeBoss = null;
@@ -2611,6 +2905,8 @@
             updateBossBar();
             clearVoidSlamZones();
             clearVoidEventHorizon();
+            clearVoidOverdrive();
+            clearVoidOrbitTrails();
             clearVoidPhantomExtras();
             const line = activeBoss.dyingMessage || '...';
             startCinematicDialogue(line, true, triggerBossExplosion);
