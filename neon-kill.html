@@ -651,6 +651,8 @@
             lfoGain.gain.setValueAtTime(22, t);
             lfo.connect(lfoGain);
             lfoGain.connect(osc.frequency);
+            lfo.start(t);
+            lfo.stop(t + 0.46);
 
             const nLen = Math.floor(ctx.sampleRate * 0.25);
             const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
@@ -2004,6 +2006,7 @@
             hideBossHud();
             hideBossDialogue();
             hitFlashTimer = 0;
+            damageFlashEl.style.opacity = '0';
             freezeTimer = 0;
             flashTimer = 0;
             screenShake = 0;
@@ -2223,6 +2226,7 @@
 
                 if (p.owner === 'enemy' && p.mesh.position.distanceTo(playerPos) < 0.9 && player.hp > 0) {
                     player.hp -= 12;
+                    if (p.fromBoss || isBossWave) triggerDirectionalHitFlash(p.mesh.position);
                     scene.remove(p.mesh);
                     if (player.hp <= 0) gameOver();
                     return false;
