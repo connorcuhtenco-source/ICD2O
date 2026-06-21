@@ -366,8 +366,9 @@
         let bossIntroActive = false;
         let typewriterChars = 0;
         let typewriterDone = false;
-        let introHoldTimer = 2;
+        let introHoldTimer = 5;
         let introDialogueLine = '';
+        let chargeWasFull = false;
 
         const PLAYER_SHOT_DAMAGE = 25;
         const PARRY_SHOT_DAMAGE = PLAYER_SHOT_DAMAGE * 3;
@@ -380,8 +381,6 @@
         const FLOOR_LIMIT = ARENA - 0.85;
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x050008);
-        scene.fog = new THREE.Fog(0x050008, 20, 90);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
 
@@ -574,6 +573,46 @@
             osc.stop(t + 0.24);
         }
 
+        function playChargeReadyClick() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.42, t);
+            master.connect(ctx.destination);
+
+            const click = ctx.createOscillator();
+            click.type = 'square';
+            click.frequency.setValueAtTime(2400, t);
+            click.frequency.exponentialRampToValueAtTime(780, t + 0.022);
+            const clickGain = ctx.createGain();
+            clickGain.gain.setValueAtTime(0.55, t);
+            clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+            click.connect(clickGain);
+            clickGain.connect(master);
+            click.start(t);
+            click.stop(t + 0.04);
+
+            const snapLen = Math.floor(ctx.sampleRate * 0.018);
+            const snapBuf = ctx.createBuffer(1, snapLen, ctx.sampleRate);
+            const snapData = snapBuf.getChannelData(0);
+            for (let i = 0; i < snapLen; i += 1) {
+                snapData[i] = (Math.random() * 2 - 1) * (1 - i / snapLen);
+            }
+            const snap = ctx.createBufferSource();
+            snap.buffer = snapBuf;
+            const snapFilter = ctx.createBiquadFilter();
+            snapFilter.type = 'bandpass';
+            snapFilter.frequency.setValueAtTime(1800, t);
+            const snapGain = ctx.createGain();
+            snapGain.gain.setValueAtTime(0.28, t);
+            snapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+            snap.connect(snapFilter);
+            snapFilter.connect(snapGain);
+            snapGain.connect(master);
+            snap.start(t);
+            snap.stop(t + 0.032);
+        }
+
         function playPierceBlastSound() {
             const ctx = initAudio();
             const t = ctx.currentTime;
@@ -626,13 +665,110 @@
         fill.position.set(-20, 8, 20);
         scene.add(fill);
 
-        const gridHelper = new THREE.GridHelper(ARENA * 2, 32, 0xff007f, 0x220044);
-        gridHelper.material.opacity = 0.45;
-        gridHelper.material.transparent = true;
-        scene.add(gridHelper);
+        scene.background = new THREE.Color(0x030006);
+        scene.fog = new THREE.Fog(0x030006, 18, 95);
+
+        const floorCanvas = document.createElement('canvas');
+        floorCanvas.width = 512;
+        floorCanvas.height = 512;
+        const floorCanvasCtx = floorCanvas.getContext('2d');
+        const floorTexture = new THREE.CanvasTexture(floorCanvas);
+        floorTexture.wrapS = THREE.RepeatWrapping;
+        floorTexture.wrapT = THREE.RepeatWrapping;
+        floorTexture.repeat.set(10, 10);
+
+        function drawObsidianFloor(t) {
+            const ctx = floorCanvasCtx;
+            const w = floorCanvas.width;
+            const h = floorCanvas.height;
+            const pulse = 0.42 + Math.sin(t * 1.65) * 0.28;
+            const step = 32;
+
+            ctx.fillStyle = '#04040a';
+            ctx.fillRect(0, 0, w, h);
+
+            for (let y = 0; y <= h; y += step) {
+                for (let x = 0; x <= w; x += step) {
+                    const nx = (x / w - 0.5) * 2;
+                    const ny = (y / h - 0.5) * 2;
+                    const dist = Math.min(1, Math.hypot(nx, ny));
+                    const cellPulse = pulse * (0.12 + (1 - dist) * 0.5);
+                    ctx.fillStyle = `rgba(8, 4, 14, ${0.55 + cellPulse * 0.25})`;
+                    ctx.fillRect(x + 1, y + 1, step - 2, step - 2);
+                    ctx.strokeStyle = `rgba(120, 30, 110, ${cellPulse * 0.55})`;
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x + 0.5, y + 0.5, step, step);
+                }
+            }
+
+            ctx.strokeStyle = `rgba(255, 0, 90, ${pulse * 0.18})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.5, 0);
+            ctx.lineTo(w * 0.5, h);
+            ctx.moveTo(0, h * 0.5);
+            ctx.lineTo(w, h * 0.5);
+            ctx.stroke();
+            floorTexture.needsUpdate = true;
+        }
+        drawObsidianFloor(0);
+
+        const cathedralOverhead = [];
+        function buildCorruptedCathedral() {
+            const ringGroup = new THREE.Group();
+            ringGroup.position.y = 34;
+            for (let i = 0; i < 10; i += 1) {
+                const angle = (Math.PI * 2 / 10) * i;
+                const radius = 58;
+                const spireGeo = new THREE.ConeGeometry(5.5, 22, 4);
+                const spireEdges = new THREE.EdgesGeometry(spireGeo);
+                const spire = new THREE.LineSegments(
+                    spireEdges,
+                    new THREE.LineBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.28 })
+                );
+                spire.rotation.x = Math.PI;
+                spire.position.set(Math.cos(angle) * radius, -4, Math.sin(angle) * radius);
+                spire.rotation.z = angle;
+                ringGroup.add(spire);
+            }
+
+            const innerRing = new THREE.Group();
+            innerRing.position.y = 26;
+            for (let i = 0; i < 6; i += 1) {
+                const angle = (Math.PI * 2 / 6) * i + 0.4;
+                const buttressGeo = new THREE.BoxGeometry(2.2, 18, 2.2);
+                const buttress = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(buttressGeo),
+                    new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.22 })
+                );
+                buttress.position.set(Math.cos(angle) * 36, -6, Math.sin(angle) * 36);
+                buttress.rotation.y = angle;
+                buttress.rotation.z = 0.35;
+                innerRing.add(buttress);
+            }
+
+            const halo = new THREE.LineSegments(
+                new THREE.EdgesGeometry(new THREE.TorusGeometry(42, 0.35, 6, 48)),
+                new THREE.LineBasicMaterial({ color: 0x8800ff, transparent: true, opacity: 0.3 })
+            );
+            halo.rotation.x = Math.PI / 2;
+            halo.position.y = 30;
+
+            scene.add(ringGroup, innerRing, halo);
+            cathedralOverhead.push(
+                { group: ringGroup, speed: 0.018 },
+                { group: innerRing, speed: -0.026 },
+                { group: halo, speed: 0.012 }
+            );
+        }
+        buildCorruptedCathedral();
 
         const floorGeo = new THREE.PlaneGeometry(ARENA * 2, ARENA * 2);
-        const floorMat = new THREE.MeshBasicMaterial({ color: 0x0a0018, transparent: true, opacity: 0.88 });
+        const floorMat = new THREE.MeshBasicMaterial({
+            map: floorTexture,
+            transparent: true,
+            opacity: 0.96
+        });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
@@ -788,7 +924,7 @@
 
         function startBossIntro(boss) {
             bossIntroActive = true;
-            introHoldTimer = 2;
+            introHoldTimer = 5;
             typewriterChars = 0;
             typewriterDone = false;
             introDialogueLine = boss.dialogue || '';
@@ -798,7 +934,6 @@
 
         function updateBossDialogue(rawDt) {
             if (!bossIntroActive) return;
-            introHoldTimer = Math.max(0, introHoldTimer - rawDt);
 
             if (!typewriterDone) {
                 typewriterChars += rawDt * 38;
@@ -807,10 +942,12 @@
                 if (shown.length >= introDialogueLine.length) {
                     typewriterDone = true;
                     bossDialogueEl.classList.add('done');
+                    introHoldTimer = 5;
                 }
                 return;
             }
 
+            introHoldTimer = Math.max(0, introHoldTimer - rawDt);
             if (introHoldTimer <= 0) {
                 bossIntroActive = false;
                 hideBossDialogue();
@@ -834,10 +971,61 @@
             }
         }
 
+        function clearVoidGlitchTrails() {
+            if (!activeBoss || !activeBoss.glitchTrails) return;
+            activeBoss.glitchTrails.forEach(t => scene.remove(t.mesh));
+            activeBoss.glitchTrails = [];
+        }
+
         function clearBossExtras() {
             clearLaserWalls();
             clearShockwaves();
             clearTrackingLaser();
+            clearVoidGlitchTrails();
+        }
+
+        function spawnVoidGlitchBurst(x, z) {
+            if (!activeBoss || activeBoss.type !== 'void') return;
+            for (let i = 0; i < 24; i += 1) {
+                const len = 1.5 + Math.random() * 4.5;
+                const angle = Math.random() * Math.PI * 2;
+                const geo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(x, 1.5 + Math.random() * 3, z),
+                    new THREE.Vector3(
+                        x + Math.cos(angle) * len,
+                        1.5 + (Math.random() - 0.5) * 2.5,
+                        z + Math.sin(angle) * len
+                    )
+                ]);
+                const mesh = new THREE.Line(
+                    geo,
+                    new THREE.LineBasicMaterial({
+                        color: Math.random() > 0.5 ? 0xcc66ff : 0x220818,
+                        transparent: true,
+                        opacity: 0.85
+                    })
+                );
+                scene.add(mesh);
+                activeBoss.glitchTrails.push({
+                    mesh,
+                    life: 0.45 + Math.random() * 0.35,
+                    stretch: 1 + Math.random() * 2
+                });
+            }
+        }
+
+        function updateVoidGlitchTrails(dt) {
+            if (!activeBoss || activeBoss.type !== 'void') return;
+            activeBoss.glitchTrails = (activeBoss.glitchTrails || []).filter(t => {
+                t.life -= dt;
+                t.mesh.material.opacity = Math.max(0, t.life / 0.5) * 0.85;
+                t.mesh.scale.y = t.stretch * (1 + (0.5 - t.life) * 2);
+                if (t.life <= 0) {
+                    scene.remove(t.mesh);
+                    return false;
+                }
+                return true;
+            });
         }
 
         function addWireBox(w, h, d, color = 0xff2244) {
@@ -850,26 +1038,58 @@
         }
 
         function spawnApexSentry() {
-            const geo = new THREE.DodecahedronGeometry(3.8, 0);
-            const plateMat = new THREE.MeshBasicMaterial({
-                color: 0x2a3038,
-                transparent: true,
-                opacity: 0.92
-            });
-            const coreGeo = new THREE.DodecahedronGeometry(2.2, 0);
-            const coreMat = new THREE.MeshBasicMaterial({
-                color: 0xff1133,
-                transparent: true,
-                opacity: 0.55
-            });
-            const seamMat = new THREE.LineBasicMaterial({ color: 0xff5577, transparent: true, opacity: 0.95 });
-            const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), seamMat);
-            const plates = new THREE.Mesh(geo, plateMat);
-            const core = new THREE.Mesh(coreGeo, coreMat);
-            const coreWire = new THREE.LineSegments(new THREE.EdgesGeometry(coreGeo), new THREE.LineBasicMaterial({ color: 0xff88aa }));
             const mesh = new THREE.Group();
-            mesh.add(plates, wire, core, coreWire);
-            mesh.position.set(0, 8, 0);
+            const coreMat = new THREE.MeshBasicMaterial({
+                color: 0xff0022,
+                transparent: true,
+                opacity: 0.82
+            });
+            const core = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.2, 2.2), coreMat);
+            const coreGlow = new THREE.LineSegments(
+                new THREE.EdgesGeometry(new THREE.BoxGeometry(2.35, 2.35, 2.35)),
+                new THREE.LineBasicMaterial({ color: 0xff6688, transparent: true, opacity: 0.95 })
+            );
+
+            const rings = [];
+            const ringConfigs = [
+                { radius: 3.2, tube: 0.14, tilt: 0.2, speed: [2.4, 1.8, 0.6], color: 0xff2244 },
+                { radius: 4.4, tube: 0.11, tilt: 1.1, speed: [-1.9, 2.6, 1.1], color: 0xff4466 },
+                { radius: 5.6, tube: 0.1, tilt: 2.2, speed: [1.5, -2.2, 1.8], color: 0xaa1133 },
+                { radius: 6.8, tube: 0.09, tilt: 0.8, speed: [-2.8, 1.2, -1.4], color: 0xff1133 },
+                { radius: 8.2, tube: 0.08, tilt: 1.7, speed: [2.1, -1.6, 2.4], color: 0xcc2244 }
+            ];
+            ringConfigs.forEach(cfg => {
+                const ringGeo = new THREE.TorusGeometry(cfg.radius, cfg.tube, 8, 36);
+                const ringFill = new THREE.Mesh(
+                    ringGeo,
+                    new THREE.MeshBasicMaterial({ color: 0x1a0810, transparent: true, opacity: 0.75 })
+                );
+                const ringWire = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(ringGeo),
+                    new THREE.LineBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.9 })
+                );
+                ringFill.rotation.set(cfg.tilt, cfg.tilt * 0.5, 0);
+                ringWire.rotation.copy(ringFill.rotation);
+                mesh.add(ringFill, ringWire);
+                rings.push({ fill: ringFill, wire: ringWire, speed: cfg.speed });
+            });
+
+            const crown = new THREE.Group();
+            for (let i = 0; i < 16; i += 1) {
+                const angle = (Math.PI * 2 / 16) * i;
+                const spikeGeo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(0, 0, 0),
+                    new THREE.Vector3(Math.cos(angle) * 5.5, (Math.random() - 0.5) * 1.2, Math.sin(angle) * 5.5)
+                ]);
+                const spike = new THREE.Line(
+                    spikeGeo,
+                    new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.85 })
+                );
+                crown.add(spike);
+            }
+
+            mesh.add(core, coreGlow, crown);
+            mesh.position.set(0, 10, 0);
             scene.add(mesh);
 
             activeBoss = {
@@ -879,6 +1099,10 @@
                 dialogue: 'CRITICAL ERROR... INTRUDER THREAD SPOTTED... PURGING SYSTEM...',
                 mesh,
                 core,
+                coreGlow,
+                rings,
+                crown,
+                crownFlare: 0,
                 hp: 1200,
                 maxHp: 1200,
                 mode: 'projectiles',
@@ -891,22 +1115,57 @@
 
         function spawnVoidOblivion() {
             const mesh = new THREE.Group();
-            const wireColor = 0xcc66ff;
-            const torso = addWireBox(1.3, 2.4, 0.9, wireColor);
-            torso.position.y = 2.3;
-            const head = addWireBox(0.95, 0.95, 0.95, wireColor);
-            head.position.y = 4.1;
-            const armL = addWireBox(0.35, 2.1, 0.35, wireColor);
-            armL.position.set(-1.05, 2.5, 0);
-            const armR = addWireBox(0.35, 2.1, 0.35, wireColor);
-            armR.position.set(1.05, 2.5, 0);
-            const legL = addWireBox(0.42, 2.3, 0.42, wireColor);
-            legL.position.set(-0.45, 0.35, 0);
-            const legR = addWireBox(0.42, 2.3, 0.42, wireColor);
-            legR.position.set(0.45, 0.35, 0);
-            mesh.add(torso, head, armL, armR, legL, legR);
+            const glassMat = new THREE.MeshBasicMaterial({
+                color: 0x0a0612,
+                transparent: true,
+                opacity: 0.48
+            });
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0x7744aa, transparent: true, opacity: 0.88 });
+
+            function addGlassPart(w, h, d, px, py, pz, rx, ry, rz) {
+                const geo = new THREE.BoxGeometry(w, h, d);
+                const part = new THREE.Mesh(geo, glassMat);
+                const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+                part.position.set(px, py, pz);
+                wire.position.copy(part.position);
+                part.rotation.set(rx, ry, rz);
+                wire.rotation.copy(part.rotation);
+                mesh.add(part, wire);
+            }
+
+            addGlassPart(1.5, 4.2, 1.1, 0, 2.4, 0, 0.08, 0.15, 0);
+            addGlassPart(0.55, 3.4, 0.55, -1.55, 2.8, 0.35, 0.5, -0.6, 0.9);
+            addGlassPart(0.45, 2.8, 0.45, 1.35, 3.1, -0.25, -0.35, 0.45, -0.7);
+            addGlassPart(0.4, 2.2, 0.4, -0.55, 4.6, 0.15, 0.2, 0.1, 0.3);
+            addGlassPart(0.65, 2.6, 0.65, 0.85, 1.1, 0.55, -0.25, 0.8, 0.15);
+            addGlassPart(0.5, 2.4, 0.5, -0.75, 0.9, -0.45, 0.4, -0.35, -0.2);
+            addGlassPart(0.35, 1.9, 0.35, 1.05, 4.8, 0.55, -0.6, 0.25, 0.55);
+
+            const particleCloud = new THREE.Group();
+            particleCloud.position.set(0, 2.5, 0);
+            const voidParticles = [];
+            for (let i = 0; i < 48; i += 1) {
+                const pMesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.08 + Math.random() * 0.1, 4, 4),
+                    new THREE.MeshBasicMaterial({
+                        color: Math.random() > 0.5 ? 0xaa44ff : 0x220818,
+                        transparent: true,
+                        opacity: 0.55 + Math.random() * 0.35
+                    })
+                );
+                const orbit = {
+                    radius: 1.2 + Math.random() * 2.4,
+                    height: (Math.random() - 0.5) * 2.2,
+                    speed: 1.5 + Math.random() * 2.5,
+                    phase: Math.random() * Math.PI * 2,
+                    stretch: 1
+                };
+                particleCloud.add(pMesh);
+                voidParticles.push({ mesh: pMesh, orbit });
+            }
+            mesh.add(particleCloud);
             mesh.position.set(0, 0, 0);
-            mesh.scale.set(2.2, 2.2, 2.2);
+            mesh.scale.set(2.6, 2.6, 2.6);
             scene.add(mesh);
 
             activeBoss = {
@@ -915,13 +1174,16 @@
                 label: bossWaveLabel('THE VOID OBLIVION'),
                 dialogue: 'YOU ARE A GHOST IN OUR MACHINE. WELCOME TO THE END OF THE LINE.',
                 mesh,
+                particleCloud,
+                voidParticles,
+                glitchTrails: [],
+                baseScale: 2.6,
                 hp: 2200,
                 maxHp: 2200,
                 teleportTimer: 3.5,
                 shockTimer: 2.8,
                 laserTimer: 6,
                 laserActive: false,
-                laserCharge: 0,
                 glitchTimer: 0,
                 isBoss: true
             };
@@ -1042,20 +1304,46 @@
                 [-ARENA * 0.55, -ARENA * 0.55]
             ];
             const [x, z] = quadrants[Math.floor(Math.random() * quadrants.length)];
+            spawnVoidGlitchBurst(activeBoss.mesh.position.x, activeBoss.mesh.position.z);
             activeBoss.mesh.position.set(x, 0, z);
-            activeBoss.glitchTimer = 0.35;
-            activeBoss.mesh.scale.set(0.1, 3.5, 0.1);
+            activeBoss.glitchTimer = 0.42;
+            activeBoss.mesh.scale.set(0.08, 3.8, 0.08);
+            spawnVoidGlitchBurst(x, z);
         }
 
         function updateApexBoss(dt) {
             const b = activeBoss;
-            b.mesh.position.y = 8 + Math.sin(performance.now() * 0.0012) * 0.9;
-            b.mesh.rotation.x += dt * 0.25;
-            b.mesh.rotation.y += dt * 0.45;
+            const t = performance.now() * 0.001;
+            b.mesh.position.y = 10 + Math.sin(t * 1.2) * 1.1;
             if (b.core) {
-                const pulse = 0.45 + Math.sin(performance.now() * 0.004) * 0.25;
+                const pulse = 0.62 + Math.sin(t * 4.2) * 0.28;
                 b.core.material.opacity = pulse;
-                b.core.rotation.y -= dt * 0.8;
+                b.core.scale.setScalar(0.92 + pulse * 0.12);
+                b.core.rotation.y -= dt * 1.4;
+                b.core.rotation.x += dt * 0.6;
+            }
+            if (b.coreGlow) {
+                b.coreGlow.rotation.copy(b.core.rotation);
+                b.coreGlow.scale.copy(b.core.scale);
+            }
+
+            (b.rings || []).forEach(r => {
+                r.fill.rotation.x += r.speed[0] * dt;
+                r.fill.rotation.y += r.speed[1] * dt;
+                r.fill.rotation.z += r.speed[2] * dt;
+                r.wire.rotation.copy(r.fill.rotation);
+            });
+
+            const attacking = b.mode === 'projectiles' || b.mode === 'laserwall';
+            b.crownFlare = THREE.MathUtils.lerp(b.crownFlare || 0, attacking ? 1 : 0, dt * 5);
+            if (b.crown) {
+                const flare = b.crownFlare;
+                b.crown.scale.set(1 + flare * 0.45, 1 + flare * 0.2, 1 + flare * 0.45);
+                b.crown.rotation.y += dt * (1.2 + flare * 6);
+                b.crown.children.forEach((spike, i) => {
+                    spike.material.opacity = 0.45 + flare * 0.55;
+                    spike.scale.y = 1 + flare * 0.35 * (i % 2 === 0 ? 1 : 0.7);
+                });
             }
 
             b.modeTimer -= dt;
@@ -1076,20 +1364,40 @@
 
         function updateVoidBoss(dt) {
             const b = activeBoss;
+            const scale = b.baseScale || 2.6;
             if (b.glitchTimer > 0) {
                 b.glitchTimer -= dt;
-                const t = Math.max(0, b.glitchTimer / 0.35);
+                const t = Math.max(0, b.glitchTimer / 0.42);
                 b.mesh.scale.set(
-                    THREE.MathUtils.lerp(2.2, 0.1, 1 - t),
-                    THREE.MathUtils.lerp(2.2, 3.5, 1 - t),
-                    THREE.MathUtils.lerp(2.2, 0.1, 1 - t)
+                    THREE.MathUtils.lerp(scale, 0.08, 1 - t),
+                    THREE.MathUtils.lerp(scale, 3.8, 1 - t),
+                    THREE.MathUtils.lerp(scale, 0.08, 1 - t)
                 );
+                (b.voidParticles || []).forEach(p => { p.orbit.stretch = 2.8; });
             } else {
-                b.mesh.scale.set(2.2, 2.2, 2.2);
+                b.mesh.scale.set(scale, scale, scale);
+                (b.voidParticles || []).forEach(p => {
+                    p.orbit.stretch = THREE.MathUtils.lerp(p.orbit.stretch, 1, dt * 4);
+                });
+            }
+
+            const orbitT = performance.now() * 0.001;
+            if (b.particleCloud && b.voidParticles) {
+                b.particleCloud.rotation.y += dt * 0.35;
+                b.voidParticles.forEach(p => {
+                    const ang = orbitT * p.orbit.speed + p.orbit.phase;
+                    p.mesh.position.set(
+                        Math.cos(ang) * p.orbit.radius,
+                        p.orbit.height + Math.sin(ang * 1.7) * 0.35,
+                        Math.sin(ang) * p.orbit.radius
+                    );
+                    p.mesh.scale.set(1, p.orbit.stretch, 1);
+                    p.mesh.material.opacity = 0.35 + Math.sin(ang * 3) * 0.2 + b.glitchTimer * 0.8;
+                });
             }
 
             b.mesh.lookAt(playerPos.x, b.mesh.position.y + 4, playerPos.z);
-            b.mesh.position.y = Math.sin(performance.now() * 0.0015) * 0.15;
+            b.mesh.position.y = Math.sin(performance.now() * 0.0015) * 0.2;
 
             b.teleportTimer -= dt;
             if (b.teleportTimer <= 0) {
@@ -1110,6 +1418,7 @@
                 startTrackingLaser();
             }
 
+            updateVoidGlitchTrails(dt);
             updateTrackingLaser(dt);
             updateShockwaves(dt);
         }
@@ -1157,6 +1466,7 @@
             styleMultiplier = Math.min(8, styleMultiplier + 1.0);
             score += Math.floor(500 * styleMultiplier);
             const pos = activeBoss.mesh.position.clone();
+            clearVoidGlitchTrails();
             scene.remove(activeBoss.mesh);
             activeBoss = null;
             isBossWave = false;
@@ -1263,6 +1573,7 @@
             chargeLevel = 0;
             isCharging = false;
             chargeCommitted = false;
+            chargeWasFull = false;
             leftHoldTime = 0;
             drawBatteryHUD();
         }
@@ -1273,7 +1584,12 @@
             if (leftHoldTime >= TAP_HOLD_THRESHOLD) {
                 chargeCommitted = true;
                 isCharging = true;
+                const prevCharge = chargeLevel;
                 chargeLevel = Math.min(100, chargeLevel + dt * CHARGE_RATE);
+                if (prevCharge < 100 && chargeLevel >= 100 && !chargeWasFull) {
+                    chargeWasFull = true;
+                    playChargeReadyClick();
+                }
                 drawBatteryHUD();
             }
         }
@@ -1517,6 +1833,7 @@
             parryFlashEl.classList.remove('solid');
             parryAnimTimer = 0;
             gunRecoil = 0;
+            chargeWasFull = false;
             drawBatteryHUD();
             enemies = [];
             projectiles = [];
@@ -1541,8 +1858,12 @@
             return Math.abs(playerPos.x) <= ARENA && Math.abs(playerPos.z) <= ARENA;
         }
 
-        function updateShiftingPillars() {
+        function updateShiftingPillars(dt) {
             const t = performance.now() * 0.001;
+            drawObsidianFloor(t);
+            cathedralOverhead.forEach(item => {
+                item.group.rotation.y += item.speed * (dt || 0.016);
+            });
             for (const p of pillars) {
                 const y = p.baseY + Math.sin(t * 0.55 + p.phase) * p.amp;
                 p.mesh.position.y = y;
@@ -1782,7 +2103,7 @@
             if (gameRunning) {
                 updateBossDialogue(rawDt);
                 updateLeftMouse(rawDt);
-                updateShiftingPillars();
+                updateShiftingPillars(rawDt);
                 updatePlayer(dt);
                 applyScreenShake();
                 if (screenShake > 0) screenShake = Math.max(0, screenShake - rawDt * 2.2);
