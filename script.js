@@ -194,6 +194,18 @@ const ACHIEVEMENTS = [
         name: 'How are you alive?',
         description: 'Get a 200,000 high score in Space Runner.',
         icon: '🚀'
+    },
+    {
+        id: 'tank',
+        name: 'Tank',
+        description: 'Kill 5 brawlers without dying as Juggernaut in Water Royale.',
+        icon: '🛡️'
+    },
+    {
+        id: 'untouchable',
+        name: 'Untouchable',
+        description: 'Defeat a boss without taking damage in Neon Kill.',
+        icon: '✨'
     }
 ];
 
@@ -2269,6 +2281,9 @@ document.addEventListener('keydown', event => {
 });
 
 window.ArcadeAchievements = {
+    unlock(id) {
+        unlockAchievement(id);
+    },
     onSpaceRunnerGameOver(highscore, runScore) {
         checkSpaceRunnerAchievements(highscore);
         ArcadeMeta.onSpaceRunnerEnd(runScore || 0);

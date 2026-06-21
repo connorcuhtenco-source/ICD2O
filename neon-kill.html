@@ -384,6 +384,7 @@
         </div>
     </div>
 
+    <script src="arcade-achievements.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
     (() => {
@@ -483,6 +484,8 @@
         let isBossWave = false;
         let activeBoss = null;
         let bossIntroActive = false;
+        let bossEncounterNoDamage = true;
+        let bossEncounterTracking = false;
         let typewriterChars = 0;
         let typewriterDone = false;
         let introHoldTimer = 5;
@@ -1258,11 +1261,27 @@
             updateDamageFlashVisual(hitFlashTimer / 0.42);
         }
 
+        function beginBossEncounterTracking() {
+            bossEncounterTracking = true;
+            bossEncounterNoDamage = true;
+        }
+
+        function endBossEncounterTracking() {
+            bossEncounterTracking = false;
+        }
+
+        function markBossEncounterDamage() {
+            if (bossEncounterTracking) bossEncounterNoDamage = false;
+        }
+
         function applyBossDamage(dps, dt, sourcePos) {
             if (player.hp <= 0) return;
             const prev = player.hp;
             player.hp -= dps * dt;
-            if (player.hp < prev) triggerDirectionalHitFlash(sourcePos);
+            if (player.hp < prev) {
+                markBossEncounterDamage();
+                triggerDirectionalHitFlash(sourcePos);
+            }
             if (player.hp <= 0) gameOver();
             else updateUI();
         }
@@ -1760,6 +1779,7 @@
         }
 
         function startBossIntro(boss) {
+            beginBossEncounterTracking();
             bossIntroActive = true;
             syncDialogueLock();
             introHoldTimer = 5;
@@ -2479,6 +2499,7 @@
                 if (slash.active && !slash.hit && slash.mesh.position.distanceTo(playerPos) < slash.width && player.hp > 0) {
                     slash.hit = true;
                     player.hp -= 34;
+                    markBossEncounterDamage();
                     triggerDirectionalHitFlash(slash.mesh.position);
                     screenShake = 0.75;
                     if (player.hp <= 0) gameOver();
@@ -2554,6 +2575,7 @@
                     Math.abs(playerPos.x - b.mesh.position.x) < 2.2) {
                     b.decapHit = true;
                     player.hp -= 40;
+                    markBossEncounterDamage();
                     triggerDirectionalHitFlash(b.mesh.position);
                     screenShake = 0.9;
                     if (player.hp <= 0) gameOver();
@@ -2919,6 +2941,7 @@
                     const dz = playerPos.z - o.z;
                     if (Math.hypot(dx, dz) < o.radius && playerPos.y < FLOOR_Y + 4) {
                         player.hp -= 55;
+                        markBossEncounterDamage();
                         triggerDirectionalHitFlash(new THREE.Vector3(o.x, playerPos.y, o.z));
                         if (player.hp <= 0) gameOver();
                         else updateUI();
@@ -2996,6 +3019,7 @@
                     spawnVoidShockRing(wp.x, wp.z);
                     if (Math.hypot(playerPos.x - wp.x, playerPos.z - wp.z) < 8 && onGround && playerPos.y < FLOOR_Y + 3.5) {
                         player.hp -= 32;
+                        markBossEncounterDamage();
                         triggerDirectionalHitFlash(wp);
                         if (player.hp <= 0) gameOver();
                         else updateUI();
@@ -3438,6 +3462,10 @@
         }
 
         function finishBossDefeat() {
+            if (bossEncounterNoDamage) {
+                window.ArcadeAchievements?.unlock?.('untouchable');
+            }
+            endBossEncounterTracking();
             bossDefeatActive = false;
             bossDefeatPhase = 'idle';
             defeatFlashEl.style.opacity = '0';
@@ -3554,6 +3582,7 @@
             clearBossExtras();
             activeBoss = null;
             isBossWave = false;
+            endBossEncounterTracking();
             bossIntroActive = false;
             lastDialogueCharCount = 0;
             hideBossHud();
@@ -4163,6 +4192,7 @@
             if (activeBoss) scene.remove(activeBoss.mesh);
             activeBoss = null;
             isBossWave = false;
+            endBossEncounterTracking();
             bossIntroActive = false;
             bossDefeatActive = false;
             bossDefeatPhase = 'idle';
@@ -4272,6 +4302,7 @@
             if (onArenaFloor()) return;
             if (playerPos.y < CHASM_Y) {
                 player.hp -= 15;
+                markBossEncounterDamage();
                 playerPos.set(0, FLOOR_Y + EYE_HEIGHT, 0);
                 velY = 0;
                 player.vel.y = 0;
@@ -4377,7 +4408,9 @@
                         enemy.mesh.lookAt(playerPos.x, enemy.mesh.position.y, playerPos.z);
                     }
                     if (dist < 1.8 && player.hp > 0) {
+                        const prevHp = player.hp;
                         player.hp -= 18 * dt;
+                        if (player.hp < prevHp) markBossEncounterDamage();
                         if (player.hp <= 0) gameOver();
                     }
                 }
@@ -4414,6 +4447,7 @@
 
                 if (p.owner === 'enemy' && p.mesh.position.distanceTo(playerPos) < 0.9 && player.hp > 0) {
                     player.hp -= 12;
+                    markBossEncounterDamage();
                     if (p.fromBoss || isBossWave) triggerDirectionalHitFlash(p.mesh.position);
                     scene.remove(p.mesh);
                     if (player.hp <= 0) gameOver();

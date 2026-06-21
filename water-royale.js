@@ -359,6 +359,20 @@ const state = {
   time: 0
 };
 
+let juggernautKillStreak = 0;
+
+function resetJuggernautKillStreak() {
+  juggernautKillStreak = 0;
+}
+
+function onPlayerKill() {
+  if (state.selectedClass !== "juggernaut") return;
+  juggernautKillStreak += 1;
+  if (juggernautKillStreak >= 5) {
+    window.ArcadeAchievements?.unlock?.("tank");
+  }
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -507,6 +521,7 @@ function makeFighter(type, x, y, name, ai = false) {
 
 function resetGame() {
   const spec = classes[state.selectedClass];
+  resetJuggernautKillStreak();
   state.running = true;
   state.over = false;
   state.time = 0;
@@ -916,7 +931,10 @@ function updateBullets(dt) {
         target.hp -= actualDamage;
         hit = true;
         splash(b.x, b.y, b.color);
-        if (target.hp <= 0) knockOut(target);
+        if (target.hp <= 0) {
+          if (b.owner === state.player) onPlayerKill();
+          knockOut(target);
+        }
         break;
       }
     }
@@ -1374,6 +1392,7 @@ function loop(time) {
 function endGame(won) {
   state.over = true;
   state.running = false;
+  if (!won) resetJuggernautKillStreak();
   if (won) {
     record.wins += 1;
     saveRecord();
