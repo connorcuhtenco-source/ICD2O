@@ -64,29 +64,188 @@ for (const key in weaponImageFiles) {
   weaponImages[key] = img;
 }
 
-const juggernautSprite = new Image();
-juggernautSprite.src = spritePath('juggernaut_sprite_1.png');
-const juggernautSpriteFrame = { w: 24, h: 32, cols: 4, rows: 4 };
-const juggernautSpriteDisplay = { w: juggernautSpriteFrame.w * 4, h: juggernautSpriteFrame.h * 4 };
+const CHARACTER_STYLES = {
+  default: {
+    body: ["#1cb8ff", "#0a78c9"],
+    trim: "#7ee3ff",
+    gear: "#ffd166",
+    shadow: "#063553",
+    scale: 1
+  },
+  juggernaut: {
+    body: ["#b688ff", "#6b38d9"],
+    trim: "#e8d4ff",
+    gear: "#3a1f78",
+    shadow: "#1a0a3a",
+    scale: 1.28
+  },
+  speedster: {
+    body: ["#35f0a8", "#0f9a5c"],
+    trim: "#b8ffe0",
+    gear: "#063553",
+    shadow: "#043326",
+    scale: 0.92
+  }
+};
 
-const speedsterSprite = new Image();
-speedsterSprite.src = spritePath('speedster_sprite.png');
-const speedsterSpriteFrame = { w: 24, h: 32, cols: 4, rows: 4 };
-const speedsterSpriteDisplay = { w: speedsterSpriteFrame.w * 4, h: speedsterSpriteFrame.h * 4 };
+function tileSeed(c, r, salt = 0) {
+  return ((c * 928371 + r * 689287 + salt * 17389) >>> 0) % 997;
+}
 
-const defaultSprite = new Image();
-defaultSprite.src = spritePath('deafult_sprite.png');
-const defaultSpriteFrame = { w: 24, h: 32, cols: 4, rows: 4 };
-const defaultSpriteDisplay = { w: defaultSpriteFrame.w * 4, h: defaultSpriteFrame.h * 4 };
+function drawGradientBody(x, y, w, h, colors, radius) {
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, colors[0]);
+  grad.addColorStop(1, colors[1]);
+  ctx.fillStyle = grad;
+  roundRect(x, y, w, h, radius);
+  ctx.fill();
+}
 
-const wallSprite = new Image();
-wallSprite.src = spritePath('New_Piskel.png');
+function drawCharacter(fighter, x, y, aim) {
+  const style = CHARACTER_STYLES[fighter.type] || CHARACTER_STYLES.default;
+  const moving = Math.hypot(fighter.dirX, fighter.dirY) > 0.05;
+  const faceAngle = moving ? Math.atan2(fighter.dirY, fighter.dirX) : aim;
+  const facingRight = Math.cos(faceAngle) >= 0;
+  const walkPhase = fighter.walkFrame || 0;
+  const bob = moving ? [0, -4, -1][walkPhase] : Math.sin(state.time * 3 + fighter.x) * 1.2;
+  const legSwing = moving ? [-7, 0, 7][walkPhase] : 0;
+  const scale = style.scale * (fighter.ai ? 0.94 : 1);
 
-const speedTileSprite = new Image();
-speedTileSprite.src = spritePath('New_Piskel_1.png');
+  ctx.save();
+  ctx.translate(x, y + bob);
+  ctx.scale(facingRight ? scale : -scale, scale);
 
-const bushSprite = new Image();
-bushSprite.src = spritePath('New_Piskel_2.png');
+  ctx.fillStyle = "rgba(6, 53, 83, 0.22)";
+  ctx.beginPath();
+  ctx.ellipse(0, 18, 16 * (fighter.type === "juggernaut" ? 1.35 : 1), 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (fighter.type === "speedster" && moving) {
+    ctx.strokeStyle = "rgba(53, 240, 168, 0.45)";
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(-18 - i * 8, -8 + i * 6);
+      ctx.lineTo(-30 - i * 8, -8 + i * 6);
+      ctx.stroke();
+    }
+  }
+
+  ctx.fillStyle = style.gear;
+  ctx.fillRect(-8 + legSwing * 0.25, 12, 7, 10);
+  ctx.fillRect(1 - legSwing * 0.25, 12, 7, 10);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(-9 + legSwing * 0.25, 20, 9, 4);
+  ctx.fillRect(0 - legSwing * 0.25, 20, 9, 4);
+
+  if (fighter.type === "juggernaut") {
+    drawGradientBody(-18, -8, 36, 28, style.body, 8);
+    ctx.fillStyle = style.trim;
+    roundRect(-14, -2, 28, 8, 4);
+    ctx.fill();
+    ctx.fillStyle = style.gear;
+    roundRect(-22, -12, 10, 18, 4);
+    ctx.fill();
+    roundRect(12, -12, 10, 18, 4);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(0, 2, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = style.body[1];
+    ctx.fillRect(-4, -1, 8, 6);
+  } else if (fighter.type === "speedster") {
+    drawGradientBody(-11, -2, 22, 22, style.body, 10);
+    ctx.fillStyle = style.trim;
+    roundRect(-12, -10, 24, 8, 5);
+    ctx.fill();
+    ctx.fillStyle = style.gear;
+    roundRect(-8, -8, 16, 5, 3);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(-3, -7, 6, 3);
+    ctx.fillStyle = style.trim;
+    ctx.beginPath();
+    ctx.moveTo(8, -4);
+    ctx.lineTo(16, 0);
+    ctx.lineTo(8, 4);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    drawGradientBody(-13, -2, 26, 24, style.body, 9);
+    ctx.fillStyle = "#ffffff";
+    roundRect(-10, 2, 20, 12, 4);
+    ctx.fill();
+    ctx.fillStyle = style.body[0];
+    ctx.fillRect(-10, 7, 20, 3);
+    ctx.fillStyle = style.gear;
+    roundRect(-12, -14, 24, 10, 5);
+    ctx.fill();
+    ctx.fillStyle = style.trim;
+    ctx.beginPath();
+    ctx.arc(0, -9, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = style.body[0];
+    roundRect(8, -4, 8, 10, 3);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = style.shadow;
+  ctx.beginPath();
+  ctx.arc(0, -10, fighter.type === "juggernaut" ? 11 : 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#f7d7b5";
+  ctx.beginPath();
+  ctx.arc(0, -10, fighter.type === "juggernaut" ? 9 : 7.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (fighter.type === "juggernaut") {
+    ctx.fillStyle = style.gear;
+    roundRect(-10, -18, 20, 8, 4);
+    ctx.fill();
+    ctx.fillStyle = style.trim;
+    ctx.fillRect(-8, -16, 16, 3);
+  } else if (fighter.type === "speedster") {
+    ctx.fillStyle = style.gear;
+    roundRect(-9, -18, 18, 6, 3);
+    ctx.fill();
+    ctx.fillStyle = "#35f0a8";
+    ctx.fillRect(-7, -17, 5, 2);
+    ctx.fillRect(2, -17, 5, 2);
+  } else {
+    ctx.fillStyle = style.gear;
+    roundRect(-11, -19, 22, 8, 4);
+    ctx.fill();
+    ctx.fillStyle = style.trim;
+    ctx.fillRect(-8, -17, 16, 2);
+  }
+
+  ctx.restore();
+
+  const gunLen = fighter.type === "juggernaut" ? 24 : fighter.type === "speedster" ? 18 : 20;
+  ctx.save();
+  ctx.translate(x, y + bob);
+  ctx.rotate(aim);
+  ctx.fillStyle = style.trim;
+  roundRect(8, -3, gunLen, 6, 3);
+  ctx.fill();
+  ctx.fillStyle = style.body[1];
+  ctx.fillRect(8 + gunLen - 5, -2, 5, 4);
+  ctx.restore();
+
+  if (fighter.invulnerable > 0) {
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y + bob, fighter.r + 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(126, 227, 255, 0.35)";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(x, y + bob, fighter.r + 14, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
 
 // Persistent lobby record (wins / losses) stored in localStorage
 const recordKey = 'waterroyale_record_v1';
@@ -764,13 +923,27 @@ function splash(x, y, color) {
 }
 
 function drawTileMap() {
-  ctx.fillStyle = "#6fc86d";
+  const grassGrad = ctx.createLinearGradient(0, 0, arena.w, arena.h);
+  grassGrad.addColorStop(0, "#7ad86a");
+  grassGrad.addColorStop(0.5, "#66c85a");
+  grassGrad.addColorStop(1, "#5fbf56");
+  ctx.fillStyle = grassGrad;
   ctx.fillRect(0, 0, arena.w, arena.h);
-  ctx.fillStyle = "rgba(255,255,255,0.05)";
+
+  ctx.fillStyle = "rgba(255,255,255,0.04)";
   for (let c = 0; c < cols; c += 1) {
     for (let r = 0; r < rows; r += 1) {
       if ((c + r) % 2 === 0) ctx.fillRect(c * tile, r * tile, tile, tile);
     }
+  }
+
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  for (let r = 1; r < rows; r += 3) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * tile + 0.5);
+    ctx.lineTo(arena.w, r * tile + 0.5);
+    ctx.stroke();
   }
 
   drawPatioPatches();
@@ -807,78 +980,146 @@ function drawPatioPatches() {
 }
 
 function drawWallTile(rect) {
-  const scale = 1.45;
-  const width = rect.w * scale;
-  const height = rect.h * scale;
-  const x = rect.x - (width - rect.w) / 2;
-  const y = rect.y - (height - rect.h) / 2;
+  const { x, y, w, h, c, r } = rect;
+  const seed = tileSeed(c, r, 11);
 
-  if (wallSprite.complete && wallSprite.naturalWidth) {
-    ctx.save();
-    if (rect.flip) {
-      ctx.translate(x + width / 2, y + height / 2);
-      ctx.scale(1, -1);
-      ctx.drawImage(wallSprite, -width / 2, -height / 2, width, height);
-    } else {
-      ctx.drawImage(wallSprite, x, y, width, height);
-    }
-    ctx.restore();
-    return;
+  ctx.fillStyle = "#2f6f95";
+  roundRect(x + 1, y + 1, w - 2, h - 2, 5);
+  ctx.fill();
+
+  const slats = 5;
+  const gap = (w - 10) / slats;
+  for (let i = 0; i < slats; i += 1) {
+    const sx = x + 5 + i * gap;
+    const grad = ctx.createLinearGradient(sx, y + 4, sx + gap - 2, y + h - 6);
+    grad.addColorStop(0, "#8edcff");
+    grad.addColorStop(0.45, "#49b8ea");
+    grad.addColorStop(1, "#1f7fb8");
+    ctx.fillStyle = grad;
+    roundRect(sx, y + 6, gap - 2, h - 12, 3);
+    ctx.fill();
   }
 
-  ctx.fillStyle = "#43bdf5";
-  roundRect(rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, 6);
+  ctx.fillStyle = "#f4fbff";
+  roundRect(x + 2, y + 3, w - 4, 7, 4);
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.22)";
-  ctx.fillRect(rect.x + 8, rect.y + 7, rect.w - 16, 6);
-  ctx.fillStyle = "rgba(0,60,90,0.2)";
-  ctx.fillRect(rect.x + 5, rect.y + rect.h - 10, rect.w - 10, 5);
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillRect(x + 6, y + 5, w - 12, 2);
+
+  ctx.fillStyle = "rgba(6, 53, 83, 0.18)";
+  ctx.fillRect(x + 4, y + h - 7, w - 8, 4);
+
+  if (seed % 4 === 0) {
+    ctx.fillStyle = "rgba(126, 227, 255, 0.85)";
+    ctx.beginPath();
+    ctx.arc(x + w * 0.72, y + h * 0.35, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + w * 0.72, y + h * 0.35 + 5, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (rect.flip) {
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillRect(x + 3, y + 8, 4, h - 16);
+  }
 }
 
 function drawBushTile(rect) {
-  const scale = 1.45;
-  const width = rect.w * scale;
-  const height = rect.h * scale;
-  const x = rect.x - (width - rect.w) / 2;
-  const y = rect.y - (height - rect.h) / 2;
+  const { x, y, w, h, c, r } = rect;
+  const seed = tileSeed(c, r, 23);
+  const cx = x + w / 2;
+  const cy = y + h / 2 + 2;
 
-  if (bushSprite.complete && bushSprite.naturalWidth) {
-    ctx.drawImage(bushSprite, x, y, width, height);
-    return;
+  ctx.fillStyle = "rgba(18, 92, 48, 0.35)";
+  roundRect(x + 3, y + h - 10, w - 6, 8, 4);
+  ctx.fill();
+
+  const blobs = [
+    { ox: -10, oy: 4, rad: 13, color: "#0f7a42" },
+    { ox: 10, oy: 4, rad: 13, color: "#0f7a42" },
+    { ox: 0, oy: -6, rad: 15, color: "#18a857" },
+    { ox: -6, oy: -2, rad: 10, color: "#31df62" },
+    { ox: 8, oy: -1, rad: 10, color: "#31df62" }
+  ];
+
+  blobs.forEach((blob, i) => {
+    ctx.fillStyle = blob.color;
+    ctx.beginPath();
+    ctx.arc(cx + blob.ox, cy + blob.oy, blob.rad, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
+    ctx.beginPath();
+    ctx.arc(cx + blob.ox - 3, cy + blob.oy - 4, blob.rad * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.strokeStyle = "rgba(8, 58, 31, 0.35)";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 5; i += 1) {
+    const angle = -Math.PI / 2 + (i - 2) * 0.35;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + 2);
+    ctx.lineTo(cx + Math.cos(angle) * 14, cy + 2 + Math.sin(angle) * 14);
+    ctx.stroke();
   }
 
-  ctx.fillStyle = "#0fae5c";
-  roundRect(rect.x + 2, rect.y + 2, rect.w - 4, rect.h - 4, 7);
-  ctx.fill();
-  ctx.fillStyle = "#31df62";
-  for (let i = 0; i < 4; i += 1) {
+  if (seed % 3 === 0) {
+    const fx = x + 10 + (seed % 5) * 4;
+    const fy = y + 12 + (seed % 4) * 3;
+    ctx.fillStyle = "#ff7eb6";
     ctx.beginPath();
-    ctx.arc(rect.x + 10 + i * 9, rect.y + 14 + Math.sin(rect.c + i) * 7, 8, 0, Math.PI * 2);
+    ctx.arc(fx, fy, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.arc(fx + 8, fy + 5, 2, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
 function drawSpeedTile(rect) {
-  const scale = 1.35;
-  const width = rect.w * scale;
-  const height = rect.h * scale;
-  const x = rect.x - (width - rect.w) / 2;
-  const y = rect.y - (height - rect.h) / 2;
+  const { x, y, w, h, c, r } = rect;
+  const pulse = 0.5 + Math.sin(state.time * 6 + c * 0.7 + r * 0.5) * 0.5;
 
-  if (speedTileSprite.complete && speedTileSprite.naturalWidth) {
-    ctx.drawImage(speedTileSprite, x, y, width, height);
-    return;
+  const padGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+  padGrad.addColorStop(0, "#8dffb8");
+  padGrad.addColorStop(0.5, "#45f238");
+  padGrad.addColorStop(1, "#1ec76a");
+  ctx.fillStyle = padGrad;
+  roundRect(x + 2, y + 2, w - 4, h - 4, 6);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 2;
+  roundRect(x + 4, y + 4, w - 8, h - 8, 5);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(255,255,255,${0.18 + pulse * 0.22})`;
+  for (let i = 0; i < 3; i += 1) {
+    const offset = ((state.time * 90 + i * 14) % (w + 20)) - 10;
+    ctx.beginPath();
+    ctx.moveTo(x + offset, y + 8);
+    ctx.lineTo(x + offset + 12, y + h / 2);
+    ctx.lineTo(x + offset, y + h - 8);
+    ctx.closePath();
+    ctx.fill();
   }
 
-  ctx.fillStyle = "#45f238";
-  ctx.fillRect(x + 1, y + 1, width - 2, height - 2);
-  ctx.fillStyle = "rgba(255,255,255,0.28)";
-  ctx.beginPath();
-  ctx.moveTo(x + 10, y + 10);
-  ctx.lineTo(x + 30, y + 22);
-  ctx.lineTo(x + 10, y + 34);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fillStyle = "rgba(6, 53, 83, 0.82)";
+  const chevY = y + h / 2;
+  for (let i = 0; i < 2; i += 1) {
+    const cx = x + w * (0.38 + i * 0.18);
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, chevY - 10);
+    ctx.lineTo(cx + 2, chevY);
+    ctx.lineTo(cx - 8, chevY + 10);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.fillStyle = `rgba(255,255,255,${0.25 + pulse * 0.2})`;
+  ctx.fillRect(x + 6, y + 6, w - 12, 3);
 }
 
 function drawDecoTile(rect) {
@@ -948,77 +1189,15 @@ function drawFighter(fighter) {
   const hidden = fighter.ai && isInBush(fighter) && dist(fighter, state.player) > 190 && (fighter.revealedTimer || 0) <= 0;
   if (hidden) return;
   const aim = fighter.ai ? angleTo(fighter, state.player) : angleTo(fighter, screenToWorld(mouse.x, mouse.y));
-
   const drawX = fighter.x;
   const drawY = fighter.y - (fighter.hopOffset || 0);
 
-  const spriteData = fighter.type === 'juggernaut'
-    ? { sprite: juggernautSprite, frameInfo: juggernautSpriteFrame, display: juggernautSpriteDisplay }
-    : fighter.type === 'speedster'
-      ? { sprite: speedsterSprite, frameInfo: speedsterSpriteFrame, display: speedsterSpriteDisplay }
-      : fighter.type === 'default'
-        ? { sprite: defaultSprite, frameInfo: defaultSpriteFrame, display: defaultSpriteDisplay }
-        : null;
+  drawCharacter(fighter, drawX, drawY, aim);
 
-  if (spriteData && spriteData.sprite.complete && spriteData.sprite.naturalWidth) {
-    const dx = fighter.dirX;
-    const dy = fighter.dirY;
-    let row;
-    if (Math.abs(dx) > Math.abs(dy)) {
-      row = dx > 0 ? 3 : 2;
-    } else {
-      row = dy > 0 ? 0 : 1;
-    }
-    const frame = fighter.walkFrame || 0;
-    ctx.drawImage(
-      spriteData.sprite,
-      frame * spriteData.frameInfo.w,
-      row * spriteData.frameInfo.h,
-      spriteData.frameInfo.w,
-      spriteData.frameInfo.h,
-      drawX - spriteData.display.w / 2,
-      drawY - spriteData.display.h / 2,
-      spriteData.display.w,
-      spriteData.display.h
-    );
-    if (fighter.invulnerable > 0) {
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(drawX, drawY, fighter.r + 8, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  } else {
-    ctx.save();
-    ctx.translate(drawX, drawY);
-    ctx.rotate(aim);
-    ctx.fillStyle = "#0f5a7c";
-    roundRect(2, -7, 35, 14, 7);
-    ctx.fill();
-    ctx.restore();
-
-    ctx.globalAlpha = fighter.invulnerable > 0 && Math.floor(state.time * 10) % 2 === 0 ? 0.55 : 1;
-    ctx.fillStyle = fighter.color;
-    ctx.beginPath();
-    ctx.arc(drawX, drawY, fighter.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    if (fighter.invulnerable > 0) {
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(drawX, drawY, fighter.r + 8, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "rgba(255,255,255,0.88)";
-    ctx.beginPath();
-    ctx.arc(drawX + Math.cos(aim) * 7, drawY + Math.sin(aim) * 7, fighter.r * 0.38, 0, Math.PI * 2);
-    ctx.fill();
-  }
   ctx.fillStyle = "#102e3f";
   ctx.font = "700 13px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(fighter.name, drawX, drawY - fighter.r - 15);
+  ctx.fillText(fighter.name, drawX, drawY - fighter.r - 18);
 
   ctx.fillStyle = "rgba(14,31,45,0.4)";
   ctx.fillRect(drawX - 30, drawY + fighter.r + 9, 60, 8);
