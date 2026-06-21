@@ -64,6 +64,55 @@ for (const key in weaponImageFiles) {
   weaponImages[key] = img;
 }
 
+const WEAPON_HOLD = {
+  pistol: { length: 54, gripX: 11, gripY: 4, imgScale: 1 },
+  shotgun: { length: 70, gripX: 13, gripY: 5, imgScale: 1.08 },
+  sniper: { length: 88, gripX: 15, gripY: 3, imgScale: 1.12 },
+  rifle: { length: 76, gripX: 13, gripY: 4, imgScale: 1.05 }
+};
+
+function drawAttachedWeapon(fighter, x, y, bob, aim, style) {
+  const hold = WEAPON_HOLD[fighter.weapon] || WEAPON_HOLD.pistol;
+  const classScale = style.scale * (fighter.ai ? 0.94 : 1);
+  const gripX = hold.gripX * classScale;
+  const gripY = hold.gripY * classScale;
+  const gunLen = hold.length * classScale * hold.imgScale;
+
+  ctx.save();
+  ctx.translate(x, y + bob);
+  ctx.rotate(aim);
+  if (Math.cos(aim) < 0) ctx.scale(1, -1);
+
+  ctx.strokeStyle = "#f7d7b5";
+  ctx.lineWidth = 5 * classScale;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(3 * classScale, 2 * classScale);
+  ctx.lineTo(gripX, gripY);
+  ctx.stroke();
+
+  ctx.fillStyle = style.trim;
+  ctx.beginPath();
+  ctx.arc(gripX, gripY, 4 * classScale, 0, Math.PI * 2);
+  ctx.fill();
+
+  const img = weaponImages[fighter.weapon];
+  if (img && img.complete && img.naturalWidth) {
+    const aspect = img.naturalHeight / img.naturalWidth;
+    const drawW = gunLen;
+    const drawH = drawW * aspect;
+    ctx.drawImage(img, gripX, gripY - drawH * 0.52, drawW, drawH);
+  } else {
+    ctx.fillStyle = weaponStats[fighter.weapon].color;
+    roundRect(gripX, gripY - 4 * classScale, gunLen, 8 * classScale, 3);
+    ctx.fill();
+    ctx.fillStyle = style.body[1];
+    ctx.fillRect(gripX + gunLen - 6 * classScale, gripY - 3 * classScale, 6 * classScale, 6 * classScale);
+  }
+
+  ctx.restore();
+}
+
 const CHARACTER_STYLES = {
   default: {
     body: ["#1cb8ff", "#0a78c9"],
@@ -185,9 +234,6 @@ function drawCharacter(fighter, x, y, aim) {
     ctx.beginPath();
     ctx.arc(0, -9, 4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = style.body[0];
-    roundRect(8, -4, 8, 10, 3);
-    ctx.fill();
   }
 
   ctx.fillStyle = style.shadow;
@@ -222,16 +268,7 @@ function drawCharacter(fighter, x, y, aim) {
 
   ctx.restore();
 
-  const gunLen = fighter.type === "juggernaut" ? 24 : fighter.type === "speedster" ? 18 : 20;
-  ctx.save();
-  ctx.translate(x, y + bob);
-  ctx.rotate(aim);
-  ctx.fillStyle = style.trim;
-  roundRect(8, -3, gunLen, 6, 3);
-  ctx.fill();
-  ctx.fillStyle = style.body[1];
-  ctx.fillRect(8 + gunLen - 5, -2, 5, 4);
-  ctx.restore();
+  drawAttachedWeapon(fighter, x, y, bob, aim, style);
 
   if (fighter.invulnerable > 0) {
     ctx.strokeStyle = "rgba(255,255,255,0.95)";
