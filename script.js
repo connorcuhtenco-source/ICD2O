@@ -15,6 +15,7 @@ const closeAchievementsBtn = document.getElementById('closeAchievementsBtn');
 
 const tagZoneBtn = document.getElementById('tagZoneBtn');
 const neonKillBtn = document.getElementById('neonKillBtn');
+const waterRoyaleBtn = document.getElementById('waterRoyaleBtn');
 const platformerBtn = document.getElementById('platformerBtn');
 const playBtn = document.getElementById('playBtn');
 const backBtn = document.getElementById('backBtn');
@@ -2156,6 +2157,10 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
+function startWaterRoyale() {
+    window.location.href = 'water-royale.html';
+}
+
 function startNeonKill() {
     sessionStorage.setItem('neonKillUpgrades', JSON.stringify({
         overclock: ArcadeMeta.hasEquippedUpgrade('kill-overclock-core'),
@@ -2212,6 +2217,8 @@ document.addEventListener('keyup', e => {
 tagZoneBtn.addEventListener('click', startTagZone);
 
 neonKillBtn?.addEventListener('click', startNeonKill);
+
+waterRoyaleBtn?.addEventListener('click', startWaterRoyale);
 
 platformerBtn.addEventListener('click', startSpaceRunner);
 

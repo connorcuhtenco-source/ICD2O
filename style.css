@@ -953,6 +953,11 @@ body.boot-sequence-active .landing-reveal {
     box-shadow: 0 0 24px rgba(255, 230, 109, 0.12);
 }
 
+.game-tile-water {
+    border-color: rgba(27, 184, 255, 0.45);
+    box-shadow: 0 0 24px rgba(27, 184, 255, 0.14);
+}
+
 .game-tile-header {
     display: flex;
     justify-content: space-between;
@@ -1614,4 +1619,253 @@ canvas {
     text-shadow: 0 0 14px rgba(255, 230, 109, 0.45);
     margin-bottom: 12px;
     display: none;
+}
+
+/* Water Royale standalone page */
+body.water-royale-page {
+    display: block;
+    overflow: auto;
+    min-width: 320px;
+    background:
+        radial-gradient(circle at 18% 14%, rgba(255, 209, 102, 0.2), transparent 22rem),
+        linear-gradient(145deg, #b9f1ff 0%, #d8f7c2 42%, #8cd878 100%);
+    color: #f8fbff;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    animation: none;
+}
+
+body.water-royale-page .water-shell {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 14px;
+    min-height: 100vh;
+    padding: 18px;
+}
+
+body.water-royale-page .water-topbar,
+body.water-royale-page .water-lower {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    width: min(1280px, 100%);
+    margin: 0 auto;
+    flex-wrap: wrap;
+}
+
+body.water-royale-page .water-topbar h1 {
+    color: #063553;
+    font-size: clamp(2rem, 5vw, 4.8rem);
+    line-height: 0.9;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+body.water-royale-page .water-eyebrow {
+    color: #116c50;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin: 8px 0 4px;
+    text-transform: uppercase;
+}
+
+body.water-royale-page .water-hub-btn {
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.85);
+    color: #063553;
+    box-shadow: 0 8px 20px rgba(7, 35, 28, 0.18);
+}
+
+body.water-royale-page .water-hud span,
+body.water-royale-page .water-stat {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(23, 50, 77, 0.15);
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(7, 24, 38, 0.22);
+    color: #17324d;
+    font-weight: 800;
+    padding: 9px 12px;
+}
+
+body.water-royale-page .water-game-wrap {
+    border: 1px solid rgba(255, 255, 255, 0.68);
+    border-radius: 8px;
+    box-shadow: 0 22px 60px rgba(7, 35, 28, 0.35);
+    margin: 0 auto;
+    max-height: calc(100vh - 190px);
+    max-width: 1280px;
+    min-height: 360px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+}
+
+body.water-royale-page #game {
+    display: block;
+    height: 100%;
+    min-height: 360px;
+    width: 100%;
+}
+
+body.water-royale-page .water-overlay,
+body.water-royale-page .water-message {
+    align-items: center;
+    background: rgba(11, 39, 47, 0.5);
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    padding: 18px;
+    position: absolute;
+}
+
+body.water-royale-page .water-panel,
+body.water-royale-page .water-message {
+    backdrop-filter: blur(12px);
+    background: rgba(248, 251, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    border-radius: 8px;
+    box-shadow: 0 24px 70px rgba(0, 24, 42, 0.28);
+    color: #17324d;
+}
+
+body.water-royale-page .water-panel {
+    max-width: 650px;
+    padding: 24px;
+    width: min(650px, 100%);
+}
+
+body.water-royale-page .water-panel h2,
+body.water-royale-page .water-message strong {
+    color: #073e63;
+    font-size: clamp(2rem, 7vw, 4.2rem);
+    line-height: 0.95;
+    margin: 0 0 10px;
+    text-transform: uppercase;
+}
+
+body.water-royale-page .water-panel p {
+    color: #31536d;
+    line-height: 1.45;
+    margin: 0 0 18px;
+}
+
+body.water-royale-page .water-record {
+    margin-bottom: 14px;
+    color: #31536d;
+    font-weight: 700;
+}
+
+body.water-royale-page .water-class-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    margin-bottom: 18px;
+}
+
+body.water-royale-page .water-class-card {
+    background: #ffffff;
+    border: 2px solid rgba(23, 50, 77, 0.12);
+    color: #17324d;
+    display: grid;
+    gap: 5px;
+    min-height: 118px;
+    padding: 14px;
+    text-align: left;
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+}
+
+body.water-royale-page .water-class-card.active {
+    border-color: #1bb8ff;
+    box-shadow: inset 0 0 0 2px rgba(27, 184, 255, 0.25);
+}
+
+body.water-royale-page .water-class-card strong {
+    font-size: 1.05rem;
+}
+
+body.water-royale-page .water-class-card span {
+    color: #47657a;
+    font-weight: 700;
+}
+
+body.water-royale-page .water-primary,
+body.water-royale-page .water-message button {
+    background: linear-gradient(135deg, #00a7ec, #23d18b);
+    box-shadow: 0 12px 26px rgba(0, 124, 172, 0.28);
+    color: white;
+    font-weight: 900;
+    padding: 13px 18px;
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+}
+
+body.water-royale-page .water-message {
+    flex-direction: column;
+    gap: 10px;
+    inset: 50% auto auto 50%;
+    min-width: min(420px, calc(100% - 30px));
+    padding: 24px;
+    text-align: center;
+    transform: translate(-50%, -50%);
+}
+
+body.water-royale-page .water-message span {
+    color: #31536d;
+    font-weight: 700;
+}
+
+body.water-royale-page .water-stat {
+    display: grid;
+    gap: 2px;
+    min-width: 135px;
+}
+
+body.water-royale-page .water-stat b {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+}
+
+body.water-royale-page .water-stat span {
+    color: #31536d;
+}
+
+@media (max-width: 840px) {
+    body.water-royale-page .water-shell {
+        padding: 10px;
+    }
+
+    body.water-royale-page .water-topbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    body.water-royale-page .water-game-wrap {
+        max-height: calc(100vh - 245px);
+    }
+
+    body.water-royale-page .water-class-grid {
+        grid-template-columns: 1fr;
+    }
+
+    body.water-royale-page .water-lower {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    body.water-royale-page .water-stat {
+        min-width: 0;
+    }
 }

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Royale — Arcade Arena</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="water-royale-page">
+    <main class="water-shell">
+        <section class="water-topbar">
+            <div>
+                <button id="backHub" class="water-hub-btn">← Hub</button>
+                <p class="water-eyebrow">Backyard brawler arena</p>
+                <h1>Water Royale</h1>
+            </div>
+            <div class="water-hud">
+                <span id="classLabel">Class: Default</span>
+                <span id="weaponLabel">Pistol</span>
+                <span id="ammoLabel">Ammo: 4/4</span>
+                <span id="aliveLabel">Players: 12</span>
+            </div>
+        </section>
+
+        <section class="water-game-wrap">
+            <canvas id="game" width="1280" height="760" tabindex="0" aria-label="Water Royale game arena"></canvas>
+
+            <div id="menu" class="water-overlay">
+                <div class="water-panel">
+                    <h2>Water Royale</h2>
+                    <p>Pick your backyard champion, use bushes and speed tiles, and soak the AI squad.</p>
+                    <div class="water-record">
+                        <strong>Record:</strong>
+                        <span id="winCount">0</span> W - <span id="lossCount">0</span> L
+                    </div>
+                    <div class="water-class-grid">
+                        <button class="water-class-card active" data-class="default">
+                            <strong>Default</strong>
+                            <span>100 HP</span>
+                            <span>75 speed</span>
+                        </button>
+                        <button class="water-class-card" data-class="juggernaut">
+                            <strong>Juggernaut</strong>
+                            <span>150 HP</span>
+                            <span>25 speed</span>
+                        </button>
+                        <button class="water-class-card" data-class="speedster">
+                            <strong>Speedster</strong>
+                            <span>75 HP</span>
+                            <span>100 speed</span>
+                        </button>
+                    </div>
+                    <button id="startBtn" class="water-primary">Start Match</button>
+                </div>
+            </div>
+
+            <div id="message" class="water-message hidden">
+                <strong id="messageTitle">Victory!</strong>
+                <span id="messageBody">You ruled the backyard.</span>
+                <button id="restartBtn">Play Again</button>
+            </div>
+
+            <div id="respawn" class="water-message hidden">
+                <strong id="respawnTitle">Soaked!</strong>
+                <span id="respawnBody">Respawning in <span id="respawnTimer">3</span>...</span>
+            </div>
+        </section>
+
+        <section class="water-lower">
+            <div class="water-stat"><b>Move</b><span>WASD</span></div>
+            <div class="water-stat"><b>Shoot</b><span>Left click</span></div>
+            <div class="water-stat"><b>Pickup</b><span>E near water guns</span></div>
+            <div class="water-stat"><b>Reload</b><span>Automatic</span></div>
+            <div class="water-stat"><b>Shield</b><span>Spawn immunity</span></div>
+            <div class="water-stat"><b>Arena</b><span>Bushes, walls, speed tiles</span></div>
+        </section>
+    </main>
+
+    <script src="water-royale.js"></script>
+    <script>
+        document.getElementById('backHub').addEventListener('click', () => {
+            window.location.href = 'index.html';
+        });
+    </script>
+</body>
+</html>
