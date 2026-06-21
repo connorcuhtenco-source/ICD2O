@@ -1,5 +1,6 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;
 
 const hud = {
   classLabel: document.getElementById("classLabel"),
@@ -406,7 +407,8 @@ function moveFighter(fighter, dx, dy, dt, scale = 1) {
   const ny = clamp(fighter.y + dy / mag * step, fighter.r, arena.h - fighter.r);
   if (!collidesWall(fighter.x, ny, fighter.r)) fighter.y = ny;
   if (fighter.type === 'juggernaut' || fighter.type === 'speedster' || fighter.type === 'default') {
-    fighter.walkFrame = 0;
+    fighter.walkTimer += dt;
+    fighter.walkFrame = Math.floor(fighter.walkTimer * 10) % 3;
     fighter.dirX = dx / mag;
     fighter.dirY = dy / mag;
   }
@@ -961,7 +963,7 @@ function drawFighter(fighter) {
     } else {
       row = dy > 0 ? 0 : 1;
     }
-    const frame = 0;
+    const frame = fighter.walkFrame || 0;
     ctx.drawImage(
       spriteData.sprite,
       frame * spriteData.frameInfo.w,
