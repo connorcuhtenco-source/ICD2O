@@ -615,3 +615,5 @@ const ArcadeMeta = (() => {
         hasEquippedUpgrade
     };
 })();
+
+window.ArcadeMeta = ArcadeMeta;

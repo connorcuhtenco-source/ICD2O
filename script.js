@@ -516,7 +516,6 @@ function showGamesPage() {
     ArcadeMeta.hideMetaPages();
     gamesPage.classList.remove('hidden');
     gameContainer.classList.add('hidden');
-    LandingEffects.clearMouseTrail();
 }
 
 function setupHubControls() {
@@ -2299,9 +2298,28 @@ const LandingEffects = (() => {
     const shards = [];
     const trail = [];
 
-    function isLandingVisible() {
+    function isMenuVisible() {
         const menuEl = document.getElementById('menu');
         return menuEl && !menuEl.classList.contains('hidden');
+    }
+
+    function isHubTrailActive() {
+        const gameContainer = document.getElementById('gameContainer');
+        if (gameContainer && !gameContainer.classList.contains('hidden')) return false;
+        return ['menu', 'gamesPage', 'shopPage', 'inventoryPage'].some(id => {
+            const el = document.getElementById(id);
+            return el && !el.classList.contains('hidden');
+        });
+    }
+
+    function getEquippedTrailStyle(alpha) {
+        if (typeof ArcadeMeta !== 'undefined' && ArcadeMeta.getTrailStyle) {
+            return ArcadeMeta.getTrailStyle(alpha);
+        }
+        return {
+            fill: `rgba(0, 255, 204, ${alpha})`,
+            stroke: `rgba(255, 77, 141, ${Math.max(0.15, alpha * 0.7)})`
+        };
     }
 
     function resizeCanvases() {
@@ -2405,7 +2423,7 @@ const LandingEffects = (() => {
 
     function setDroneVolume(forceOn) {
         if (!droneMaster || !audioContext) return;
-        const target = (forceOn || isLandingVisible()) && settings.sound > 0
+        const target = (forceOn || isMenuVisible()) && settings.sound > 0
             ? 0.032 * getSoundVolume()
             : 0.0001;
         droneMaster.gain.setTargetAtTime(target, audioContext.currentTime, 0.35);
@@ -2541,10 +2559,7 @@ const LandingEffects = (() => {
                 continue;
             }
             const radius = 3 + (1 - point.life) * 8;
-            const trailStyle = window.ArcadeMeta?.getTrailStyle(point.life * 0.35) || {
-                fill: `rgba(0, 255, 204, ${point.life * 0.35})`,
-                stroke: `rgba(255, 77, 141, ${point.life * 0.25})`
-            };
+            const trailStyle = getEquippedTrailStyle(point.life * 0.35);
             trailCtx.fillStyle = trailStyle.fill;
             trailCtx.beginPath();
             trailCtx.arc(point.x, point.y, radius, 0, Math.PI * 2);
@@ -2566,18 +2581,22 @@ const LandingEffects = (() => {
     function animateLanding(time) {
         const dt = Math.min((time - lastLandingTime) / 1000, 0.05);
         lastLandingTime = time;
-        if (isLandingVisible()) {
+        if (isMenuVisible()) {
             landingCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
             drawShards();
             updateGridGlitch(dt);
             setDroneVolume();
-            drawMouseTrail();
         } else {
-            clearMouseTrail();
             setDroneVolume();
             if (landingCtx) {
                 landingCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
             }
+        }
+
+        if (isHubTrailActive()) {
+            drawMouseTrail();
+        } else {
+            clearMouseTrail();
         }
         landingAnimationId = requestAnimationFrame(animateLanding);
     }
@@ -2624,7 +2643,7 @@ const LandingEffects = (() => {
             });
 
             window.addEventListener('mousemove', event => {
-                if (!isLandingVisible()) return;
+                if (!isHubTrailActive()) return;
                 mouse.x = event.clientX;
                 mouse.y = event.clientY;
             });

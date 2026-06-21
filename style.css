@@ -644,7 +644,7 @@ body.theme-void .terminal-void-grid {
 }
 
 .mouse-trail-canvas {
-    z-index: 3;
+    z-index: 6;
 }
 
 .terminal-void-grid {
