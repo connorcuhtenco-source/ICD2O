@@ -1,8 +1,23 @@
 :root {
     color-scheme: dark;
     font-family: 'Courier New', Courier, monospace;
-    background-color: #02030a;
+    background-color: #0a0a0c;
     color: #eef8ff;
+    --shop-page-overlay: linear-gradient(180deg, rgba(10, 10, 12, 0.55), rgba(10, 10, 12, 0.9));
+    --shop-card-bg: rgba(14, 14, 18, 0.94);
+    --shop-card-border: rgba(0, 255, 255, 0.22);
+    --shop-card-equipped: rgba(0, 255, 255, 0.45);
+    --shop-accent: #00ffff;
+    --shop-accent-soft: rgba(0, 255, 255, 0.35);
+    --shop-title: #00ffff;
+    --shop-token-border: rgba(0, 255, 255, 0.45);
+    --shop-section-bar: linear-gradient(180deg, #00ffff, #aa44ff);
+    --shop-btn-border: rgba(0, 255, 255, 0.55);
+    --shop-btn-text: #00ffff;
+    --shop-btn-hover-bg: #aa44ff;
+    --shop-btn-hover-border: #dd88ff;
+    --shop-btn-hover-glow: rgba(170, 68, 255, 0.45);
+    --shop-equipped-text: #00ffff;
 }
 
 * {
@@ -23,26 +38,83 @@ body {
     background: #0a0a0c;
 }
 
-body:not(.theme-sunset):not(.theme-ocean):not(.theme-void) {
-    animation: none;
+body.theme-terminal {
     background: #0a0a0c;
-}
-
-@keyframes auroraShift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
+    animation: none;
 }
 
 body.theme-sunset {
+    --shop-page-overlay: linear-gradient(180deg, rgba(42, 8, 0, 0.52), rgba(18, 4, 0, 0.9));
+    --shop-card-bg: rgba(24, 8, 6, 0.94);
+    --shop-card-border: rgba(255, 136, 68, 0.28);
+    --shop-card-equipped: rgba(255, 107, 53, 0.55);
+    --shop-accent: #ffb066;
+    --shop-accent-soft: rgba(255, 107, 53, 0.35);
+    --shop-title: #ffb066;
+    --shop-token-border: rgba(255, 136, 68, 0.5);
+    --shop-section-bar: linear-gradient(180deg, #ff8844, #ff4d8d);
+    --shop-btn-border: rgba(255, 136, 68, 0.55);
+    --shop-btn-text: #ffb066;
+    --shop-btn-hover-bg: #ff4d8d;
+    --shop-btn-hover-border: #ff8866;
+    --shop-btn-hover-glow: rgba(255, 77, 141, 0.45);
+    --shop-equipped-text: #ff8844;
     background: linear-gradient(135deg, #2a0800 0%, #6b1a00 25%, #ff6b35 55%, #ff4d8d 80%, #2a0800 100%);
+    background-size: 300% 300%;
+    animation: auroraShift 14s ease infinite;
 }
 
 body.theme-ocean {
+    --shop-page-overlay: linear-gradient(180deg, rgba(0, 16, 36, 0.52), rgba(0, 8, 24, 0.9));
+    --shop-card-bg: rgba(4, 16, 32, 0.94);
+    --shop-card-border: rgba(0, 180, 216, 0.28);
+    --shop-card-equipped: rgba(0, 180, 216, 0.55);
+    --shop-accent: #66d4ff;
+    --shop-accent-soft: rgba(0, 180, 216, 0.35);
+    --shop-title: #66d4ff;
+    --shop-token-border: rgba(0, 180, 216, 0.5);
+    --shop-section-bar: linear-gradient(180deg, #00b4d8, #0077b6);
+    --shop-btn-border: rgba(0, 180, 216, 0.55);
+    --shop-btn-text: #66d4ff;
+    --shop-btn-hover-bg: #0077b6;
+    --shop-btn-hover-border: #00b4d8;
+    --shop-btn-hover-glow: rgba(0, 180, 216, 0.45);
+    --shop-equipped-text: #00b4d8;
     background: linear-gradient(135deg, #001833 0%, #003d5c 30%, #0077b6 55%, #00b4d8 75%, #001833 100%);
+    background-size: 300% 300%;
+    animation: auroraShift 16s ease infinite;
 }
 
 body.theme-void {
+    --shop-page-overlay: linear-gradient(180deg, rgba(10, 0, 20, 0.55), rgba(6, 0, 12, 0.92));
+    --shop-card-bg: rgba(12, 4, 22, 0.94);
+    --shop-card-border: rgba(170, 68, 255, 0.28);
+    --shop-card-equipped: rgba(170, 68, 255, 0.55);
+    --shop-accent: #cc88ff;
+    --shop-accent-soft: rgba(170, 68, 255, 0.35);
+    --shop-title: #cc88ff;
+    --shop-token-border: rgba(170, 68, 255, 0.5);
+    --shop-section-bar: linear-gradient(180deg, #aa44ff, #6600aa);
+    --shop-btn-border: rgba(170, 68, 255, 0.55);
+    --shop-btn-text: #cc88ff;
+    --shop-btn-hover-bg: #8800cc;
+    --shop-btn-hover-border: #bb66ff;
+    --shop-btn-hover-glow: rgba(170, 68, 255, 0.45);
+    --shop-equipped-text: #bb66ff;
     background: linear-gradient(135deg, #0a0014 0%, #1a0033 35%, #3d0066 60%, #12001f 100%);
+    background-size: 300% 300%;
+    animation: auroraShift 18s ease infinite;
+}
+
+body:not(.theme-sunset):not(.theme-ocean):not(.theme-void) .terminal-void-grid {
+    opacity: 0.55;
+}
+
+body.theme-sunset .terminal-void-grid,
+body.theme-ocean .terminal-void-grid,
+body.theme-void .terminal-void-grid {
+    opacity: 0.14;
+    filter: hue-rotate(35deg);
 }
 
 .hub-token-bar {
@@ -128,10 +200,13 @@ body.theme-void {
     padding: 24px 16px 40px;
 }
 
+@keyframes auroraShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
 .shop-page {
-    background:
-        radial-gradient(circle at top, rgba(255, 77, 141, 0.08), transparent 40%),
-        linear-gradient(180deg, rgba(2, 8, 18, 0.96) 0%, rgba(8, 16, 36, 0.98) 100%);
+    background: var(--shop-page-overlay);
 }
 
 .shop-shell {
@@ -152,15 +227,24 @@ body.theme-void {
     width: auto;
     min-width: 120px;
     padding: 10px 16px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 8px;
-    background: rgba(2, 8, 18, 0.85);
-    color: #eef8ff;
+    border: 1px solid var(--shop-btn-border);
+    border-radius: 0;
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    background: var(--shop-card-bg);
+    color: var(--shop-btn-text);
     font-family: inherit;
     font-size: 11px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     cursor: pointer;
+    transition: background 0.06s linear, color 0.06s linear, border-color 0.06s linear, box-shadow 0.06s linear;
+}
+
+.shop-back-btn:hover {
+    background: var(--shop-btn-hover-bg);
+    color: #ffffff;
+    border-color: var(--shop-btn-hover-border);
+    box-shadow: 0 0 16px var(--shop-btn-hover-glow);
 }
 
 .shop-header-title {
@@ -168,8 +252,8 @@ body.theme-void {
     font-size: clamp(1.6rem, 4vw, 2.2rem);
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: #ffe66d;
-    text-shadow: 0 0 18px rgba(255, 230, 109, 0.35);
+    color: var(--shop-title);
+    text-shadow: 0 0 18px var(--shop-accent-soft);
 }
 
 .shop-token-pill {
@@ -178,10 +262,12 @@ body.theme-void {
     align-items: center;
     gap: 8px;
     padding: 8px 14px;
-    border: 1px solid rgba(255, 230, 109, 0.45);
-    border-radius: 999px;
-    background: rgba(2, 8, 18, 0.88);
-    box-shadow: 0 0 16px rgba(255, 230, 109, 0.15);
+    border: 1px solid var(--shop-token-border);
+    border-radius: 0;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    background: var(--shop-card-bg);
+    box-shadow: 0 0 16px var(--shop-accent-soft);
+    color: var(--shop-accent);
 }
 
 .shop-coin {
@@ -209,8 +295,8 @@ body.theme-void {
     width: 4px;
     height: 18px;
     border-radius: 999px;
-    background: linear-gradient(180deg, #ffe66d, #ff4d8d);
-    box-shadow: 0 0 10px rgba(255, 230, 109, 0.45);
+    background: var(--shop-section-bar);
+    box-shadow: 0 0 10px var(--shop-accent-soft);
 }
 
 .shop-grid {
@@ -224,18 +310,19 @@ body.theme-void {
     flex-direction: column;
     gap: 10px;
     padding: 14px 14px 16px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0;
+    clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+    border: 1px solid var(--shop-card-border);
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 28%),
-        rgba(12, 18, 34, 0.92);
+        var(--shop-card-bg);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
     text-align: center;
 }
 
 .shop-card.equipped {
-    border-color: rgba(0, 255, 204, 0.45);
-    box-shadow: 0 0 18px rgba(0, 255, 204, 0.12);
+    border-color: var(--shop-card-equipped);
+    box-shadow: 0 0 18px var(--shop-accent-soft);
 }
 
 .shop-card-name {
@@ -248,7 +335,8 @@ body.theme-void {
 .shop-card-preview {
     position: relative;
     height: 92px;
-    border-radius: 10px;
+    border-radius: 0;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
     border: 1px solid rgba(255, 255, 255, 0.08);
     background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%) 0 0 / 18px 18px,
@@ -265,9 +353,26 @@ body.theme-void {
 }
 
 .shop-preview-art {
+    position: relative;
     width: 78%;
     height: 56%;
-    border-radius: 8px;
+    border-radius: 0;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+.shop-preview-art[class*="preview-theme"]::after {
+    content: 'BTN';
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 3px 10px;
+    font-size: 7px;
+    letter-spacing: 0.14em;
+    clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(0, 0, 0, 0.45);
+    color: rgba(255, 255, 255, 0.85);
 }
 
 .preview-stop-time {
@@ -307,19 +412,48 @@ body.theme-void {
 }
 
 .preview-theme-default {
-    background: linear-gradient(135deg, #12002b, #0d3b66, #ff4d8d);
+    background:
+        repeating-linear-gradient(90deg, rgba(0, 255, 255, 0.14) 0 1px, transparent 1px 14px),
+        repeating-linear-gradient(0deg, rgba(170, 68, 255, 0.1) 0 1px, transparent 1px 14px),
+        #0a0a0c;
+}
+
+.preview-theme-default::after {
+    border-color: rgba(0, 255, 255, 0.65);
+    color: #00ffff;
+    background: rgba(10, 10, 12, 0.88);
 }
 
 .preview-theme-sunset {
     background: linear-gradient(135deg, #2a0800, #ff6b35, #ff4d8d);
 }
 
+.preview-theme-sunset::after {
+    border-color: rgba(255, 136, 68, 0.7);
+    color: #ffb066;
+    background: rgba(24, 8, 6, 0.88);
+}
+
 .preview-theme-ocean {
     background: linear-gradient(135deg, #001833, #0077b6, #00b4d8);
 }
 
+.preview-theme-ocean::after {
+    border-color: rgba(0, 180, 216, 0.7);
+    color: #66d4ff;
+    background: rgba(4, 16, 32, 0.88);
+}
+
 .preview-theme-void {
-    background: linear-gradient(135deg, #0a0014, #3d0066, #12001f);
+    background:
+        repeating-linear-gradient(90deg, rgba(170, 68, 255, 0.12) 0 1px, transparent 1px 14px),
+        linear-gradient(135deg, #0a0014, #3d0066, #12001f);
+}
+
+.preview-theme-void::after {
+    border-color: rgba(170, 68, 255, 0.7);
+    color: #cc88ff;
+    background: rgba(12, 4, 22, 0.88);
 }
 
 .shop-card-desc {
@@ -333,23 +467,27 @@ body.theme-void {
 .shop-price-btn {
     width: 100%;
     padding: 10px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 8px;
-    background: rgba(2, 8, 18, 0.92);
-    color: #ffe66d;
+    border: 1px solid var(--shop-btn-border);
+    border-radius: 0;
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    background: var(--shop-card-bg);
+    color: var(--shop-btn-text);
     font-family: inherit;
     font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: background 0.06s linear, color 0.06s linear, border-color 0.06s linear, box-shadow 0.06s linear;
 }
 
 .shop-price-btn.buy:hover:not(:disabled),
 .shop-price-btn.equip:hover,
 .shop-price-btn.unequip:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 0 14px rgba(255, 230, 109, 0.2);
+    transform: none;
+    background: var(--shop-btn-hover-bg);
+    color: #ffffff;
+    border-color: var(--shop-btn-hover-border);
+    box-shadow: 0 0 16px var(--shop-btn-hover-glow);
 }
 
 .shop-price-btn:disabled {
@@ -359,8 +497,8 @@ body.theme-void {
 
 .shop-price-btn.equipped,
 .shop-price-btn.owned {
-    color: #00ffcc;
-    border-color: rgba(0, 255, 204, 0.35);
+    color: var(--shop-equipped-text);
+    border-color: var(--shop-card-equipped);
 }
 
 .shop-price-btn:disabled:not(.equipped):not(.owned) {
@@ -397,9 +535,10 @@ body.theme-void {
     flex: 1 1 220px;
     min-width: 0;
     padding: 12px 14px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 8px;
-    background: rgba(2, 8, 18, 0.92);
+    border: 1px solid var(--shop-btn-border);
+    border-radius: 0;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+    background: var(--shop-card-bg);
     color: #eef8ff;
     font-family: inherit;
     font-size: 13px;
@@ -408,8 +547,8 @@ body.theme-void {
 
 .shop-promo-input:focus {
     outline: none;
-    border-color: rgba(0, 255, 204, 0.45);
-    box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.12);
+    border-color: var(--shop-card-equipped);
+    box-shadow: 0 0 12px var(--shop-accent-soft);
 }
 
 .shop-promo-box .shop-price-btn {

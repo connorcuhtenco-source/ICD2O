@@ -22,7 +22,7 @@ const ArcadeMeta = (() => {
         { id: 'trail-gold', category: 'trail', name: 'Gold Rush Trail', price: 100, desc: 'Golden arcade streaks behind your cursor.', preview: 'preview-trail-gold' },
         { id: 'trail-purple', category: 'trail', name: 'Violet Pulse Trail', price: 100, desc: 'Purple glow with cyan accents.', preview: 'preview-trail-purple' },
         { id: 'trail-green', category: 'trail', name: 'Toxic Green Trail', price: 90, desc: 'Radioactive green neon trail.', preview: 'preview-trail-green' },
-        { id: 'theme-default', category: 'theme', name: 'Aurora Default', price: 0, desc: 'The classic Arcade Arena aurora look.', preview: 'preview-theme-default' },
+        { id: 'theme-default', category: 'theme', name: 'Terminal Void', price: 0, desc: 'Obsidian grid hub with cyan cyber wiring.', preview: 'preview-theme-default' },
         { id: 'theme-sunset', category: 'theme', name: 'Neon Sunset', price: 120, desc: 'Warm orange and magenta skies.', preview: 'preview-theme-sunset' },
         { id: 'theme-ocean', category: 'theme', name: 'Deep Ocean', price: 120, desc: 'Cool blue underwater neon vibes.', preview: 'preview-theme-ocean' },
         { id: 'theme-void', category: 'theme', name: 'Void Purple', price: 150, desc: 'Dark cosmic purple background.', preview: 'preview-theme-void' }
@@ -142,11 +142,10 @@ const ArcadeMeta = (() => {
     }
 
     function applyTheme() {
-        document.body.classList.remove('theme-sunset', 'theme-ocean', 'theme-void');
+        document.body.classList.remove('theme-terminal', 'theme-sunset', 'theme-ocean', 'theme-void');
         const theme = state.equipped.theme || 'theme-default';
-        if (theme !== 'theme-default') {
-            document.body.classList.add(theme);
-        }
+        const themeClass = theme === 'theme-default' ? 'theme-terminal' : theme;
+        document.body.classList.add(themeClass);
     }
 
     function getTrailStyle(alpha) {
