@@ -379,6 +379,7 @@
         let typewriterDone = false;
         let introHoldTimer = 5;
         let introDialogueLine = '';
+        let lastDialogueCharCount = 0;
         let chargeWasFull = false;
 
         const PLAYER_SHOT_DAMAGE = 25;
@@ -623,6 +624,75 @@
             snapGain.connect(master);
             snap.start(t);
             snap.stop(t + 0.032);
+        }
+
+        function playDialogueTypewriterBlip() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.11, t);
+            master.connect(ctx.destination);
+
+            const jitter = (Math.random() - 0.5) * 36;
+            const bursts = [
+                { freq: 248 + jitter, at: 0, dur: 0.016 },
+                { freq: 196 + jitter * 0.6, at: 0.023, dur: 0.015 },
+                { freq: 264 + jitter * 0.4, at: 0.046, dur: 0.014 }
+            ];
+
+            bursts.forEach((b, i) => {
+                const osc = ctx.createOscillator();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(b.freq, t + b.at);
+                if (i === 1) {
+                    osc.frequency.exponentialRampToValueAtTime(Math.max(80, b.freq * 0.82), t + b.at + b.dur);
+                }
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(420 + jitter, t + b.at);
+                filter.Q.setValueAtTime(2.8, t + b.at);
+
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.0001, t + b.at);
+                gain.gain.linearRampToValueAtTime(0.95, t + b.at + 0.002);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t + b.at + b.dur);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(master);
+                osc.start(t + b.at);
+                osc.stop(t + b.at + b.dur + 0.008);
+            });
+
+            const crackLen = Math.floor(ctx.sampleRate * 0.012);
+            const crackBuf = ctx.createBuffer(1, crackLen, ctx.sampleRate);
+            const crackData = crackBuf.getChannelData(0);
+            for (let i = 0; i < crackLen; i += 1) {
+                crackData[i] = (Math.random() * 2 - 1) * (1 - i / crackLen);
+            }
+            const crack = ctx.createBufferSource();
+            crack.buffer = crackBuf;
+            const crackFilter = ctx.createBiquadFilter();
+            crackFilter.type = 'highpass';
+            crackFilter.frequency.setValueAtTime(900, t);
+            const crackGain = ctx.createGain();
+            crackGain.gain.setValueAtTime(0.08, t);
+            crackGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.012);
+            crack.connect(crackFilter);
+            crackFilter.connect(crackGain);
+            crackGain.connect(master);
+            crack.start(t);
+            crack.stop(t + 0.014);
+        }
+
+        function emitDialogueTypewriterBlips(prevCount, nextCount) {
+            const limit = Math.min(nextCount, introDialogueLine.length);
+            for (let i = prevCount; i < limit; i += 1) {
+                const ch = introDialogueLine[i];
+                if (ch === ' ') continue;
+                playDialogueTypewriterBlip();
+            }
         }
 
         function playVoidAttackWarning() {
@@ -1040,6 +1110,7 @@
             introHoldTimer = 5;
             typewriterChars = 0;
             typewriterDone = false;
+            lastDialogueCharCount = 0;
             introDialogueLine = boss.dialogue || '';
             showBossDialogue();
             showBossHud();
@@ -1050,7 +1121,12 @@
 
             if (!typewriterDone) {
                 typewriterChars += rawDt * 38;
-                const shown = introDialogueLine.slice(0, Math.floor(typewriterChars));
+                const nextCount = Math.floor(typewriterChars);
+                const shown = introDialogueLine.slice(0, nextCount);
+                if (nextCount > lastDialogueCharCount) {
+                    emitDialogueTypewriterBlips(lastDialogueCharCount, nextCount);
+                    lastDialogueCharCount = nextCount;
+                }
                 bossDialogueTextEl.textContent = shown;
                 if (shown.length >= introDialogueLine.length) {
                     typewriterDone = true;
@@ -1656,6 +1732,7 @@
             hideBossHud();
             hideBossDialogue();
             bossIntroActive = false;
+            lastDialogueCharCount = 0;
             clearBossExtras();
             for (let i = 0; i < 6; i++) {
                 const m = new THREE.Mesh(
@@ -2003,6 +2080,7 @@
             activeBoss = null;
             isBossWave = false;
             bossIntroActive = false;
+            lastDialogueCharCount = 0;
             hideBossHud();
             hideBossDialogue();
             hitFlashTimer = 0;
