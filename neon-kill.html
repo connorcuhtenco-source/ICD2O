@@ -110,6 +110,14 @@
             transition: opacity 0.05s linear;
         }
         #parryFlash.solid { background: #ffffff; }
+        #damageFlash {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 6;
+            opacity: 0;
+            transition: opacity 0.04s linear;
+        }
         #startScreen, #gameOverScreen {
             position: absolute;
             inset: 0;
@@ -243,6 +251,7 @@
     <div id="gameRoot">
         <button id="backHub" class="btn">← Hub</button>
         <div id="parryFlash"></div>
+        <div id="damageFlash" aria-hidden="true"></div>
         <div id="crosshair" aria-hidden="true">
             <span class="dot"></span>
             <span class="tick top"></span>
@@ -348,6 +357,8 @@
         let gunRecoil = 0;
         let freezeTimer = 0;
         let flashTimer = 0;
+        let hitFlashTimer = 0;
+        let hitFlashAngle = 0;
         let screenShake = 0;
         let isCharging = false;
         let chargeLevel = 0;
@@ -521,6 +532,7 @@
         scene.add(camera);
 
         const parryFlashEl = document.getElementById('parryFlash');
+        const damageFlashEl = document.getElementById('damageFlash');
         const bossHudEl = document.getElementById('bossHud');
         const bossNameEl = document.getElementById('bossName');
         const bossBarFillEl = document.getElementById('bossBarFill');
@@ -611,6 +623,105 @@
             snapGain.connect(master);
             snap.start(t);
             snap.stop(t + 0.032);
+        }
+
+        function playVoidAttackWarning() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.5, t);
+            master.connect(ctx.destination);
+
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(86, t);
+            osc.frequency.exponentialRampToValueAtTime(42, t + 0.42);
+            const oscGain = ctx.createGain();
+            oscGain.gain.setValueAtTime(0.38, t);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+            osc.connect(oscGain);
+            oscGain.connect(master);
+            osc.start(t);
+            osc.stop(t + 0.46);
+
+            const lfo = ctx.createOscillator();
+            lfo.type = 'square';
+            lfo.frequency.setValueAtTime(11, t);
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.setValueAtTime(22, t);
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+
+            const nLen = Math.floor(ctx.sampleRate * 0.25);
+            const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+            const nd = nBuf.getChannelData(0);
+            for (let i = 0; i < nLen; i += 1) {
+                nd[i] = (Math.random() * 2 - 1) * (1 - i / nLen) * 0.35;
+            }
+            const noise = ctx.createBufferSource();
+            noise.buffer = nBuf;
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(220, t);
+            const nGain = ctx.createGain();
+            nGain.gain.setValueAtTime(0.22, t);
+            nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(master);
+            noise.start(t);
+            noise.stop(t + 0.36);
+        }
+
+        function tickVoidAttackWarning(boss, timerProp, warnedProp, dt) {
+            const remaining = boss[timerProp];
+            if (remaining <= 0.5 && remaining > 0 && !boss[warnedProp]) {
+                playVoidAttackWarning();
+                boss[warnedProp] = true;
+            }
+            if (remaining > 0.55) boss[warnedProp] = false;
+        }
+
+        function triggerDirectionalHitFlash(sourcePos) {
+            const dx = sourcePos.x - playerPos.x;
+            const dz = sourcePos.z - playerPos.z;
+            hitFlashAngle = Math.atan2(dx, -dz) - yaw;
+            hitFlashTimer = 0.42;
+            updateDamageFlashVisual(1);
+        }
+
+        function updateDamageFlashVisual(intensity) {
+            const c = Math.cos(hitFlashAngle);
+            const s = Math.sin(hitFlashAngle);
+            const top = Math.max(0, c) * intensity;
+            const bottom = Math.max(0, -c) * intensity;
+            const right = Math.max(0, s) * intensity;
+            const left = Math.max(0, -s) * intensity;
+            damageFlashEl.style.opacity = String(Math.min(0.82, 0.25 + intensity * 0.55));
+            damageFlashEl.style.background = [
+                `linear-gradient(to bottom, rgba(255,24,48,${top * 0.78}) 0%, transparent 44%)`,
+                `linear-gradient(to top, rgba(255,24,48,${bottom * 0.78}) 0%, transparent 44%)`,
+                `linear-gradient(to right, rgba(255,24,48,${right * 0.78}) 0%, transparent 40%)`,
+                `linear-gradient(to left, rgba(255,24,48,${left * 0.78}) 0%, transparent 40%)`
+            ].join(', ');
+        }
+
+        function updateDamageFlash(dt) {
+            if (hitFlashTimer <= 0) {
+                damageFlashEl.style.opacity = '0';
+                return;
+            }
+            hitFlashTimer = Math.max(0, hitFlashTimer - dt);
+            updateDamageFlashVisual(hitFlashTimer / 0.42);
+        }
+
+        function applyBossDamage(dps, dt, sourcePos) {
+            if (player.hp <= 0) return;
+            const prev = player.hp;
+            player.hp -= dps * dt;
+            if (player.hp < prev) triggerDirectionalHitFlash(sourcePos);
+            if (player.hp <= 0) gameOver();
+            else updateUI();
         }
 
         function playPierceBlastSound() {
@@ -965,10 +1076,10 @@
         }
 
         function clearTrackingLaser() {
-            if (trackingLaser) {
-                scene.remove(trackingLaser.mesh);
-                trackingLaser = null;
-            }
+            if (!trackingLaser) return;
+            if (trackingLaser.aimLine) scene.remove(trackingLaser.aimLine);
+            if (trackingLaser.beamMesh) scene.remove(trackingLaser.beamMesh);
+            trackingLaser = null;
         }
 
         function clearVoidGlitchTrails() {
@@ -1185,6 +1296,9 @@
                 laserTimer: 6,
                 laserActive: false,
                 glitchTimer: 0,
+                teleportWarned: false,
+                shockWarned: false,
+                laserWarned: false,
                 isBoss: true
             };
             startBossIntro(activeBoss);
@@ -1220,75 +1334,137 @@
         }
 
         function spawnShockwave(x, z) {
-            const geo = new THREE.RingGeometry(0.8, 1.5, 36);
+            const innerR = 0.55;
+            const outerR = 1.35;
+            const geo = new THREE.RingGeometry(innerR, outerR, 48);
             geo.rotateX(-Math.PI / 2);
             const mat = new THREE.MeshBasicMaterial({
-                color: 0xcc66ff,
+                color: 0x00ffee,
                 transparent: true,
-                opacity: 0.72,
+                opacity: 0.98,
                 side: THREE.DoubleSide
             });
             const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(x, 0.12, z);
+            mesh.position.set(x, 0.16, z);
             scene.add(mesh);
-            shockwaves.push({ mesh, radius: 1.5, speed: 16, life: 4, width: 1.4 });
+
+            const glowGeo = new THREE.RingGeometry(innerR * 0.85, outerR * 1.2, 48);
+            glowGeo.rotateX(-Math.PI / 2);
+            const glow = new THREE.Mesh(
+                glowGeo,
+                new THREE.MeshBasicMaterial({
+                    color: 0xff2266,
+                    transparent: true,
+                    opacity: 0.72,
+                    side: THREE.DoubleSide
+                })
+            );
+            glow.position.set(x, 0.2, z);
+            scene.add(glow);
+
+            shockwaves.push({
+                mesh,
+                glow,
+                radius: outerR,
+                baseOuter: outerR,
+                width: 1.55,
+                life: 5.5
+            });
         }
 
-        function startTrackingLaser() {
-            clearTrackingLaser();
-            const geo = new THREE.BoxGeometry(0.55, 0.55, 1);
-            const mat = new THREE.MeshBasicMaterial({ color: 0xff00cc, transparent: true, opacity: 0.82 });
-            const mesh = new THREE.Mesh(geo, mat);
-            scene.add(mesh);
-            trackingLaser = { mesh, active: true, duration: 3.2 };
-        }
-
-        function updateTrackingLaser(dt) {
-            if (!trackingLaser || !activeBoss || activeBoss.type !== 'void') return;
-            trackingLaser.duration -= dt;
-            if (trackingLaser.duration <= 0) {
-                clearTrackingLaser();
-                if (activeBoss) activeBoss.laserActive = false;
-                return;
-            }
-
+        function getBossLaserAim() {
             const origin = activeBoss.mesh.position.clone();
             origin.y += 4.5;
             const target = playerPos.clone();
             const dir = new THREE.Vector3().subVectors(target, origin);
             const len = dir.length();
-            if (len < 0.01) return;
+            if (len < 0.01) return null;
             dir.normalize();
+            return { origin, target, dir, len };
+        }
 
-            trackingLaser.mesh.scale.set(1, 1, len);
-            trackingLaser.mesh.position.copy(origin).add(dir.clone().multiplyScalar(len * 0.5));
-            trackingLaser.mesh.lookAt(target);
+        function startTrackingLaser() {
+            clearTrackingLaser();
+            const aimGeo = new THREE.BufferGeometry();
+            const aimLine = new THREE.Line(
+                aimGeo,
+                new THREE.LineBasicMaterial({ color: 0xff2244, transparent: true, opacity: 0.8 })
+            );
+            const beamGeo = new THREE.BoxGeometry(0.55, 0.55, 1);
+            const beamMesh = new THREE.Mesh(
+                beamGeo,
+                new THREE.MeshBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.9 })
+            );
+            beamMesh.visible = false;
+            scene.add(aimLine, beamMesh);
+            trackingLaser = {
+                aimLine,
+                aimGeo,
+                beamMesh,
+                phase: 'charge',
+                chargeTime: 1.5,
+                fireTime: 3.2
+            };
+        }
 
-            const distToBeam = distPointToRay(playerPos, origin, dir);
-            if (distToBeam < 0.75 && player.hp > 0) {
-                player.hp -= 28 * dt;
-                if (player.hp <= 0) gameOver();
+        function updateTrackingLaser(dt) {
+            if (!trackingLaser || !activeBoss || activeBoss.type !== 'void') return;
+            const aim = getBossLaserAim();
+            if (!aim) return;
+
+            trackingLaser.aimGeo.setFromPoints([aim.origin, aim.target]);
+            trackingLaser.aimGeo.attributes.position.needsUpdate = true;
+
+            if (trackingLaser.phase === 'charge') {
+                trackingLaser.chargeTime -= dt;
+                trackingLaser.aimLine.visible = true;
+                trackingLaser.beamMesh.visible = false;
+                const pulse = 0.45 + Math.sin(performance.now() * 0.014) * 0.45;
+                trackingLaser.aimLine.material.opacity = 0.35 + pulse * 0.55;
+                if (trackingLaser.chargeTime <= 0) {
+                    trackingLaser.phase = 'fire';
+                    trackingLaser.aimLine.visible = false;
+                    trackingLaser.beamMesh.visible = true;
+                }
+                return;
+            }
+
+            trackingLaser.fireTime -= dt;
+            trackingLaser.beamMesh.scale.set(1, 1, aim.len);
+            trackingLaser.beamMesh.position.copy(aim.origin).add(aim.dir.clone().multiplyScalar(aim.len * 0.5));
+            trackingLaser.beamMesh.lookAt(aim.target);
+
+            const distToBeam = distPointToRay(playerPos, aim.origin, aim.dir);
+            if (distToBeam < 0.75) {
+                applyBossDamage(28, dt, activeBoss.mesh.position);
+            }
+
+            if (trackingLaser.fireTime <= 0) {
+                clearTrackingLaser();
+                if (activeBoss) activeBoss.laserActive = false;
             }
         }
 
         function updateShockwaves(dt) {
             shockwaves = shockwaves.filter(s => {
                 s.life -= dt;
-                s.radius += s.speed * dt;
-                s.mesh.scale.set(s.radius / 1.5, s.radius / 1.5, 1);
-                s.mesh.material.opacity = Math.max(0, s.life / 4) * 0.72;
+                s.mesh.scale.addScalar(0.1);
+                if (s.glow) s.glow.scale.copy(s.mesh.scale);
+                s.radius = s.baseOuter * s.mesh.scale.x;
+                const pulse = 0.75 + Math.sin(performance.now() * 0.008) * 0.25;
+                s.mesh.material.opacity = Math.max(0, s.life / 5.5) * 0.98 * pulse;
+                if (s.glow) s.glow.material.opacity = Math.max(0, s.life / 5.5) * 0.72 * pulse;
 
                 const dx = playerPos.x - s.mesh.position.x;
                 const dz = playerPos.z - s.mesh.position.z;
                 const dist = Math.hypot(dx, dz);
-                const band = s.width;
-                if (onGround && Math.abs(dist - s.radius) < band && player.hp > 0) {
-                    player.hp -= 34 * dt;
-                    if (player.hp <= 0) gameOver();
+                if (onGround && Math.abs(dist - s.radius) < s.width) {
+                    applyBossDamage(34, dt, s.mesh.position);
                 }
 
-                if (s.life <= 0 || s.radius > ARENA * 1.2) {
+                if (s.life <= 0 || s.radius > ARENA * 1.25) {
                     scene.remove(s.mesh);
+                    if (s.glow) scene.remove(s.glow);
                     return false;
                 }
                 return true;
@@ -1399,23 +1575,29 @@
             b.mesh.lookAt(playerPos.x, b.mesh.position.y + 4, playerPos.z);
             b.mesh.position.y = Math.sin(performance.now() * 0.0015) * 0.2;
 
+            tickVoidAttackWarning(b, 'teleportTimer', 'teleportWarned', dt);
             b.teleportTimer -= dt;
             if (b.teleportTimer <= 0) {
                 teleportVoidBoss();
                 b.teleportTimer = 4.5 + Math.random() * 2;
+                b.teleportWarned = false;
             }
 
+            tickVoidAttackWarning(b, 'shockTimer', 'shockWarned', dt);
             b.shockTimer -= dt;
             if (b.shockTimer <= 0) {
                 spawnShockwave(b.mesh.position.x, b.mesh.position.z);
                 b.shockTimer = 2.6 + Math.random() * 1.4;
+                b.shockWarned = false;
             }
 
+            tickVoidAttackWarning(b, 'laserTimer', 'laserWarned', dt);
             b.laserTimer -= dt;
             if (b.laserTimer <= 0 && !b.laserActive) {
                 b.laserActive = true;
                 b.laserTimer = 7.5;
                 startTrackingLaser();
+                b.laserWarned = false;
             }
 
             updateVoidGlitchTrails(dt);
@@ -1429,9 +1611,8 @@
                 w.mesh.position.z += w.velZ * dt;
                 if (Math.abs(playerPos.z - w.mesh.position.z) < 1.1 &&
                     Math.abs(playerPos.y - w.mesh.position.y) < 1.2 &&
-                    Math.abs(playerPos.x) < ARENA * 0.95 && player.hp > 0) {
-                    player.hp -= 22 * dt;
-                    if (player.hp <= 0) gameOver();
+                    Math.abs(playerPos.x) < ARENA * 0.95) {
+                    applyBossDamage(22, dt, w.mesh.position);
                 }
                 if (w.life <= 0 || w.mesh.position.z > ARENA * 1.1) {
                     scene.remove(w.mesh);
@@ -1822,6 +2003,7 @@
             bossIntroActive = false;
             hideBossHud();
             hideBossDialogue();
+            hitFlashTimer = 0;
             freezeTimer = 0;
             flashTimer = 0;
             screenShake = 0;
@@ -2113,10 +2295,12 @@
                 updateBeamEffects(rawDt);
                 updateParryBursts(rawDt);
                 updateFlash(rawDt);
+                updateDamageFlash(rawDt);
                 updateStyle(dt);
                 updateUI();
             } else {
                 updateFlash(rawDt);
+                updateDamageFlash(rawDt);
                 updateParryBursts(rawDt);
                 updateBeamEffects(rawDt);
             }
