@@ -654,10 +654,11 @@
         let voidStalkerTrails = [];
         let voidSparkTrails = [];
         let voidDashWake = [];
-        let architectFistSlam = null;
-        let architectLaserBeam = null;
-        let architectMatrixProjectiles = [];
+        let architectJudgement = null;
+        let architectMortars = [];
+        let architectCrushCubes = [];
         let architectWallDebris = [];
+        let architectLightState = null;
         let architectIntroActive = false;
         let architectIntroPhase = 'idle';
         let architectIntroTimer = 0;
@@ -665,7 +666,6 @@
         let architectStarrySky = null;
         let architectArenaGroup = null;
         let architectAmbience = null;
-        let architectClimaxWipe = null;
         let isDialogueActive = false;
         let voidTransformActive = false;
         let voidTransformPhase = 'idle';
@@ -983,7 +983,7 @@
         let coreLockHumOsc = null;
         let coreLockHumGain = null;
         let coreLockActive = false;
-        const ARCHITECT_FOG = { color: 0x050008, near: 28, far: 180 };
+        const ARCHITECT_FOG = { color: 0x120002, near: 10, far: 72 };
         const BASE_FOG = { color: 0x030006, near: 18, far: 95 };
         const weaponLabelEl = document.getElementById('weaponLabel');
 
@@ -4034,6 +4034,26 @@
 
         function enterArchitectArena() {
             if (architectArenaGroup) return;
+            if (arenaAmbientLight && !architectLightState) {
+                architectLightState = {
+                    ambient: arenaAmbientLight.color.getHex(),
+                    ambientInt: arenaAmbientLight.intensity,
+                    key: arenaKeyLight ? arenaKeyLight.color.getHex() : 0xff007f,
+                    keyInt: arenaKeyLight ? arenaKeyLight.intensity : 1.2,
+                    fill: arenaFillLight ? arenaFillLight.color.getHex() : 0x00ffff,
+                    fillInt: arenaFillLight ? arenaFillLight.intensity : 0.8
+                };
+                arenaAmbientLight.color.setHex(0x330000);
+                arenaAmbientLight.intensity = 0.92;
+                if (arenaKeyLight) {
+                    arenaKeyLight.color.setHex(0x660011);
+                    arenaKeyLight.intensity = 1.45;
+                }
+                if (arenaFillLight) {
+                    arenaFillLight.color.setHex(0x330008);
+                    arenaFillLight.intensity = 0.35;
+                }
+            }
             architectArenaGroup = new THREE.Group();
             const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.35, transparent: true, opacity: 0.75 });
             const starVerts = [];
@@ -4060,8 +4080,9 @@
             scene.fog.color.setHex(ARCHITECT_FOG.color);
             scene.fog.near = ARCHITECT_FOG.near;
             scene.fog.far = ARCHITECT_FOG.far;
-            camera.far = 260;
+            camera.far = 320;
             camera.updateProjectionMatrix();
+            setArchitectCrimsonVeil(0.72);
         }
 
         function exitArchitectArena() {
@@ -4077,6 +4098,19 @@
             architectTransformActive = false;
             setArchitectCrimsonVeil(0);
             setArchitectIntroHud(false);
+            if (architectLightState && arenaAmbientLight) {
+                arenaAmbientLight.color.setHex(architectLightState.ambient);
+                arenaAmbientLight.intensity = architectLightState.ambientInt;
+                if (arenaKeyLight) {
+                    arenaKeyLight.color.setHex(architectLightState.key);
+                    arenaKeyLight.intensity = architectLightState.keyInt;
+                }
+                if (arenaFillLight) {
+                    arenaFillLight.color.setHex(architectLightState.fill);
+                    arenaFillLight.intensity = architectLightState.fillInt;
+                }
+                architectLightState = null;
+            }
             scene.fog.color.setHex(BASE_FOG.color);
             scene.fog.near = BASE_FOG.near;
             scene.fog.far = BASE_FOG.far;
@@ -4094,23 +4128,18 @@
                 if (d.wire) scene.remove(d.wire);
             });
             architectWallDebris = [];
-            if (architectFistSlam) {
-                if (architectFistSlam.circle) scene.remove(architectFistSlam.circle);
-                if (architectFistSlam.fist) scene.remove(architectFistSlam.fist);
-                architectFistSlam = null;
+            if (architectJudgement) {
+                if (architectJudgement.ring) scene.remove(architectJudgement.ring);
+                architectJudgement = null;
             }
-            if (architectLaserBeam) {
-                if (architectLaserBeam.mesh) scene.remove(architectLaserBeam.mesh);
-                if (architectLaserBeam.line) scene.remove(architectLaserBeam.line);
-                architectLaserBeam = null;
-            }
-            architectMatrixProjectiles.forEach(p => { if (p.mesh) scene.remove(p.mesh); });
-            architectMatrixProjectiles = [];
-            if (architectClimaxWipe) {
-                scene.remove(architectClimaxWipe);
-                architectClimaxWipe = null;
-            }
-            setArchitectCrimsonVeil(0);
+            architectMortars.forEach(m => {
+                if (m.warn) scene.remove(m.warn);
+                if (m.pillar) scene.remove(m.pillar);
+            });
+            architectMortars = [];
+            architectCrushCubes.forEach(c => { if (c.mesh) scene.remove(c.mesh); });
+            architectCrushCubes = [];
+            setArchitectCrimsonVeil(activeBoss && activeBoss.type === 'architect' ? 0.72 : 0);
         }
 
         function createArchitectWallTear() {
@@ -4164,7 +4193,6 @@
 
         function buildRiggedArm(side) {
             const root = new THREE.Group();
-            root.position.set(side * 20, 28, 8);
             const shoulder = new THREE.Group();
             const upperArm = new THREE.Group();
             upperArm.position.y = -5;
@@ -4172,10 +4200,11 @@
             forearm.position.y = -6;
             const hand = new THREE.Group();
             hand.position.y = -5;
-            const plateMat = new THREE.MeshBasicMaterial({ color: 0x08060a, transparent: true, opacity: 0.94 });
-            const edgeMat = new THREE.LineBasicMaterial({ color: 0x445566, transparent: true, opacity: 0.85 });
-            const arcMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+            const plateMat = new THREE.MeshBasicMaterial({ color: 0x08060a, transparent: true, opacity: 0.96 });
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.92 });
+            const arcMat = new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.88 });
             const segments = [];
+            const seamCracks = [];
             [shoulder, upperArm, forearm, hand].forEach((joint, idx) => {
                 const w = 4.2 - idx * 0.35;
                 const geo = new THREE.BoxGeometry(w, 2.8 - idx * 0.15, w * 0.85);
@@ -4183,6 +4212,13 @@
                 const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat.clone());
                 joint.add(plate, edge);
                 segments.push({ joint, plate, edge });
+                const crackGeo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(-w * 0.2, 0.4, w * 0.42),
+                    new THREE.Vector3(w * 0.15, -0.3, w * 0.42)
+                ]);
+                const crack = new THREE.Line(crackGeo, arcMat.clone());
+                joint.add(crack);
+                seamCracks.push(crack);
             });
             const fingerArcs = [];
             for (let f = 0; f < 4; f += 1) {
@@ -4202,169 +4238,129 @@
             upperArm.add(forearm);
             forearm.add(hand);
             root.add(shoulder);
-            return { root, shoulder, upperArm, forearm, hand, segments, fingerArcs, side, pose: { raise: 0, clench: 0, reach: 0 } };
+            root.scale.setScalar(3);
+            return {
+                root, shoulder, upperArm, forearm, hand, segments, fingerArcs, seamCracks, side,
+                pose: { raise: 0, clench: 0, reach: 0, slamY: 0 },
+                hoverY: 18, targetX: side * ARENA * 0.72, targetZ: -ARENA * 0.22
+            };
+        }
+
+        function addMaskSeamCracks(tile, w, h) {
+            const crackMat = new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.95 });
+            const cracks = [];
+            const paths = [
+                [[-w * 0.35, h * 0.2, 0.24], [0, -h * 0.15, 0.24], [w * 0.3, h * 0.25, 0.24]],
+                [[-w * 0.1, h * 0.35, 0.24], [w * 0.15, -h * 0.3, 0.24]]
+            ];
+            paths.forEach(pts => {
+                const geo = new THREE.BufferGeometry().setFromPoints(pts.map(p => new THREE.Vector3(...p)));
+                const line = new THREE.Line(geo, crackMat.clone());
+                tile.add(line);
+                cracks.push(line);
+            });
+            return cracks;
         }
 
         function buildDecrepitArchitect() {
             const mesh = new THREE.Group();
-            const porcelainMat = new THREE.MeshBasicMaterial({ color: 0xeeeae2, transparent: true, opacity: 0.96 });
+            const porcelainMat = new THREE.MeshBasicMaterial({ color: 0x0a0608, transparent: true, opacity: 0.98 });
             const maskGroup = new THREE.Group();
-            maskGroup.position.set(0, 38, 5);
+            maskGroup.position.set(0, 54, -ARENA * 0.62);
             const maskLeft = new THREE.Group();
             const maskRight = new THREE.Group();
             const leftTile = new THREE.Mesh(new THREE.BoxGeometry(3.6, 5.2, 0.45), porcelainMat.clone());
             leftTile.position.set(-1.9, 0.2, 0);
             const rightTile = new THREE.Mesh(new THREE.BoxGeometry(3.6, 5.2, 0.45), porcelainMat.clone());
             rightTile.position.set(1.9, 0.2, 0);
+            const leftCracks = addMaskSeamCracks(leftTile, 3.6, 5.2);
+            const rightCracks = addMaskSeamCracks(rightTile, 3.6, 5.2);
+            const leftEdge = new THREE.LineSegments(
+                new THREE.EdgesGeometry(leftTile.geometry),
+                new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.85 })
+            );
+            const rightEdge = new THREE.LineSegments(
+                new THREE.EdgesGeometry(rightTile.geometry),
+                new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.85 })
+            );
+            leftTile.add(leftEdge);
+            rightTile.add(rightEdge);
             maskLeft.add(leftTile);
             maskRight.add(rightTile);
-            const trackingEye = new THREE.Mesh(
-                new THREE.SphereGeometry(1.4, 16, 16),
-                new THREE.MeshBasicMaterial({ color: 0xff1133, transparent: true, opacity: 0.98 })
+            const singularityCore = new THREE.Group();
+            singularityCore.position.set(0, 0.3, 0.8);
+            singularityCore.visible = false;
+            const coreInner = new THREE.Mesh(
+                new THREE.SphereGeometry(1.1, 24, 24),
+                new THREE.MeshBasicMaterial({ color: 0xffffff })
             );
-            trackingEye.position.set(0, 0.3, 1.2);
-            trackingEye.visible = false;
-            maskGroup.add(maskLeft, maskRight, trackingEye);
+            const coreShell = new THREE.Mesh(
+                new THREE.SphereGeometry(2.2, 28, 28),
+                new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
+            );
+            const coreGlow = new THREE.PointLight(0xffffff, 0, 80);
+            singularityCore.add(coreInner, coreShell, coreGlow);
+            maskGroup.add(maskLeft, maskRight, singularityCore);
+            maskGroup.scale.setScalar(3);
             const armL = buildRiggedArm(-1);
             const armR = buildRiggedArm(1);
-            const torsoGeo = new THREE.BoxGeometry(12, 16, 7);
-            const torso = new THREE.Mesh(torsoGeo, new THREE.MeshBasicMaterial({ color: 0x07050a, transparent: true, opacity: 0.92 }));
-            torso.position.set(0, 24, 0);
-            const torsoWire = new THREE.LineSegments(new THREE.EdgesGeometry(torsoGeo), new THREE.LineBasicMaterial({ color: 0xff1133, transparent: true, opacity: 0.55 }));
-            torsoWire.position.copy(torso.position);
-            mesh.add(torso, torsoWire, maskGroup, armL.root, armR.root);
-            mesh.position.set(0, -10, -ARENA * 1.72);
-            mesh.rotation.x = 0.18;
+            armL.root.position.set(-ARENA * 0.78, armL.hoverY, -ARENA * 0.18);
+            armR.root.position.set(ARENA * 0.78, armR.hoverY, -ARENA * 0.18);
+            mesh.add(maskGroup, armL.root, armR.root);
+            mesh.position.set(0, -4, -ARENA * 1.05);
+            mesh.rotation.x = 0.22;
             mesh.scale.setScalar(0.01);
             mesh.visible = false;
             return {
                 mesh, maskGroup, maskLeft, maskRight, maskLeftTile: leftTile, maskRightTile: rightTile,
-                trackingEye, armL, armR, torso, core: trackingEye, crown: maskGroup
+                maskCracks: [...leftCracks, ...rightCracks], singularityCore, coreInner, coreShell, coreGlow,
+                armL, armR, core: singularityCore, crown: maskGroup
             };
         }
 
         function buildPlasmaArchitect() {
-            const mesh = new THREE.Group();
-            const plasmaMat = new THREE.LineBasicMaterial({ color: 0xff1133, transparent: true, opacity: 0.95 });
-            const bones = [];
-            const addBone = (a, b) => {
-                const geo = new THREE.BufferGeometry().setFromPoints([a.clone(), b.clone()]);
-                const line = new THREE.Line(geo, plasmaMat.clone());
-                mesh.add(line);
-                bones.push(line);
-            };
-            addBone(new THREE.Vector3(0, 42, 6), new THREE.Vector3(0, 28, 4));
-            addBone(new THREE.Vector3(0, 28, 4), new THREE.Vector3(-10, 18, 2));
-            addBone(new THREE.Vector3(0, 28, 4), new THREE.Vector3(10, 18, 2));
-            addBone(new THREE.Vector3(-10, 18, 2), new THREE.Vector3(-18, 8, 0));
-            addBone(new THREE.Vector3(10, 18, 2), new THREE.Vector3(18, 8, 0));
-            addBone(new THREE.Vector3(-18, 8, 0), new THREE.Vector3(-24, -2, -2));
-            addBone(new THREE.Vector3(18, 8, 0), new THREE.Vector3(24, -2, -2));
-
-            const chestCore = new THREE.Group();
-            chestCore.position.set(0, 30, 5);
-
-            const coreInner = new THREE.Mesh(
-                new THREE.SphereGeometry(1.65, 28, 28),
-                new THREE.MeshBasicMaterial({ color: 0xffffff })
-            );
-            const coreShell = new THREE.Mesh(
-                new THREE.SphereGeometry(3.2, 32, 32),
-                new THREE.MeshStandardMaterial({
-                    color: 0xffffff,
-                    emissive: 0x9900ff,
-                    emissiveIntensity: 3,
-                    transparent: true,
-                    opacity: 0.82,
-                    metalness: 0.15,
-                    roughness: 0.12
-                })
-            );
-            const coreLight = new THREE.PointLight(0xffffff, 4.5, 48);
-            const accretionRing = new THREE.Mesh(
-                new THREE.RingGeometry(4.1, 5.2, 64),
-                new THREE.MeshBasicMaterial({
-                    color: 0xff00dd,
-                    transparent: true,
-                    opacity: 0.88,
-                    side: THREE.DoubleSide
-                })
-            );
-            accretionRing.rotation.x = Math.PI / 2;
-            chestCore.add(coreInner, coreShell, coreLight, accretionRing);
-
-            const attractorCount = 54;
-            const attractorPositions = new Float32Array(attractorCount * 3);
-            const attractorGeo = new THREE.BufferGeometry();
-            attractorGeo.setAttribute('position', new THREE.BufferAttribute(attractorPositions, 3));
-            const attractorPoints = new THREE.Points(
-                attractorGeo,
-                new THREE.PointsMaterial({ color: 0xff0055, size: 0.42, transparent: true, opacity: 0.92 })
-            );
-            mesh.add(chestCore, attractorPoints);
-
-            const attractorParticles = [];
-            for (let i = 0; i < attractorCount; i += 1) {
-                attractorParticles.push({ t: Math.random(), source: i % 3 });
-            }
-
-            mesh.position.set(0, -6, -ARENA * 1.65);
-            mesh.scale.setScalar(0.01);
-            return {
-                mesh, bones, chestCore, coreInner, coreShell, coreLight, accretionRing,
-                attractorPoints, attractorParticles, armL: null, armR: null, core: coreShell, crown: coreShell
-            };
+            return buildDecrepitArchitect();
         }
 
         const architectCoreScaleScratch = new THREE.Vector3();
-        const ARCHITECT_CORE_VISUAL_RADIUS = 3.2;
+        const ARCHITECT_CORE_VISUAL_RADIUS = 2.2;
 
         function getArchitectCoreHitRadius() {
             if (!activeBoss || activeBoss.type !== 'architect') return 5;
-            if (activeBoss.purgeActive) return 3.5 * 1.3;
             if (activeBoss.architectPhase === 2 && activeBoss.coreShell) {
                 activeBoss.coreShell.getWorldScale(architectCoreScaleScratch);
                 const worldVisual = ARCHITECT_CORE_VISUAL_RADIUS *
                     Math.max(architectCoreScaleScratch.x, architectCoreScaleScratch.y, architectCoreScaleScratch.z);
-                return worldVisual * 1.3;
+                return worldVisual * 1.35;
             }
-            return 6;
+            return 5.5;
         }
 
         function updateArchitectPhase2CoreFx(dt) {
             const b = activeBoss;
             if (!b || b.architectPhase !== 2) return;
             const time = performance.now() * 0.001;
-            if (b.accretionRing) b.accretionRing.rotation.z += dt * 9.5;
             if (b.coreInner) {
-                const pulse = 1 + Math.sin(time * 14) * 0.1;
+                const pulse = 1 + Math.sin(time * 16) * 0.14;
                 b.coreInner.scale.setScalar(pulse);
             }
-            if (b.coreLight) b.coreLight.intensity = 4.2 + Math.sin(time * 10) * 1.1;
-            if (!b.attractorParticles || !b.attractorPoints) return;
-            const sources = [
-                new THREE.Vector3(-24, -2, -2),
-                new THREE.Vector3(24, -2, -2),
-                new THREE.Vector3(0, 42, 6)
-            ];
-            const coreLocal = new THREE.Vector3(0, 30, 5);
-            const positions = b.attractorPoints.geometry.attributes.position.array;
-            b.attractorParticles.forEach((p, i) => {
-                p.t += dt * (0.75 + (i % 4) * 0.12);
-                if (p.t > 1) p.t -= 1;
-                const src = sources[p.source];
-                const idx = i * 3;
-                positions[idx] = src.x + (coreLocal.x - src.x) * p.t;
-                positions[idx + 1] = src.y + (coreLocal.y - src.y) * p.t;
-                positions[idx + 2] = src.z + (coreLocal.z - src.z) * p.t;
-            });
-            b.attractorPoints.geometry.attributes.position.needsUpdate = true;
+            if (b.coreShell) {
+                b.coreShell.material.opacity = 0.5 + Math.sin(time * 12) * 0.22;
+            }
+            if (b.coreGlow) b.coreGlow.intensity = 5.5 + Math.sin(time * 11) * 2.2;
+            if (b.singularityCore) b.singularityCore.visible = true;
         }
 
         function getArchitectCoreWorld() {
             if (!activeBoss || activeBoss.type !== 'architect') return new THREE.Vector3();
             const pos = new THREE.Vector3();
-            activeBoss.core.getWorldPosition(pos);
+            if (activeBoss.architectPhase === 2 && activeBoss.singularityCore) {
+                activeBoss.singularityCore.getWorldPosition(pos);
+            } else if (activeBoss.maskGroup) {
+                activeBoss.maskGroup.getWorldPosition(pos);
+            } else {
+                activeBoss.core.getWorldPosition(pos);
+            }
             return pos;
         }
 
@@ -4379,23 +4375,46 @@
         function architectCanTakeDamage(source) {
             const b = activeBoss;
             if (!b || b.type !== 'architect') return true;
-            if (b.purgeActive) return source === 'ultimate';
-            if (b.architectPhase === 2 && b.shielded && source !== 'parry') return false;
+            if (b.architectPhase === 1 && b.movePhase === 'phase2cut') return false;
             return true;
         }
 
-        function updateArchitectArmRig(arm, time, attacking) {
+        function setArchitectSeamFlash(arm, flash) {
             if (!arm) return;
-            arm.pose.reach = THREE.MathUtils.lerp(arm.pose.reach, attacking ? 0.6 : 0.15, 0.04);
-            arm.pose.raise = THREE.MathUtils.lerp(arm.pose.raise, attacking ? 0.85 : 0.1, 0.05);
-            arm.pose.clench = THREE.MathUtils.lerp(arm.pose.clench, attacking ? 1 : 0.2, 0.06);
-            arm.shoulder.rotation.z = arm.side * (0.25 + arm.pose.reach * 0.35);
-            arm.upperArm.rotation.x = -arm.pose.raise * 1.4;
-            arm.forearm.rotation.x = -arm.pose.clench * 0.8;
-            arm.hand.rotation.x = -arm.pose.clench * 0.5;
-            arm.root.position.y = 28 + Math.sin(time * 0.9 + arm.side) * 0.6;
+            const color = flash ? 0xffffff : 0xff0033;
+            arm.segments.forEach(seg => {
+                seg.edge.material.color.setHex(color);
+            });
+            (arm.seamCracks || []).forEach(c => {
+                c.material.color.setHex(color);
+                c.material.opacity = flash ? 1 : 0.88;
+            });
+        }
+
+        function setArchitectMaskCrackFlash(flash) {
+            const b = activeBoss;
+            if (!b || !b.maskCracks) return;
+            const color = flash ? 0xffffff : 0xff0033;
+            b.maskCracks.forEach(c => {
+                c.material.color.setHex(color);
+            });
+        }
+
+        function updateArchitectArmRig(arm, time, attacking, slamming) {
+            if (!arm) return;
+            const hoverBase = arm.hoverY || 18;
+            arm.pose.reach = THREE.MathUtils.lerp(arm.pose.reach, attacking ? 0.72 : 0.12, 0.05);
+            arm.pose.raise = THREE.MathUtils.lerp(arm.pose.raise, attacking ? 0.95 : 0.08, 0.06);
+            arm.pose.clench = THREE.MathUtils.lerp(arm.pose.clench, attacking ? 1 : 0.15, 0.07);
+            arm.shoulder.rotation.z = arm.side * (0.22 + arm.pose.reach * 0.42);
+            arm.upperArm.rotation.x = -arm.pose.raise * 1.55;
+            arm.forearm.rotation.x = -arm.pose.clench * 0.95;
+            arm.hand.rotation.x = -arm.pose.clench * 0.55;
+            if (!slamming) {
+                arm.root.position.y = THREE.MathUtils.lerp(arm.root.position.y, hoverBase + Math.sin(time * 0.9 + arm.side) * 1.2, 0.04);
+            }
             arm.fingerArcs.forEach((f, i) => {
-                f.finger.scale.y = 1 - arm.pose.clench * 0.25;
+                f.finger.scale.y = 1 - arm.pose.clench * 0.28;
                 f.finger.position.y = -1.8 - arm.pose.clench * (0.2 + i * 0.05);
             });
         }
@@ -4403,246 +4422,371 @@
         function openArchitectMask(amount) {
             const b = activeBoss;
             if (!b || !b.maskLeft || !b.maskRight) return;
-            b.maskLeft.rotation.y = -amount * 0.55;
-            b.maskRight.rotation.y = amount * 0.55;
-            b.maskLeft.position.x = -1.9 - amount * 0.8;
-            b.maskRight.position.x = 1.9 + amount * 0.8;
-            if (b.trackingEye) {
-                b.trackingEye.visible = amount > 0.15;
-                const eyeWorld = playerPos.clone();
-                const local = b.maskGroup.worldToLocal(eyeWorld);
-                b.trackingEye.position.x = THREE.MathUtils.clamp(local.x * 0.08, -0.8, 0.8);
-                b.trackingEye.position.y = 0.3 + local.y * 0.02;
-            }
+            b.maskLeft.rotation.y = -amount * 0.62;
+            b.maskRight.rotation.y = amount * 0.62;
+            b.maskLeft.position.x = -1.9 - amount * 1.35;
+            b.maskRight.position.x = 1.9 + amount * 1.35;
+            if (b.singularityCore) b.singularityCore.visible = amount > 0.35 || b.architectPhase === 2;
         }
 
-        function beginArchitectFistSmash() {
-            const b = activeBoss;
-            b.movePhase = 'fist';
-            b.fistTimer = 2.2;
-            b.fistPhase = 'raise';
-            b.fistSide = Math.random() > 0.5 ? b.armR : b.armL;
-            b.fistX = playerPos.x;
-            b.fistZ = playerPos.z;
-            const geo = new THREE.RingGeometry(2, 8.5, 40);
+        function playArchitectMortarAlarm() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(220, t);
+            osc.frequency.setValueAtTime(180, t + 0.12);
+            osc.frequency.setValueAtTime(260, t + 0.24);
+            gain.gain.setValueAtTime(0.001, t);
+            gain.gain.exponentialRampToValueAtTime(0.22 * getArcadeSoundVolume(), t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+            osc.connect(gain);
+            connectAudioOut(gain);
+            osc.start(t);
+            osc.stop(t + 0.58);
+        }
+
+        function spawnArchitectJudgementRing(x, z) {
+            const geo = new THREE.RingGeometry(1.2, 4.5, 56);
             geo.rotateX(-Math.PI / 2);
-            const circle = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff66aa, transparent: true, opacity: 0.82, side: THREE.DoubleSide }));
-            circle.position.set(b.fistX, FLOOR_Y + 0.1, b.fistZ);
-            const fist = new THREE.Mesh(new THREE.BoxGeometry(9, 9, 9), new THREE.MeshBasicMaterial({ color: 0x120810, transparent: true, opacity: 0.9 }));
-            fist.position.set(b.fistX, FLOOR_Y + 44, b.fistZ);
-            scene.add(circle, fist);
-            architectFistSlam = { circle, fist, x: b.fistX, z: b.fistZ, phase: 'track', timer: 1.6 };
-            architectBossPromptEl.textContent = 'KINETIC FIST — EVADE THE SHOCKWAVE';
-            architectBossPromptEl.classList.add('visible');
-        }
-
-        function beginArchitectLaserSweep() {
-            const b = activeBoss;
-            b.movePhase = 'laser';
-            b.laserTimer = 4.2;
-            b.laserT = 0;
-            openArchitectMask(1);
-            const beamGeo = new THREE.BoxGeometry(2.2, 0.3, ARENA * 2.1);
-            const beam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72 }));
-            beam.position.set(-ARENA * 0.95, FLOOR_Y + 0.35, 0);
-            scene.add(beam);
-            architectLaserBeam = { mesh: beam, x: -ARENA * 0.95 };
-            architectBossPromptEl.textContent = 'LASER SWEEP — USE JUMP PADS TO STAY ABOVE THE BEAM';
-            architectBossPromptEl.classList.add('visible');
-        }
-
-        function beginArchitectMatrixRain() {
-            const b = activeBoss;
-            b.movePhase = 'matrix';
-            b.matrixTimer = 5.5;
-            b.matrixSpawn = 0;
-            b.shielded = true;
-            architectBossPromptEl.textContent = 'MATRIX RAIN — PARRY PROJECTILES INTO THE CHEST CORE';
-            architectBossPromptEl.classList.add('visible');
-        }
-
-        function spawnMatrixProjectile() {
-            const x = (Math.random() - 0.5) * ARENA * 1.6;
-            const z = (Math.random() - 0.5) * ARENA * 1.6;
             const mesh = new THREE.Mesh(
-                new THREE.BoxGeometry(0.45, 0.45, 0.45),
-                new THREE.MeshBasicMaterial({ color: 0xff1133 })
+                geo,
+                new THREE.MeshBasicMaterial({
+                    color: 0xff0033,
+                    transparent: true,
+                    opacity: 0.98,
+                    side: THREE.DoubleSide
+                })
             );
-            mesh.position.set(x, FLOOR_Y + 32, z);
+            mesh.position.set(x, FLOOR_Y + 0.18, z);
             scene.add(mesh);
-            projectiles.push({
+            shockwaves.push({
                 mesh,
-                vel: new THREE.Vector3(0, -22 - Math.random() * 8, 0),
-                owner: 'enemy',
-                life: 6,
-                fromBoss: true,
-                architectMatrix: true
+                glow: null,
+                radius: 4.5,
+                baseOuter: 4.5,
+                width: 2.8,
+                life: 9,
+                voidPulse: true,
+                architectRing: true
             });
         }
 
-        function beginArchitectSystemPurge() {
-            const b = activeBoss;
-            if (!b || b.purgeActive) return;
-            b.purgeActive = true;
-            b.movePhase = 'purge';
-            b.purgeTimer = 7.5;
-            b.hp = Math.max(1, Math.floor(b.maxHp * 0.1));
-            updateBossBar();
-            ultimateCharge = 100;
-            updateUltimateHUD();
-            ultimatePromptEl.classList.add('architect-climax');
-            architectBossPromptEl.textContent = 'SYSTEM PURGE — UNLEASH G ULTIMATE INTO THE CORE';
-            architectBossPromptEl.classList.add('visible');
-            const wipeGeo = new THREE.PlaneGeometry(ARENA * 2.4, ARENA * 2.4);
-            const wipe = new THREE.Mesh(wipeGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide }));
-            wipe.rotation.x = -Math.PI / 2;
-            wipe.position.set(0, FLOOR_Y + 0.4, 0);
-            scene.add(wipe);
-            architectClimaxWipe = wipe;
-            screenShake = 2.6;
+        function updateArchitectCrushParry() {
+            if (!player.isParrying || architectCrushCubes.length === 0) return;
+            const ms = parryAnimTimer * 1000;
+            if (ms < 31 || ms > 70) return;
+            const center = getParryHitCenter();
+            architectCrushCubes = architectCrushCubes.filter(c => {
+                if (c.mesh.position.distanceTo(center) < 3.2) {
+                    scene.remove(c.mesh);
+                    triggerParrySuccess(c.mesh.position);
+                    damageBoss(0, 'parry');
+                    return false;
+                }
+                return true;
+            });
         }
 
-        function updateArchitectFistSmash(dt) {
-            if (!architectFistSlam || !activeBoss) return;
-            const s = architectFistSlam;
-            s.timer -= dt;
-            if (s.phase === 'track') {
-                s.x = playerPos.x;
-                s.z = playerPos.z;
-                s.circle.position.set(s.x, FLOOR_Y + 0.1, s.z);
-                s.fist.position.set(s.x, FLOOR_Y + 44, s.z);
-                updateArchitectArmRig(activeBoss.fistSide, performance.now() * 0.001, true);
-                if (s.timer <= 0) {
-                    s.phase = 'slam';
-                    s.timer = 0.35;
+        function beginArchitectJudgementSlam() {
+            const b = activeBoss;
+            b.movePhase = 'judgement';
+            b.lastAttack = 'judgement';
+            b.judgementSide = Math.random() > 0.5 ? b.armR : b.armL;
+            b.judgementX = playerPos.x;
+            b.judgementZ = playerPos.z;
+            b.judgementTimer = 1.2;
+            b.judgementPhase = 'track';
+            b.judgementSlamY = 58;
+            architectJudgement = { phase: 'track', timer: 1.2 };
+            architectBossPromptEl.textContent = 'JUDGEMENT SLAM — JUMP THE SHOCKWAVE';
+            architectBossPromptEl.classList.add('visible');
+            setArchitectSeamFlash(b.judgementSide, true);
+        }
+
+        function beginArchitectDie() {
+            const b = activeBoss;
+            b.movePhase = 'die';
+            b.lastAttack = 'die';
+            b.dieShot = 0;
+            b.dieGap = 0.4;
+            b.dieTimer = 2.6;
+            playArchitectMortarAlarm();
+            if (b.armL) b.armL.pose.clench = 1;
+            if (b.armR) b.armR.pose.clench = 1;
+            architectBossPromptEl.textContent = 'DIE! — STRAFE THE TRACKING PILLARS';
+            architectBossPromptEl.classList.add('visible');
+        }
+
+        function spawnArchitectMortarWarning(x, z) {
+            const geo = new THREE.RingGeometry(0.6, 3.2, 36);
+            geo.rotateX(-Math.PI / 2);
+            const warn = new THREE.Mesh(
+                geo,
+                new THREE.MeshBasicMaterial({ color: 0xff1133, transparent: true, opacity: 0.92, side: THREE.DoubleSide })
+            );
+            warn.position.set(x, FLOOR_Y + 0.12, z);
+            scene.add(warn);
+            architectMortars.push({ x, z, timer: 0.5, warn, pillar: null, fired: false });
+        }
+
+        function beginArchitectCrush() {
+            const b = activeBoss;
+            b.movePhase = 'crush';
+            b.lastAttack = 'crush';
+            b.crushTimer = 0;
+            b.crushPhase = 'wind';
+            b.crushSide = Math.random() > 0.5 ? b.armR : b.armL;
+            b.crushDir = Math.random() > 0.5 ? 1 : -1;
+            b.crushGapRow = Math.floor(Math.random() * 4);
+            b.crushGapCol = Math.floor(Math.random() * 5);
+            b.crushGapTop = Math.random() > 0.5;
+            architectBossPromptEl.textContent = 'CRUSH! — PARRY OR DASH THROUGH THE GAP';
+            architectBossPromptEl.classList.add('visible');
+            setArchitectSeamFlash(b.crushSide, true);
+        }
+
+        function spawnArchitectCrushWall() {
+            const b = activeBoss;
+            const cols = 14;
+            const rows = 7;
+            const startX = b.crushDir > 0 ? -ARENA * 0.92 : ARENA * 0.92;
+            const startZ = playerPos.z;
+            for (let r = 0; r < rows; r += 1) {
+                for (let c = 0; c < cols; c += 1) {
+                    const gap = b.crushGapTop
+                        ? (r === b.crushGapRow && c === b.crushGapCol)
+                        : (c === b.crushGapCol && r < 3);
+                    if (gap) continue;
+                    const mesh = new THREE.Mesh(
+                        new THREE.BoxGeometry(1.15, 1.15, 1.15),
+                        new THREE.MeshBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.94 })
+                    );
+                    const ox = startX + c * 1.25 * b.crushDir;
+                    const oz = startZ + (r - rows * 0.5) * 1.25;
+                    mesh.position.set(ox, FLOOR_Y + 1.2 + r * 1.1, oz);
+                    scene.add(mesh);
+                    architectCrushCubes.push({
+                        mesh,
+                        vel: new THREE.Vector3(b.crushDir * 34, 0, 0),
+                        parried: false
+                    });
                 }
-            } else if (s.phase === 'slam') {
-                s.fist.position.y = THREE.MathUtils.lerp(s.fist.position.y, FLOOR_Y + 1.5, dt * 10);
-                if (s.timer <= 0) {
-                    s.phase = 'done';
-                    screenShake = 2.8;
-                    if (Math.hypot(playerPos.x - s.x, playerPos.z - s.z) < 9 && playerPos.y < FLOOR_Y + 3.8) {
-                        player.hp -= 52;
+            }
+        }
+
+        function updateArchitectJudgement(dt) {
+            const b = activeBoss;
+            if (!b || b.movePhase !== 'judgement' || !architectJudgement) return;
+            const j = architectJudgement;
+            const arm = b.judgementSide;
+            const time = performance.now() * 0.001;
+            j.timer -= dt;
+            if (j.phase === 'track') {
+                b.judgementX = THREE.MathUtils.lerp(b.judgementX, playerPos.x, 0.14);
+                b.judgementZ = THREE.MathUtils.lerp(b.judgementZ, playerPos.z, 0.14);
+                b.judgementSlamY = THREE.MathUtils.lerp(b.judgementSlamY, 62, 0.06);
+                if (arm) {
+                    arm.root.position.x = THREE.MathUtils.lerp(arm.root.position.x, b.judgementX, 0.12);
+                    arm.root.position.z = THREE.MathUtils.lerp(arm.root.position.z, b.judgementZ + 4, 0.1);
+                    arm.root.position.y = THREE.MathUtils.lerp(arm.root.position.y, b.judgementSlamY, 0.08);
+                    updateArchitectArmRig(arm, time, true, false);
+                }
+                setArchitectSeamFlash(arm, Math.sin(performance.now() * 0.04) > 0);
+                if (j.timer <= 0) {
+                    j.phase = 'slam';
+                    j.timer = 0.08;
+                    if (arm) arm.root.position.y = FLOOR_Y + 2.5;
+                    setArchitectSeamFlash(arm, true);
+                }
+            } else if (j.phase === 'slam') {
+                screenShake = 6;
+                if (Math.hypot(playerPos.x - b.judgementX, playerPos.z - b.judgementZ) < 11 &&
+                    playerPos.y < FLOOR_Y + 3.5) {
+                    player.hp -= 68;
+                    markBossEncounterDamage();
+                    triggerDirectionalHitFlash(new THREE.Vector3(b.judgementX, playerPos.y, b.judgementZ));
+                    if (player.hp <= 0) gameOver();
+                    else updateUI();
+                }
+                spawnArchitectJudgementRing(b.judgementX, b.judgementZ);
+                j.phase = 'recover';
+                j.timer = 0.65;
+                if (arm) updateArchitectArmRig(arm, time, false, true);
+                setArchitectSeamFlash(arm, false);
+            } else {
+                if (arm) {
+                    arm.root.position.y = THREE.MathUtils.lerp(arm.root.position.y, arm.hoverY, 0.08);
+                    arm.root.position.x = THREE.MathUtils.lerp(arm.root.position.x, arm.targetX, 0.06);
+                    arm.root.position.z = THREE.MathUtils.lerp(arm.root.position.z, arm.targetZ, 0.06);
+                }
+                if (j.timer <= 0) {
+                    architectJudgement = null;
+                    b.movePhase = 'idle';
+                    architectBossPromptEl.classList.remove('visible');
+                    finishArchitectAttack(b);
+                }
+            }
+        }
+
+        function updateArchitectDie(dt) {
+            const b = activeBoss;
+            if (!b || b.movePhase !== 'die') return;
+            b.dieTimer -= dt;
+            b.dieGap -= dt;
+            const time = performance.now() * 0.001;
+            updateArchitectArmRig(b.armL, time, true, false);
+            updateArchitectArmRig(b.armR, time, true, false);
+            if (b.dieGap <= 0 && b.dieShot < 4) {
+                spawnArchitectMortarWarning(playerPos.x, playerPos.z);
+                b.dieShot += 1;
+                b.dieGap = 0.4;
+            }
+            architectMortars = architectMortars.filter(m => {
+                m.timer -= dt;
+                if (!m.fired && m.timer <= 0) {
+                    m.fired = true;
+                    if (m.warn) scene.remove(m.warn);
+                    const pillarGeo = new THREE.CylinderGeometry(2.8, 2.8, 38, 20);
+                    const pillar = new THREE.Mesh(
+                        pillarGeo,
+                        new THREE.MeshBasicMaterial({ color: 0xff2244, transparent: true, opacity: 0.92 })
+                    );
+                    pillar.position.set(m.x, FLOOR_Y + 19, m.z);
+                    scene.add(pillar);
+                    m.pillar = pillar;
+                    m.pillarLife = 0.45;
+                    screenShake = Math.max(screenShake, 1.4);
+                    const dx = playerPos.x - m.x;
+                    const dz = playerPos.z - m.z;
+                    if (Math.hypot(dx, dz) < 3.4 && playerPos.y < FLOOR_Y + 5) {
+                        player.hp -= 48;
                         markBossEncounterDamage();
-                        triggerDirectionalHitFlash(new THREE.Vector3(s.x, playerPos.y, s.z));
+                        triggerDirectionalHitFlash(new THREE.Vector3(m.x, playerPos.y, m.z));
                         if (player.hp <= 0) gameOver();
                         else updateUI();
                     }
-                    spawnVoidShockRing(s.x, s.z);
+                }
+                if (m.pillar) {
+                    m.pillarLife -= dt;
+                    m.pillar.material.opacity = Math.max(0, m.pillarLife / 0.45) * 0.92;
+                    if (m.pillarLife <= 0) {
+                        scene.remove(m.pillar);
+                        return false;
+                    }
+                }
+                if (!m.fired) return true;
+                return m.pillarLife > 0;
+            });
+            if (b.dieTimer <= 0 && architectMortars.length === 0) {
+                b.movePhase = 'idle';
+                if (b.armL) b.armL.pose.clench = 0.15;
+                if (b.armR) b.armR.pose.clench = 0.15;
+                architectBossPromptEl.classList.remove('visible');
+                finishArchitectAttack(b);
+            }
+        }
+
+        function updateArchitectCrush(dt) {
+            const b = activeBoss;
+            if (!b || b.movePhase !== 'crush') return;
+            const time = performance.now() * 0.001;
+            b.crushTimer += dt;
+            const arm = b.crushSide;
+            if (b.crushPhase === 'wind') {
+                if (arm) {
+                    arm.root.position.z = THREE.MathUtils.lerp(arm.root.position.z, playerPos.z, 0.1);
+                    arm.pose.reach = THREE.MathUtils.lerp(arm.pose.reach, 0.85, 0.08);
+                    arm.upperArm.rotation.y = THREE.MathUtils.lerp(arm.upperArm.rotation.y, b.crushDir * 0.8, 0.1);
+                    updateArchitectArmRig(arm, time, true, false);
+                }
+                setArchitectSeamFlash(arm, Math.sin(performance.now() * 0.035) > 0);
+                if (b.crushTimer >= 0.85) {
+                    b.crushPhase = 'push';
+                    spawnArchitectCrushWall();
+                    screenShake = 2.2;
+                }
+            } else if (b.crushPhase === 'push') {
+                architectCrushCubes = architectCrushCubes.filter(c => {
+                    if (c.parried) return false;
+                    c.mesh.position.add(c.vel.clone().multiplyScalar(dt));
+                    const dx = playerPos.x - c.mesh.position.x;
+                    const dy = playerPos.y - c.mesh.position.y;
+                    const dz = playerPos.z - c.mesh.position.z;
+                    if (Math.hypot(dx, dy, dz) < 1.35 && player.hp > 0) {
+                        player.hp -= 38;
+                        markBossEncounterDamage();
+                        triggerDirectionalHitFlash(c.mesh.position);
+                        scene.remove(c.mesh);
+                        if (player.hp <= 0) gameOver();
+                        else updateUI();
+                        return false;
+                    }
+                    if (Math.abs(c.mesh.position.x) > ARENA * 1.2) {
+                        scene.remove(c.mesh);
+                        return false;
+                    }
+                    return true;
+                });
+                if (arm) {
+                    arm.root.position.x += b.crushDir * 28 * dt;
+                    updateArchitectArmRig(arm, time, true, false);
+                }
+                if (b.crushTimer >= 3.2 || architectCrushCubes.length === 0) {
+                    b.crushPhase = 'done';
+                    b.crushTimer = 0;
+                    setArchitectSeamFlash(arm, false);
+                    if (arm) {
+                        arm.root.position.x = THREE.MathUtils.lerp(arm.root.position.x, arm.targetX, 0.2);
+                        arm.upperArm.rotation.y = THREE.MathUtils.lerp(arm.upperArm.rotation.y, 0, 0.15);
+                    }
                 }
             } else {
-                scene.remove(s.circle);
-                scene.remove(s.fist);
-                architectFistSlam = null;
-                activeBoss.movePhase = 'idle';
-                architectBossPromptEl.classList.remove('visible');
-                finishArchitectAttack(activeBoss);
-            }
-        }
-
-        function updateArchitectLaser(dt) {
-            const b = activeBoss;
-            if (!b || b.movePhase !== 'laser' || !architectLaserBeam) return;
-            b.laserTimer -= dt;
-            b.laserT += dt;
-            openArchitectMask(1);
-            const sweep = THREE.MathUtils.lerp(-ARENA * 0.95, ARENA * 0.95, (Math.sin(b.laserT * 0.85) + 1) * 0.5);
-            architectLaserBeam.mesh.position.x = sweep;
-            architectLaserBeam.x = sweep;
-            if (onGround && playerPos.y < FLOOR_Y + 2.5 && Math.abs(playerPos.x - sweep) < 2.4) {
-                applyBossDamage(42, dt, architectLaserBeam.mesh.position);
-            }
-            if (b.laserTimer <= 0) {
-                scene.remove(architectLaserBeam.mesh);
-                architectLaserBeam = null;
-                openArchitectMask(0);
                 b.movePhase = 'idle';
                 architectBossPromptEl.classList.remove('visible');
                 finishArchitectAttack(b);
             }
         }
 
-        function updateArchitectMatrixRain(dt) {
+        function updateArchitectPhase2Cut(dt) {
             const b = activeBoss;
-            if (!b || b.movePhase !== 'matrix') return;
-            b.matrixTimer -= dt;
-            b.matrixSpawn += dt;
-            if (Math.floor(b.matrixSpawn * 5) > Math.floor((b.matrixSpawn - dt) * 5)) spawnMatrixProjectile();
-            if (b.matrixTimer <= 0) {
+            if (!b || b.movePhase !== 'phase2cut') return;
+            b.cutTimer += dt;
+            const t = Math.min(1, b.cutTimer / 2.8);
+            openArchitectMask(t * 1.45);
+            setArchitectMaskCrackFlash(Math.sin(performance.now() * 0.05) > 0);
+            if (b.singularityCore) {
+                b.singularityCore.visible = t > 0.35;
+                b.singularityCore.scale.setScalar(0.2 + t * 0.95);
+            }
+            if (b.coreGlow) b.coreGlow.intensity = t * 7;
+            screenShake = Math.max(screenShake, 2.5 * t);
+            if (b.cutTimer >= 2.8) {
                 b.movePhase = 'idle';
-                b.shielded = false;
-                architectBossPromptEl.classList.remove('visible');
-                finishArchitectAttack(b);
-            }
-        }
-
-        function updateArchitectSystemPurge(dt) {
-            const b = activeBoss;
-            if (!b || !b.purgeActive) return;
-            b.purgeTimer -= dt;
-            if (architectClimaxWipe) {
-                const progress = 1 - Math.max(0, b.purgeTimer) / 7.5;
-                architectClimaxWipe.material.opacity = progress * 0.55;
-                architectClimaxWipe.scale.set(1 + progress * 2.4, 1 + progress * 2.4, 1);
-            }
-            if (b.core) b.core.material.opacity = 0.75 + Math.sin(performance.now() * 0.015) * 0.25;
-            if (b.purgeTimer <= 0) {
-                player.hp -= 999;
-                markBossEncounterDamage();
-                gameOver();
+                b.architectPhase = 2;
+                b.gravityPull = true;
+                b.attackSpeed = 1.67;
+                b.attackMode = 'judgement';
+                b.attackTimer = 1.2;
+                b.label = bossWaveLabel('THE ARCHITECT — SINGULARITY');
+                b.name = 'THE ARCHITECT — SINGULARITY';
+                if (b.core) b.core = b.singularityCore || b.core;
+                updateBossBar();
+                architectTransformActive = false;
+                syncDialogueLock();
+                screenShake = 4;
             }
         }
 
         function finishArchitectAttack(b) {
             b.movePhase = 'idle';
-            if (b.architectPhase === 1) {
-                b.attackMode = b.attackMode === 'fist' ? 'laser' : 'fist';
-                b.attackTimer = 5;
-            } else {
-                b.attackMode = 'matrix';
-                b.attackTimer = 3.5 / (b.attackSpeed || 2);
-            }
-        }
-
-        function morphArchitectToPlasma() {
-            const b = activeBoss;
-            if (!b) return;
-            const pos = b.mesh.position.clone();
-            const scale = b.mesh.scale.x;
-            scene.remove(b.mesh);
-            const plasma = buildPlasmaArchitect();
-            plasma.mesh.position.copy(pos);
-            plasma.mesh.scale.setScalar(scale);
-            scene.add(plasma.mesh);
-            Object.assign(b, {
-                mesh: plasma.mesh,
-                bones: plasma.bones,
-                chestCore: plasma.chestCore,
-                coreInner: plasma.coreInner,
-                coreShell: plasma.coreShell,
-                coreLight: plasma.coreLight,
-                accretionRing: plasma.accretionRing,
-                attractorPoints: plasma.attractorPoints,
-                attractorParticles: plasma.attractorParticles,
-                core: plasma.coreShell,
-                crown: plasma.coreShell,
-                armL: null,
-                armR: null,
-                architectPhase: 2,
-                attackSpeed: 2,
-                hp: 3200,
-                maxHp: 3200,
-                attackMode: 'matrix',
-                attackTimer: 3,
-                shielded: false,
-                movePhase: 'idle'
-            });
-            delete b.maskGroup;
-            delete b.maskLeft;
-            delete b.maskRight;
-            delete b.trackingEye;
-            updateBossBar();
-            screenShake = 3;
+            const phase2 = b.architectPhase === 2;
+            const modes = phase2 ? ['judgement', 'die'] : ['judgement', 'die', 'crush'];
+            const idx = Math.max(0, modes.indexOf(b.lastAttack || 'crush'));
+            b.attackMode = modes[(idx + 1) % modes.length];
+            const baseCd = phase2 ? 2.1 : 3.6;
+            b.attackTimer = baseCd / (b.attackSpeed || 1);
         }
 
         function startArchitectPhase2Transform() {
@@ -4651,14 +4795,13 @@
             clearArchitectExtras();
             enemies.forEach(e => scene.remove(e.mesh));
             enemies = [];
-            activeBoss.hp = 0;
-            updateBossBar();
+            activeBoss.movePhase = 'phase2cut';
+            activeBoss.cutTimer = 0;
             startCinematicDialogue(
-                'MY SHELL IS BROKEN... BUT THE REWRITE CANNOT BE STOPPED. CONVERTING ALL DATA TO PURE PURGE MATERIAL.',
+                'THE SINGULARITY OPENS. GRAVITY BENDS. YOU WILL NOT ESCAPE THE REWRITE.',
                 true,
                 () => {
                     playVoidTransitionScream();
-                    morphArchitectToPlasma();
                     architectTransformActive = false;
                     syncDialogueLock();
                 }
@@ -4670,36 +4813,36 @@
             if (!b) return;
             const time = performance.now() * 0.001;
             const speed = b.attackSpeed || 1;
-            updateArchitectFistSmash(dt);
-            updateArchitectLaser(dt);
-            updateArchitectMatrixRain(dt);
-            if (b.purgeActive) {
-                updateArchitectSystemPurge(dt);
-                return;
-            }
+            updateArchitectPhase2Cut(dt);
+            updateArchitectJudgement(dt);
+            updateArchitectDie(dt);
+            updateArchitectCrush(dt);
+            updateArchitectCrushParry();
             if (b.stunTimer > 0) {
                 b.stunTimer -= dt;
                 return;
             }
-            if (b.architectPhase === 1 && b.armL && b.armR) {
-                updateArchitectArmRig(b.armL, time, b.movePhase === 'fist');
-                updateArchitectArmRig(b.armR, time, false);
-                openArchitectMask(b.movePhase === 'laser' ? 1 : 0.05 + Math.sin(time) * 0.02);
-            } else if (b.architectPhase === 2 && b.bones) {
-                b.bones.forEach((bone, i) => {
-                    bone.material.opacity = 0.55 + Math.sin(time * 6 + i) * 0.4;
-                });
-                updateArchitectPhase2CoreFx(dt);
+            if (b.armL && b.armR && b.movePhase === 'idle') {
+                updateArchitectArmRig(b.armL, time, false, false);
+                updateArchitectArmRig(b.armR, time, false, false);
+                b.armL.root.position.x = THREE.MathUtils.lerp(b.armL.root.position.x, b.armL.targetX, 0.03);
+                b.armL.root.position.z = THREE.MathUtils.lerp(b.armL.root.position.z, b.armL.targetZ, 0.03);
+                b.armR.root.position.x = THREE.MathUtils.lerp(b.armR.root.position.x, b.armR.targetX, 0.03);
+                b.armR.root.position.z = THREE.MathUtils.lerp(b.armR.root.position.z, b.armR.targetZ, 0.03);
             }
-            if (b.movePhase !== 'idle') return;
+            if (b.architectPhase === 2) {
+                updateArchitectPhase2CoreFx(dt);
+                openArchitectMask(1.2);
+            } else {
+                openArchitectMask(0.04 + Math.sin(time * 0.8) * 0.02);
+            }
+            if (b.movePhase !== 'idle' && b.movePhase !== 'phase2cut') return;
+            if (b.movePhase === 'phase2cut') return;
             b.attackTimer -= dt * speed;
             if (b.attackTimer <= 0) {
-                if (b.architectPhase === 1) {
-                    if (b.attackMode === 'fist') beginArchitectFistSmash();
-                    else beginArchitectLaserSweep();
-                } else {
-                    beginArchitectMatrixRain();
-                }
+                if (b.attackMode === 'judgement') beginArchitectJudgementSlam();
+                else if (b.attackMode === 'die') beginArchitectDie();
+                else beginArchitectCrush();
             }
         }
 
@@ -4711,9 +4854,14 @@
             syncDialogueLock();
             startArchitectAmbience();
             if (activeBoss) {
-                if (activeBoss.armL) activeBoss.armL.root.position.set(-20, 28, 8);
-                if (activeBoss.armR) activeBoss.armR.root.position.set(20, 28, 8);
-                activeBoss.attackTimer = 4;
+                if (activeBoss.armL) {
+                    activeBoss.armL.root.position.set(activeBoss.armL.targetX, activeBoss.armL.hoverY, activeBoss.armL.targetZ);
+                }
+                if (activeBoss.armR) {
+                    activeBoss.armR.root.position.set(activeBoss.armR.targetX, activeBoss.armR.hoverY, activeBoss.armR.targetZ);
+                }
+                activeBoss.attackMode = 'judgement';
+                activeBoss.attackTimer = 3.5;
             }
         }
 
@@ -4733,21 +4881,21 @@
             }
 
             if (architectIntroPhase === 'reveal') {
-                const progress = Math.min(1, architectIntroTimer / 2.4);
-                activeBoss.mesh.scale.setScalar(0.01 + progress * 0.99);
-                activeBoss.mesh.position.y = THREE.MathUtils.lerp(-10, -6, progress);
+                const progress = Math.min(1, architectIntroTimer / 2.8);
+                activeBoss.mesh.scale.setScalar(0.04 + progress * 2.96);
+                activeBoss.mesh.position.y = THREE.MathUtils.lerp(-4, -2, progress);
                 if (activeBoss.armL) {
                     activeBoss.armL.root.position.set(
-                        THREE.MathUtils.lerp(-8, -ARENA * 0.82, progress),
-                        THREE.MathUtils.lerp(8, 16, progress),
-                        THREE.MathUtils.lerp(2, -ARENA * 0.38, progress)
+                        THREE.MathUtils.lerp(-ARENA * 0.35, activeBoss.armL.targetX, progress),
+                        THREE.MathUtils.lerp(10, activeBoss.armL.hoverY, progress),
+                        THREE.MathUtils.lerp(0, activeBoss.armL.targetZ, progress)
                     );
                 }
                 if (activeBoss.armR) {
                     activeBoss.armR.root.position.set(
-                        THREE.MathUtils.lerp(8, ARENA * 0.82, progress),
-                        THREE.MathUtils.lerp(8, 16, progress),
-                        THREE.MathUtils.lerp(2, -ARENA * 0.38, progress)
+                        THREE.MathUtils.lerp(ARENA * 0.35, activeBoss.armR.targetX, progress),
+                        THREE.MathUtils.lerp(10, activeBoss.armR.hoverY, progress),
+                        THREE.MathUtils.lerp(0, activeBoss.armR.targetZ, progress)
                     );
                 }
                 if (progress >= 1) {
@@ -4796,24 +4944,28 @@
                 name: 'THE DECREPIT ARCHITECT',
                 label: bossWaveLabel('THE DECREPIT ARCHITECT'),
                 dialogue: 'CRADLED IN CODE... YET YOU CHOSE TO ASYNC FROM THE ARCHITECTURE. DIE.',
-                transformDialogue: 'MY SHELL IS BROKEN... BUT THE REWRITE CANNOT BE STOPPED. CONVERTING ALL DATA TO PURE PURGE MATERIAL.',
+                transformDialogue: 'THE SINGULARITY OPENS. GRAVITY BENDS. YOU WILL NOT ESCAPE THE REWRITE.',
                 dyingMessage: 'THE INERTIALLY BOUND CANNOT REWRITE THE ARCHITECTURE... IMPOSSIBLE!...',
                 mesh: colossus.mesh,
                 maskGroup: colossus.maskGroup,
                 maskLeft: colossus.maskLeft,
                 maskRight: colossus.maskRight,
-                trackingEye: colossus.trackingEye,
+                maskCracks: colossus.maskCracks,
+                singularityCore: colossus.singularityCore,
+                coreInner: colossus.coreInner,
+                coreShell: colossus.coreShell,
+                coreGlow: colossus.coreGlow,
                 armL: colossus.armL,
                 armR: colossus.armR,
                 core: colossus.core,
                 crown: colossus.crown,
                 movePhase: 'idle',
-                attackMode: 'fist',
-                attackTimer: 8,
+                attackMode: 'judgement',
+                lastAttack: 'crush',
+                attackTimer: 6,
                 attackSpeed: 1,
                 stunTimer: 0,
-                shielded: false,
-                purgeActive: false,
+                gravityPull: false,
                 hp: 4200,
                 maxHp: 4200,
                 isBoss: true
@@ -5194,7 +5346,7 @@
         function updateShockwaves(dt) {
             shockwaves = shockwaves.filter(s => {
                 s.life -= dt;
-                const expand = s.voidPulse ? 0.06 : 0.1;
+                const expand = s.architectRing ? 0.13 : (s.voidPulse ? 0.06 : 0.1);
                 s.mesh.scale.addScalar(expand);
                 if (s.glow) s.glow.scale.copy(s.mesh.scale);
                 s.radius = s.baseOuter * s.mesh.scale.x;
@@ -5452,18 +5604,15 @@
                     activeBoss.crown.children.forEach(c => pieces.push({ mesh: c }));
                 }
             } else if (activeBoss.type === 'architect') {
-                if (activeBoss.bones) {
-                    activeBoss.bones.forEach(b => pieces.push({ mesh: b }));
-                    if (activeBoss.chestCore) pieces.push({ mesh: activeBoss.chestCore, isCore: true });
-                } else {
-                    if (activeBoss.maskGroup) pieces.push({ mesh: activeBoss.maskGroup, isCore: true });
-                    if (activeBoss.core) pieces.push({ mesh: activeBoss.core });
-                    if (activeBoss.trackingEye) pieces.push({ mesh: activeBoss.trackingEye });
-                    [activeBoss.armL, activeBoss.armR].forEach(arm => {
-                        if (!arm || !arm.root) return;
-                        arm.root.traverse(child => { if (child.isMesh || child.type === 'Line') pieces.push({ mesh: child }); });
-                    });
+                if (activeBoss.singularityCore) pieces.push({ mesh: activeBoss.singularityCore, isCore: true });
+                if (activeBoss.maskGroup) pieces.push({ mesh: activeBoss.maskGroup });
+                if (activeBoss.core && activeBoss.core !== activeBoss.singularityCore) {
+                    pieces.push({ mesh: activeBoss.core });
                 }
+                [activeBoss.armL, activeBoss.armR].forEach(arm => {
+                    if (!arm || !arm.root) return;
+                    arm.root.traverse(child => { if (child.isMesh || child.type === 'Line') pieces.push({ mesh: child }); });
+                });
             }
 
             pieces.forEach(p => {
@@ -5675,6 +5824,14 @@
             activeBoss.hp -= dmg;
             updateBossBar();
             if (dmg > 0) showHitmarker();
+            if (activeBoss.type === 'architect' && activeBoss.architectPhase === 1 &&
+                activeBoss.hp <= activeBoss.maxHp * 0.35 && !architectTransformActive &&
+                activeBoss.movePhase !== 'phase2cut') {
+                activeBoss.hp = Math.max(activeBoss.hp, Math.floor(activeBoss.maxHp * 0.34));
+                updateBossBar();
+                startArchitectPhase2Transform();
+                return;
+            }
             if (activeBoss.hp <= 0) {
                 if (activeBoss.type === 'void' && activeBoss.voidPhase === 1) {
                     activeBoss.hp = 0;
@@ -5682,24 +5839,7 @@
                     startVoidAscension();
                     return;
                 }
-                if (activeBoss.type === 'architect' && activeBoss.architectPhase === 1) {
-                    activeBoss.hp = 0;
-                    updateBossBar();
-                    startArchitectPhase2Transform();
-                    return;
-                }
-                if (activeBoss.type === 'architect' && activeBoss.purgeActive) {
-                    startBossDefeatSequence();
-                    return;
-                }
-                if (activeBoss.type === 'architect' && !activeBoss.purgeActive) {
-                    beginArchitectSystemPurge();
-                    return;
-                }
                 startBossDefeatSequence();
-            } else if (activeBoss.type === 'architect' && activeBoss.architectPhase === 2 &&
-                !activeBoss.purgeActive && activeBoss.hp <= activeBoss.maxHp * 0.1) {
-                beginArchitectSystemPurge();
             }
         }
 
@@ -5772,9 +5912,7 @@
                     const corePos = getArchitectCoreWorld();
                     const hitRadius = getArchitectCoreHitRadius();
                     if (distPointToRay(corePos, origin, dir) < hitRadius) {
-                        if (!(activeBoss.purgeActive && bossSource !== 'ultimate')) {
-                            damageBoss(bossSource === 'ultimate' ? 0 : BOSS_PIERCE_DMG, bossSource);
-                        }
+                        damageBoss(bossSource === 'ultimate' ? 0 : BOSS_PIERCE_DMG, bossSource);
                     }
                 } else {
                     const hitPoint = voidCoreExposed ? getVoidBossCoreWorld() : activeBoss.mesh.position;
@@ -5873,7 +6011,7 @@
                     damageEnemy(enemy, 180, !onGround);
                 }
             });
-            if (activeBoss && activeBoss.type === 'architect' && activeBoss.purgeActive) {
+            if (activeBoss && activeBoss.type === 'architect') {
                 if (pos.distanceTo(getArchitectCoreWorld()) < 14) damageBoss(0, 'ultimate');
             } else if (activeBoss && activeBoss.mesh.position.distanceTo(pos) < radius + 6) {
                 damageBoss(0, 'ultimate');
@@ -5940,8 +6078,8 @@
                     }
                 }
                 if (!hit && activeBoss) {
-                    if (activeBoss.type === 'architect' && activeBoss.purgeActive) {
-                        if (r.mesh.position.distanceTo(getArchitectCoreWorld()) < 8) hit = true;
+                    if (activeBoss.type === 'architect') {
+                        if (r.mesh.position.distanceTo(getArchitectCoreWorld()) < getArchitectCoreHitRadius() + 2.5) hit = true;
                     } else if (r.mesh.position.distanceTo(activeBoss.mesh.position) < 7) {
                         hit = true;
                     }
@@ -6539,6 +6677,15 @@
 
             playerPos.x += move.x * speed * dt;
             playerPos.z += move.z * speed * dt;
+            if (activeBoss && activeBoss.type === 'architect' && activeBoss.architectPhase === 2 && activeBoss.gravityPull) {
+                const pull = new THREE.Vector2(-playerPos.x, -playerPos.z);
+                if (pull.lengthSq() > 0.5) {
+                    pull.normalize();
+                    const pullStrength = 11 + (1 - activeBoss.hp / activeBoss.maxHp) * 8;
+                    playerPos.x += pull.x * pullStrength * dt;
+                    playerPos.z += pull.y * pullStrength * dt;
+                }
+            }
             clampArena();
             pillarCollision();
 
