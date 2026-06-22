@@ -593,6 +593,28 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
     (() => {
+        // =============================================================================
+        // NEON KILL — browser FPS built on Three.js (r128)
+        // =============================================================================
+        // Pointer-lock arena shooter: WASD movement, slide, jump/slam, dual weapons
+        // (cyber revolver + shotgun), RMB/E parry, hold-LMB charge specials, G ultimates.
+        //
+        // Style system: damage builds a multiplier and rank (DULL → CHAOTIC → SUPREME)
+        // that scales score — chain kills and aerial play to climb the meter.
+        //
+        // Waves: horde fights scale with wave number; every 5th wave is a boss fight.
+        //   · Apex Sentry (waves 5, 10, 20, …) — floating icosahedron, rings, laser walls
+        //   · Void Phantom / Oblivion titan (waves 10, 20, …) — executioner, tentacles, ascension
+        //   · Corpse of the Architect (wave 15) — Minos-inspired colossus, parryable fist, black hole
+        //
+        // Hub upgrades (Overclock Core, Siphon Nanites, Slam Module) load from sessionStorage
+        // via NeonKillSetup. Procedural Web Audio combat music + synthesized SFX.
+        //
+        // Visuals: wireframe neon aesthetic, canvas obsidian floor, corrupted cathedral
+        // overhead, camera-attached viewmodels (depthTest off, renderOrder 999).
+        // =============================================================================
+
+        // ===== GAME STATE & CONSTANTS =====
         let score = 0;
         let styleMultiplier = 1.0;
         let styleRank = 'DULL';
@@ -612,6 +634,7 @@
         let hasSiphonNanites = false;
         let hasSlamModule = false;
 
+        // --- Hub session upgrades (loaded from sessionStorage) ---
         window.NeonKillSetup = {
             enableOverclockCore: () => { hasOverclockCore = true; },
             enableSiphonNanites: () => { hasSiphonNanites = true; },
@@ -667,20 +690,21 @@
         let voidStalkerTrails = [];
         let voidSparkTrails = [];
         let voidDashWake = [];
-        let architectSlam = null;
-        let architectBlackHole = null;
-        let architectPunchFist = null;
-        let architectEnemyDrops = [];
-        let architectWallDebris = [];
-        let architectLightState = null;
+        // Architect boss runtime state — see ARCHITECT BOSS section (~4115)
+        let architectSlam = null;          // active slam attack state machine { phase, timer, type }
+        let architectBlackHole = null;     // chasing void orb { mesh, ring, life, speed, hit }
+        let architectPunchFist = null;     // parryable fist projectile during punch attack
+        let architectEnemyDrops = [];      // pending parasite spawn warnings → regular enemy drops
+        let architectWallDebris = [];      // intro wall tear debris
+        let architectLightState = null;    // saved arena lights so we can restore after the fight
         let architectIntroActive = false;
-        let architectIntroPhase = 'idle';
+        let architectIntroPhase = 'idle';  // tear → reveal → dialogue → hold → done
         let architectIntroTimer = 0;
-        let architectTransformActive = false;
+        let architectTransformActive = false; // locks input during phase-2 cinematic
         let architectStarrySky = null;
-        let architectArenaGroup = null;
+        let architectArenaGroup = null;    // gate, neon pillars, stars (Minos court aesthetic)
         let architectAmbience = null;
-        let architectBarkTimer = null;
+        let architectBarkTimer = null;     // reverts large attack callout text after bark
         let isDialogueActive = false;
         let voidTransformActive = false;
         let voidTransformPhase = 'idle';
@@ -755,6 +779,7 @@
         const JUMP_PAD_VEL = 35;
         const FLOOR_LIMIT = ARENA - 0.85;
 
+        // ===== THREE.JS SCENE, CAMERA & MATERIALS =====
         const scene = new THREE.Scene();
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -799,6 +824,8 @@
         const parryWindRot = { x: 0, y: -0.28, z: 0 };
         const parryStrikeRot = { x: -0.15, y: 0.18, z: Math.PI / 4 };
 
+        // ===== VIEWMODELS & WEAPONS =====
+        // First-person revolver, shotgun, rocket-tube ultimate, charge HUD battery, parry arm.
         function stampViewmodel(group, order = VIEWMODEL_RENDER_ORDER) {
             group.traverse((obj) => {
                 if (!obj.isMesh && !obj.isLineSegments) return;
@@ -981,6 +1008,7 @@
         shotgunRocketTube.visible = false;
         camera.add(shotgunRocketTube);
 
+        // --- HUD DOM references, crosshair raycaster & Architect palette ---
         const ultimateMeterWrapEl = document.getElementById('ultimateMeterWrap');
         const ultimateMeterFillEl = document.getElementById('ultimateMeterFill');
         const ultimatePromptEl = document.getElementById('ultimatePrompt');
@@ -1007,7 +1035,7 @@
         const CORPSE_FLESH_LIGHT = 0x4a2858;
         const CORPSE_STONE = 0x151018;
         const CORPSE_WIRE = 0x664466;
-        const ARCHITECT_MAX_ADDS = 10;
+        const ARCHITECT_MAX_ADDS = 10; // cap on drones/husks spawned by parasite attack
         const BASE_FOG = { color: 0x030006, near: 18, far: 95 };
         const weaponLabelEl = document.getElementById('weaponLabel');
 
@@ -1051,6 +1079,9 @@
         let lastHitmarkerSoundTime = 0;
         let leftHoldTime = 0;
         let chargeCommitted = false;
+
+        // ===== AUDIO SYSTEM =====
+        // Web Audio context, limiter, procedural combat music scheduler, SFX helpers.
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1259,6 +1290,7 @@
             }
         }
 
+        // ===== PAUSE & HUB RETURN =====
         function clearInputState() {
             Object.keys(keys).forEach(code => { keys[code] = false; });
             mouseDown.left = false;
@@ -1359,6 +1391,7 @@
             window.location.href = 'index.html';
         }
 
+        // --- Combat feedback SFX (shots, parry, charge ready) ---
         function playShootSound() {
             const ctx = initAudio();
             const t = ctx.currentTime;
@@ -1447,6 +1480,7 @@
             osc.stop(t + 0.035);
         }
 
+        // ===== CROSSHAIR & HITMARKER =====
         function showHitmarker() {
             hitmarkerTimer = HITMARKER_FADE_MS / 1000;
             hitmarkerEl.style.opacity = '1';
@@ -1518,6 +1552,7 @@
             coreLockActive = locked;
         }
 
+        // --- Dialogue & cinematic SFX ---
         function playDialogueTypewriterBlip(char = 'a') {
             const ctx = initAudio();
             const t = ctx.currentTime;
@@ -1576,6 +1611,7 @@
             }
         }
 
+        // --- Boss & void attack SFX ---
         function playVoidTransitionScream() {
             const ctx = initAudio();
             const t = ctx.currentTime;
@@ -1916,6 +1952,7 @@
             if (remaining > 0.55) boss[warnedProp] = false;
         }
 
+        // --- Directional damage flash overlay ---
         function triggerDirectionalHitFlash(sourcePos) {
             const dx = sourcePos.x - playerPos.x;
             const dz = sourcePos.z - playerPos.z;
@@ -1949,6 +1986,8 @@
             updateDamageFlashVisual(hitFlashTimer / 0.42);
         }
 
+        // ===== BOSS ENCOUNTER TRACKING & DAMAGE =====
+        // Tracks no-damage boss clears for achievements; applyBossDamage during fights.
         function beginBossEncounterTracking() {
             bossEncounterTracking = true;
             bossEncounterNoDamage = true;
@@ -1974,6 +2013,7 @@
             else updateUI();
         }
 
+        // --- Weapon blast & ultimate SFX ---
         function playShotgunBlastSound() {
             const ctx = initAudio();
             const t = ctx.currentTime;
@@ -2148,6 +2188,8 @@
             noise.stop(t + 0.42);
         }
 
+        // ===== RENDERER, LIGHTING & ARENA GEOMETRY =====
+        // WebGL renderer, arena lights/fog, obsidian floor, cathedral overhead, pillars, jump pads.
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -2329,6 +2371,8 @@
 
         const playerPos = new THREE.Vector3(0, FLOOR_Y + EYE_HEIGHT, 0);
 
+        // ===== PLAYER MOVEMENT & COMBAT HELPERS =====
+        // Aim/muzzle queries, weapon swap, ultimate meter, speedMult upgrade hook.
         function speedMult() { return hasOverclockCore ? 1.25 : 1; }
 
         function getAimDirection() {
@@ -2385,6 +2429,7 @@
             setWeaponVisibility();
         }
 
+        // --- Style system & HUD ---
         function updateStyleRank() {
             if (styleMultiplier >= 3.5) styleRank = 'SUPREME';
             else if (styleMultiplier >= 2.0) styleRank = 'CHAOTIC';
@@ -2399,6 +2444,7 @@
             document.getElementById('multDisplay').textContent = '×' + styleMultiplier.toFixed(1);
         }
 
+        // ===== ENEMY SPAWNING =====
         function spawnEnemy(type, x, z) {
             let mesh, hp = type === 'drone' ? 30 : 50;
             if (type === 'drone') {
@@ -2426,6 +2472,7 @@
             });
         }
 
+        // ===== BOSS HUD & DIALOGUE UI =====
         function bossWaveLabel(name) {
             return `WAVE ${String(wave).padStart(2, '0')} // ${name}`;
         }
@@ -2484,6 +2531,7 @@
             mouseDown.right = false;
         }
 
+        // --- Boss cinematic audio & assembly FX ---
         function stopApexSonarHum() {
             if (!apexSonarAudio) return;
             const ctx = initAudio();
@@ -2706,6 +2754,8 @@
             voidCinematic = { rift, lightning, riftScale: 1 };
         }
 
+        // ===== BOSS DIALOGUE & CINEMATICS =====
+        // Entrance dialogues, Apex scan grid / Void rift intros, engage handoff, cinematic tick.
         function startBossEntranceDialogue(config) {
             bossIntroActive = true;
             bossAwaitingEngage = true;
@@ -2935,6 +2985,7 @@
             }
         }
 
+        // --- Boss intro typewriter & cinematic dialogue lines ---
         function startBossIntro(boss) {
             beginBossEncounterTracking();
             bossIntroActive = true;
@@ -3021,6 +3072,8 @@
             }
         }
 
+        // ===== VOID BOSS =====
+        // Phantom executioner (phase 1), Oblivion titan (phase 2), tentacles, slam zones, ascension.
         function clearLaserWalls() {
             laserWalls.forEach(w => scene.remove(w.mesh));
             laserWalls = [];
@@ -3100,6 +3153,7 @@
             clearBossCinematicExtras();
         }
 
+        // --- Void tentacle geometry, slam zones & phantom/titan builders ---
         function buildVoidTentacle(segCount, color) {
             const group = new THREE.Group();
             const segments = [];
@@ -3676,6 +3730,7 @@
             });
         }
 
+        // --- Void Phantom phase-1 AI (executioner blink, decap dash, melee slashes) ---
         function updateVoidPhantomBoss(dt) {
             const b = activeBoss;
             const time = performance.now() * 0.001;
@@ -3803,6 +3858,8 @@
             clampBossPos(b.mesh.position);
         }
 
+        // ===== APEX BOSS =====
+        // Floating icosahedron sentry: ring crown, projectile/laser-wall modes, wave-5 cinematic.
         function buildApexSentryGroup() {
             const mesh = new THREE.Group();
             const shellGeo = new THREE.IcosahedronGeometry(2.8, 0);
@@ -3939,6 +3996,7 @@
             spawnVoidPhantom();
         }
 
+        // --- Architect boss prelude audio ---
         function playArchitectWallTearSound() {
             const ctx = initAudio();
             const t = ctx.currentTime;
@@ -4058,8 +4116,18 @@
             architectCrimsonVeilEl.style.opacity = String(Math.max(0, Math.min(1, strength)));
         }
 
+        // =============================================================================
+        // ARCHITECT BOSS — wave 15: THE CORPSE OF THE ARCHITECT
+        // =============================================================================
+        // Minos-inspired colossus in a crimson/purple court arena (gate, neon pillars, stars).
+        // Attack kit: slam shockwaves, parryable punch fist, chasing black hole, parasite adds.
+        // Weakpoint: twin white eyes for the entire fight; phase-2 plasma transform + mask tear.
+        // Intro: wall tear cinematic → dialogue → combat. Runtime state declared up top (~670).
+        // =============================================================================
+
         function enterArchitectArena() {
             if (architectArenaGroup) return;
+            // Swap to purple Lust-layer lighting; restore saved values in exitArchitectArena().
             if (arenaAmbientLight && !architectLightState) {
                 architectLightState = {
                     ambient: arenaAmbientLight.color.getHex(),
@@ -4081,6 +4149,7 @@
                 }
             }
             architectArenaGroup = new THREE.Group();
+            // Iron gate between player and the colossus (Court of the Corpse King framing).
             const gateGroup = new THREE.Group();
             gateGroup.position.set(0, 0, -ARENA * 0.44);
             for (let i = 0; i < 15; i += 1) {
@@ -4149,6 +4218,7 @@
         }
 
         function exitArchitectArena() {
+            // Tear down bespoke geometry/lighting and reset intro/transform flags.
             if (architectArenaGroup) {
                 scene.remove(architectArenaGroup);
                 architectArenaGroup = null;
@@ -4186,6 +4256,7 @@
         }
 
         function clearArchitectExtras() {
+            // Remove transient attack VFX so nothing leaks between phases or after defeat.
             architectWallDebris.forEach(d => {
                 if (d.mesh) scene.remove(d.mesh);
                 if (d.wire) scene.remove(d.wire);
@@ -4212,6 +4283,7 @@
         }
 
         function createArchitectWallTear() {
+            // Intro: back wall shatters into debris before the boss scales in.
             architectWallDebris = [];
             const cols = 6;
             const rows = 5;
@@ -4260,6 +4332,8 @@
             });
         }
 
+        // --- Corpse colossus mesh builders (procedural Minos-style mummy) ---
+
         function corpseFleshMat(light = false) {
             return new THREE.MeshBasicMaterial({
                 color: light ? CORPSE_FLESH_LIGHT : CORPSE_FLESH,
@@ -4269,6 +4343,7 @@
         }
 
         function addCorpseWire(group, points, color = CORPSE_WIRE) {
+            // Barbed-wire segments: line pairs plus a small perpendicular barb at each midpoint.
             const verts = [];
             for (let i = 0; i < points.length - 1; i += 1) {
                 const a = points[i];
@@ -4441,6 +4516,7 @@
         }
 
         function buildDecrepitArchitect() {
+            // Assembles the full boss rig: mask/eyes, crown, torso, arms, and weakpoint refs.
             const mesh = new THREE.Group();
             const colossus = new THREE.Group();
             colossus.position.set(0, 24, -ARENA * 0.5);
@@ -4571,6 +4647,7 @@
             const weakpointEyes = [eyeL, eyeR];
             const maskCracks = [];
             return {
+                // Everything spawnCorpseOfTheArchitect() copies onto activeBoss.
                 mesh, maskGroup, maskLeft, maskRight, maskCracks,
                 eyeL, eyeR, eyeGlowL, eyeGlowR, eyeBeamL, eyeBeamR, eyeLight, eyeSpotL, eyeSpotR,
                 weakpointEyes, mouthWire, crown, bodyWraps, restraints,
@@ -4585,6 +4662,8 @@
 
         const architectCoreScaleScratch = new THREE.Vector3();
         const ARCHITECT_CORE_VISUAL_RADIUS = 2.2;
+
+        // --- Weakpoint / damage helpers (eyes are hittable in both phases) ---
 
         function getArchitectWeakpointMeshes() {
             const b = activeBoss;
@@ -4601,6 +4680,7 @@
         }
 
         function getArchitectCoreHitRadius() {
+            // Hit sphere scales with eye mesh world scale so aim feels consistent at any boss size.
             if (!activeBoss || activeBoss.type !== 'architect') return 5;
             const eyes = getArchitectWeakpointMeshes();
             if (eyes.length) {
@@ -4698,6 +4778,7 @@
         function architectCanTakeDamage(source) {
             const b = activeBoss;
             if (!b || b.type !== 'architect') return true;
+            // Invulnerable during phase-2 intro cinematic so HP cannot skip the cutscene.
             if (b.architectPhase === 1 && b.movePhase === 'phase2cut') return false;
             return true;
         }
@@ -4725,6 +4806,7 @@
         }
 
         function barkArchitect(line, tacticalHint = '') {
+            // Large Ultrakill-style attack callout; falls back to smaller tactical hint after 620ms.
             architectBossPromptEl.textContent = line;
             architectBossPromptEl.classList.add('visible', 'minos-bark');
             if (architectBarkTimer) clearTimeout(architectBarkTimer);
@@ -4756,6 +4838,7 @@
         }
 
         function updateArchitectArmRig(arm, time, attacking, slamming) {
+            // Procedural arm pose: reach/raise/clench lerps drive shoulder/elbow/hand during attacks.
             if (!arm) return;
             const hoverBase = arm.hoverY || 18;
             arm.pose.reach = THREE.MathUtils.lerp(arm.pose.reach, attacking ? 0.72 : 0.12, 0.05);
@@ -4775,6 +4858,7 @@
         }
 
         function openArchitectMask(amount) {
+            // Slight mask split animation; eyes stay visible unless opening wide in phase 2 cut.
             const b = activeBoss;
             if (!b || !b.maskLeft || !b.maskRight) return;
             b.maskLeft.rotation.y = -amount * 0.58;
@@ -4808,7 +4892,10 @@
             osc.stop(t + 0.58);
         }
 
+        // --- Attack implementations (Corpse of King Minos kit) ---
+
         function spawnArchitectSlamRing(x, z, ringWidth = 2.8) {
+            // Expanding ring picked up by updateShockwaves(); width controls jump timing window.
             const geo = new THREE.RingGeometry(1.2, 4.5, 56);
             geo.rotateX(-Math.PI / 2);
             const mesh = new THREE.Mesh(
@@ -4835,6 +4922,7 @@
         }
 
         function updateArchitectPunchParry() {
+            // Feedbacker window (31–70ms): parrying the fist deals bonus boss damage.
             if (!player.isParrying || !architectPunchFist || architectPunchFist.parried) return;
             const ms = parryAnimTimer * 1000;
             if (ms < 31 || ms > 70) return;
@@ -4848,6 +4936,7 @@
         }
 
         function beginArchitectSlam() {
+            // Random floor / left-wall / right-wall slam; arm tracks target during wind-up.
             const b = activeBoss;
             const types = ['floor', 'leftWall', 'rightWall'];
             const type = types[Math.floor(Math.random() * types.length)];
@@ -4876,6 +4965,7 @@
         }
 
         function beginArchitectPunch() {
+            // Wind-up then launches a forward fist hitbox the player can parry or dodge.
             const b = activeBoss;
             b.movePhase = 'punch';
             b.lastAttack = 'punch';
@@ -4890,6 +4980,7 @@
         }
 
         function beginArchitectBlackHole() {
+            // Tap wind-up; orb spawns at arena center then chases the player.
             const b = activeBoss;
             b.movePhase = 'blackhole';
             b.lastAttack = 'blackhole';
@@ -4900,6 +4991,7 @@
         }
 
         function spawnArchitectBlackHole() {
+            // Persists after attack ends until it hits the player or times out (see updateArchitectBoss).
             const mesh = new THREE.Mesh(
                 new THREE.SphereGeometry(1.8, 20, 20),
                 new THREE.MeshBasicMaterial({ color: 0x110018, transparent: true, opacity: 0.92 })
@@ -4919,6 +5011,7 @@
         }
 
         function beginArchitectParasite() {
+            // Phase-2-only in rotation: drops regular drones/husks instead of projectile parasites.
             const b = activeBoss;
             b.movePhase = 'parasite';
             b.lastAttack = 'parasite';
@@ -4939,6 +5032,7 @@
         }
 
         function spawnArchitectEnemyDrop(x, z) {
+            // Uses the same spawnEnemy() as normal waves; capped so the arena cannot flood.
             if (enemies.length >= architectAddCap()) return;
             const type = Math.random() < 0.48 ? 'drone' : 'husk';
             const sx = Math.max(-FLOOR_LIMIT + 2, Math.min(FLOOR_LIMIT - 2, x + (Math.random() - 0.5) * 4.5));
@@ -4948,6 +5042,7 @@
         }
 
         function spawnArchitectEnemyWarning(x, z) {
+            // Purple ring telegraph; architectEnemyDrops resolves into spawnArchitectEnemyDrop().
             const geo = new THREE.RingGeometry(0.8, 3.4, 36);
             geo.rotateX(-Math.PI / 2);
             const warn = new THREE.Mesh(
@@ -4960,6 +5055,7 @@
         }
 
         function updateArchitectSlam(dt) {
+            // State machine: wind (track) → impact (ring + direct hit) → recover (reset arm).
             const b = activeBoss;
             if (!b || b.movePhase !== 'slam' || !architectSlam) return;
             const s = architectSlam;
@@ -5020,6 +5116,7 @@
         }
 
         function updateArchitectPunch(dt) {
+            // State machine: wind → strike (moving fist) → recover.
             const b = activeBoss;
             if (!b || b.movePhase !== 'punch') return;
             const arm = b.punchSide;
@@ -5090,6 +5187,7 @@
         }
 
         function updateArchitectBlackHole(dt) {
+            // Spawns orb late in wind-up; boss returns idle once orb is gone.
             const b = activeBoss;
             if (!b || b.movePhase !== 'blackhole') return;
             b.blackHoleTimer -= dt;
@@ -5137,6 +5235,7 @@
         }
 
         function updateArchitectParasite(dt) {
+            // Staggered warning rings around the player; each resolves to a regular enemy spawn.
             const b = activeBoss;
             if (!b || b.movePhase !== 'parasite') return;
             b.parasiteTimer -= dt;
@@ -5175,6 +5274,7 @@
         }
 
         function updateArchitectPhase2Cut(dt) {
+            // Triggered at 35% HP: cinematic mask split + parasite burst, then faster attack rotation.
             const b = activeBoss;
             if (!b || b.movePhase !== 'phase2cut') return;
             b.cutTimer += dt;
@@ -5211,6 +5311,7 @@
         }
 
         function finishArchitectAttack(b) {
+            // Round-robin attack picker; phase 2 adds parasite to the cycle.
             b.movePhase = 'idle';
             const phase2 = b.architectPhase === 2;
             const modes = phase2
@@ -5223,6 +5324,7 @@
         }
 
         function startArchitectPhase2Transform() {
+            // Called from damageBoss() when HP crosses 35%; clears adds and starts cutscene.
             if (architectTransformActive || !activeBoss || activeBoss.architectPhase !== 1) return;
             architectTransformActive = true;
             clearArchitectExtras();
@@ -5243,6 +5345,7 @@
         }
 
         function updateArchitectBoss(dt) {
+            // Main boss tick: run active attack states, then schedule next attack when idle.
             const b = activeBoss;
             if (!b) return;
             const time = performance.now() * 0.001;
@@ -5253,6 +5356,7 @@
             updateArchitectBlackHole(dt);
             updateArchitectParasite(dt);
             updateArchitectPunchParry();
+            // Black hole keeps chasing even after the blackhole attack state ends.
             if (architectBlackHole && b.movePhase !== 'blackhole') {
                 const h = architectBlackHole;
                 h.life -= dt;
@@ -5281,7 +5385,7 @@
             }
             if (b.stunTimer > 0) {
                 b.stunTimer -= dt;
-                return;
+                return; // parry stun pauses attack scheduling
             }
             if (b.armL && b.armR && b.movePhase === 'idle') {
                 updateArchitectArmRig(b.armL, time, false, false);
@@ -5299,6 +5403,7 @@
             if (b.movePhase === 'phase2cut') return;
             b.attackTimer -= dt * speed;
             if (b.attackTimer <= 0) {
+                // Dispatch the next attack from activeBoss.attackMode (set by finishArchitectAttack).
                 if (b.attackMode === 'slam') beginArchitectSlam();
                 else if (b.attackMode === 'punch') beginArchitectPunch();
                 else if (b.attackMode === 'blackhole') beginArchitectBlackHole();
@@ -5307,6 +5412,7 @@
         }
 
         function finishArchitectIntroHandoff() {
+            // Intro complete: restore HUD/weapons and start the combat attack loop.
             architectIntroActive = false;
             architectIntroPhase = 'done';
             hideBossDialogue();
@@ -5329,6 +5435,7 @@
         }
 
         function updateArchitectIntro(rawDt) {
+            // Cinematic sequence before combat: wall tear → boss scale-in → dialogue → brief hold.
             if (!architectIntroActive || !activeBoss) return;
             architectIntroTimer += rawDt;
             updateArchitectWallDebris(rawDt);
@@ -5398,6 +5505,7 @@
         }
 
         function spawnCorpseOfTheArchitect() {
+            // Wave 15 boss entry: build arena + colossus, then play wall-tear intro.
             enterArchitectArena();
             const colossus = buildDecrepitArchitect();
             scene.add(colossus.mesh);
@@ -5455,6 +5563,9 @@
             playArchitectWallTearSound();
             screenShake = 3.5;
         }
+
+        // ===== BOSS COMBAT TICK & SHARED ATTACKS =====
+        // spawnBoss dispatch, laser walls, shockwaves, updateBoss → apex/void/architect handlers.
         function spawnBoss() {
             isBossWave = true;
             enemies = [];
@@ -5843,6 +5954,7 @@
             });
         }
 
+        // --- Apex Sentry per-frame combat (projectiles / laser-wall modes) ---
         function updateApexBoss(dt) {
             const b = activeBoss;
             const t = performance.now() * 0.001;
@@ -5910,6 +6022,7 @@
             b.attackTimer = 5.5;
         }
 
+        // --- Void Titan phase-2 AI (overdrive, shard slam, orbit collapse) ---
         function updateVoidBoss(dt) {
             const b = activeBoss;
             const time = performance.now() * 0.001;
@@ -6024,6 +6137,8 @@
             }
         }
 
+        // ===== BOSS DEFEAT SEQUENCE =====
+        // Debris burst, dying words, explosion flash, wave advance on finishBossDefeat.
         function collectBossDebris() {
             bossDebris = [];
             if (!activeBoss) return;
@@ -6274,6 +6389,7 @@
             }
         }
 
+        // --- Boss damage resolution (HP, phase transitions, defeat trigger) ---
         function damageBoss(amt, source) {
             if (!activeBoss || bossDefeatActive || voidTransformActive || architectTransformActive) return;
             if (activeBoss.type === 'architect' && !architectCanTakeDamage(source)) return;
@@ -6326,6 +6442,7 @@
             startBossDefeatSequence();
         }
 
+        // ===== WAVE SPAWNING =====
         function spawnWave() {
             enemies.forEach(e => scene.remove(e.mesh));
             enemies = [];
@@ -6352,6 +6469,8 @@
             }
         }
 
+        // ===== WEAPON FIRING, ULTIMATE & PARRY =====
+        // damageAlongRay, shotgun/revolver shots, charge pierce, ultimates, parry window.
         function calcShotgunPelletDamage(dist) {
             if (dist <= SHOTGUN_FALLOFF_NEAR) return SHOTGUN_MAX_PELLET;
             if (dist >= SHOTGUN_FALLOFF_FAR) return SHOTGUN_MIN_PELLET;
@@ -6715,6 +6834,7 @@
             projectiles.push({ mesh, vel: dir.multiplyScalar(22), owner: 'enemy', life: 5 });
         }
 
+        // --- Parry window, arm animation & success burst ---
         function startParry() {
             if (isDialogueActive || ultimateActive) return;
             if (player.isParrying || isCharging) return;
@@ -6906,6 +7026,7 @@
             }
         }
 
+        // --- Enemy damage, kills & style scoring ---
         function damageEnemy(enemy, amt, midAir) {
             if (amt > 0) showHitmarker();
             addUltimateCharge(amt);
@@ -6952,6 +7073,7 @@
             });
         }
 
+        // ===== GAME LIFECYCLE (RESET / GAME OVER) =====
         function resetGame() {
             score = 0;
             styleMultiplier = 1.0;
@@ -7058,6 +7180,8 @@
             document.getElementById('gameOverScreen').style.display = 'flex';
         }
 
+        // ===== PLAYER PHYSICS & COLLISION =====
+        // Arena clamp, pillars, jump pads, chasm fall, updatePlayer movement loop.
         function clampArena() {
             playerPos.x = Math.max(-FLOOR_LIMIT, Math.min(FLOOR_LIMIT, playerPos.x));
             playerPos.z = Math.max(-FLOOR_LIMIT, Math.min(FLOOR_LIMIT, playerPos.z));
@@ -7197,6 +7321,7 @@
         }
 
         function updateRegularEnemies(dt) {
+            // Standard drone/husk AI — also used for Architect parasite spawns during boss fights.
             for (const enemy of enemies) {
                 if (enemy.type === 'drone') {
                     enemy.mesh.position.y = 5 + Math.sin(performance.now() * 0.002 + enemy.mesh.id) * 0.5;
@@ -7226,9 +7351,11 @@
             }
         }
 
+        // ===== ENEMY & PROJECTILE UPDATES =====
         function updateEnemies(dt) {
             if (activeBoss) {
                 updateBoss(dt);
+                // Architect parasite adds still need normal enemy behavior while the boss is active.
                 if (activeBoss.type === 'architect' && enemies.length > 0 &&
                     !architectIntroActive && !architectTransformActive && !bossDefeatActive) {
                     updateRegularEnemies(dt);
@@ -7357,6 +7484,7 @@
             });
         }
 
+        // --- Heal orbs (Siphon Nanites) & style meter decay ---
         function updateHealParticles(dt) {
             const healAmt = hasSiphonNanites ? 14 : 7;
             healParticles = healParticles.filter(h => {
@@ -7380,6 +7508,8 @@
             updateStyleRank();
         }
 
+        // ===== MAIN LOOP, INPUT & BOOTSTRAP =====
+        // requestAnimationFrame tick, pointer-lock input, beginGame / menu wiring.
         let last = performance.now();
         function loop(now) {
             requestAnimationFrame(loop);
@@ -7432,6 +7562,7 @@
         }
         requestAnimationFrame(loop);
 
+        // --- Keyboard, mouse & pointer-lock input ---
         document.addEventListener('keydown', e => {
             keys[e.code] = true;
             if (e.code === 'Escape') {
@@ -7499,6 +7630,7 @@
             pitch = Math.max(-1.2, Math.min(1.2, pitch));
         });
 
+        // --- Game start, retry, hub & resize handlers ---
         function beginGame() {
             initAudio();
             isPaused = false;
