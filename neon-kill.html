@@ -744,37 +744,42 @@
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
 
-        const viewFlags = { depthTest: true, depthWrite: false, fog: false };
+        const viewFlags = { depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide };
         const VIEWMODEL_RENDER_ORDER = 2000;
-        const metalDark = new THREE.MeshBasicMaterial({ color: 0x8a9ab8, transparent: false, opacity: 1.0, ...viewFlags });
-        const metalMid = new THREE.MeshBasicMaterial({ color: 0xa8b8d0, transparent: false, opacity: 1.0, ...viewFlags });
-        const metalLight = new THREE.MeshBasicMaterial({ color: 0xc8d8f0, transparent: false, opacity: 1.0, ...viewFlags });
-        const metalEdge = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalDark = new THREE.MeshBasicMaterial({ color: 0xd8e8ff, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalMid = new THREE.MeshBasicMaterial({ color: 0xe8f4ff, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalLight = new THREE.MeshBasicMaterial({ color: 0xf4fbff, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalEdge = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, depthTest: false, depthWrite: false, fog: false });
+        const metalWireOverlay = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: false, opacity: 1.0, ...viewFlags });
         const cyanSlotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, ...viewFlags });
         const armFillMat = new THREE.MeshBasicMaterial({
-            color: 0xff007f,
-            transparent: true,
-            opacity: 0.62,
+            color: 0xff2288,
+            transparent: false,
+            opacity: 1.0,
             ...viewFlags
         });
         const armWireMat = new THREE.LineBasicMaterial({
             color: 0xffffff,
             transparent: false,
             opacity: 1.0,
-            ...viewFlags
+            depthTest: false,
+            depthWrite: false,
+            fog: false
         });
-        const armGlowMat = new THREE.MeshBasicMaterial({
-            color: 0x00ffff,
-            transparent: true,
-            opacity: 0.28,
+        const armWireOverlay = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            wireframe: true,
+            transparent: false,
+            opacity: 1.0,
             ...viewFlags
         });
 
-        const REVOLVER_BASE = { x: 0.35, y: -0.35, z: -0.7 };
-        const SHOTGUN_BASE = { x: 0.38, y: -0.38, z: -0.62 };
-        const ironDark = new THREE.MeshBasicMaterial({ color: 0x9a8aa8, transparent: false, opacity: 1.0, ...viewFlags });
-        const ironMid = new THREE.MeshBasicMaterial({ color: 0xb8a8c8, transparent: false, opacity: 1.0, ...viewFlags });
-        const ironEdge = new THREE.LineBasicMaterial({ color: 0xff88dd, transparent: false, opacity: 1.0, ...viewFlags });
+        const REVOLVER_BASE = { x: 0.35, y: -0.32, z: -0.52 };
+        const SHOTGUN_BASE = { x: 0.38, y: -0.34, z: -0.48 };
+        const ironDark = new THREE.MeshBasicMaterial({ color: 0xf0d8ff, transparent: false, opacity: 1.0, ...viewFlags });
+        const ironMid = new THREE.MeshBasicMaterial({ color: 0xf8e8ff, transparent: false, opacity: 1.0, ...viewFlags });
+        const ironEdge = new THREE.LineBasicMaterial({ color: 0xff66cc, transparent: false, opacity: 1.0, depthTest: false, depthWrite: false, fog: false });
+        const ironWireOverlay = new THREE.MeshBasicMaterial({ color: 0xff66cc, wireframe: true, transparent: false, opacity: 1.0, ...viewFlags });
         const orangeVentMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: false, opacity: 1.0, ...viewFlags });
         const orangeGlowMat = new THREE.MeshBasicMaterial({
             color: 0xff8833,
@@ -799,30 +804,33 @@
                     if (!mat) return;
                     mat.fog = false;
                     mat.depthWrite = false;
-                    mat.depthTest = true;
+                    mat.depthTest = false;
+                    if (mat.wireframe !== true && mat.map == null) {
+                        mat.transparent = false;
+                        mat.opacity = 1;
+                    }
+                    if (mat.isMeshBasicMaterial || mat.isLineBasicMaterial) {
+                        mat.side = THREE.DoubleSide;
+                    }
                 });
             });
         }
 
-        function addSolidWithEdges(geo, fillMat, edgeMat) {
+        function addSolidWithEdges(geo, fillMat, edgeMat, wireOverlayMat = metalWireOverlay) {
             const mesh = new THREE.Mesh(geo, fillMat);
+            const wireOverlay = new THREE.Mesh(geo, wireOverlayMat);
             const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
-            const wireGlow = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
-            wireGlow.scale.setScalar(1.012);
             const g = new THREE.Group();
-            g.add(mesh, wire, wireGlow);
+            g.add(mesh, wireOverlay, wire);
             return g;
         }
 
         function addWireHologram(geo) {
-            const glow = new THREE.Mesh(geo, armGlowMat);
-            glow.scale.setScalar(1.06);
             const mesh = new THREE.Mesh(geo, armFillMat);
+            const wireOverlay = new THREE.Mesh(geo, armWireOverlay);
             const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), armWireMat);
-            const wireGlow = new THREE.LineSegments(new THREE.EdgesGeometry(geo), armWireMat);
-            wireGlow.scale.setScalar(1.015);
             const g = new THREE.Group();
-            g.add(glow, mesh, wire, wireGlow);
+            g.add(mesh, wireOverlay, wire);
             return g;
         }
 
@@ -879,12 +887,9 @@
         triggerGuard.position.set(0.02, -0.06, 0.04);
 
         const chamberGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.1, 8);
-        const chamber = new THREE.Mesh(chamberGeo, metalDark);
+        const chamber = addSolidWithEdges(chamberGeo, metalDark, metalEdge);
         chamber.rotation.x = Math.PI / 2;
         chamber.position.set(0.04, 0.04, -0.02);
-        const chamberWire = new THREE.LineSegments(new THREE.EdgesGeometry(chamberGeo), metalEdge);
-        chamberWire.rotation.copy(chamber.rotation);
-        chamberWire.position.copy(chamber.position);
         for (let i = 0; i < 6; i++) {
             const slot = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.04, 0.022), cyanSlotMat);
             const angle = (Math.PI * 2 / 6) * i;
@@ -909,7 +914,7 @@
         batteryHUD.position.set(-0.05, 0.08, 0.1);
         batteryHUD.rotation.set(-0.55, 0.15, 0);
 
-        cyberRevolver.add(topStrap, receiver, grip, triggerGuard, chamber, chamberWire, heavyBarrel, barrelShroud, muzzlePoint, batteryHUD);
+        cyberRevolver.add(topStrap, receiver, grip, triggerGuard, chamber, heavyBarrel, barrelShroud, muzzlePoint, batteryHUD);
         cyberRevolver.position.set(REVOLVER_BASE.x, REVOLVER_BASE.y, REVOLVER_BASE.z);
         cyberRevolver.rotation.set(-0.1, 0.04, 0.02);
         stampViewmodel(cyberRevolver);
@@ -917,19 +922,19 @@
         drawBatteryHUD();
 
         const cyberShotgun = new THREE.Group();
-        const sgStock = addSolidWithEdges(new THREE.BoxGeometry(0.16, 0.24, 0.34), ironDark, ironEdge);
+        const sgStock = addSolidWithEdges(new THREE.BoxGeometry(0.16, 0.24, 0.34), ironDark, ironEdge, ironWireOverlay);
         sgStock.position.set(-0.06, -0.12, 0.08);
         sgStock.rotation.z = 0.1;
-        const sgReceiver = addSolidWithEdges(new THREE.BoxGeometry(0.34, 0.16, 0.28), ironMid, ironEdge);
+        const sgReceiver = addSolidWithEdges(new THREE.BoxGeometry(0.34, 0.16, 0.28), ironMid, ironEdge, ironWireOverlay);
         sgReceiver.position.set(0.04, 0, 0.02);
-        const sgGrip = addSolidWithEdges(new THREE.BoxGeometry(0.1, 0.22, 0.13), ironDark, ironEdge);
+        const sgGrip = addSolidWithEdges(new THREE.BoxGeometry(0.1, 0.22, 0.13), ironDark, ironEdge, ironWireOverlay);
         sgGrip.position.set(0.02, -0.14, 0.06);
         sgGrip.rotation.z = 0.14;
-        const sgBarrelL = addSolidWithEdges(new THREE.BoxGeometry(0.09, 0.09, 0.46), ironMid, ironEdge);
+        const sgBarrelL = addSolidWithEdges(new THREE.BoxGeometry(0.09, 0.09, 0.46), ironMid, ironEdge, ironWireOverlay);
         sgBarrelL.position.set(-0.04, 0.04, -0.22);
-        const sgBarrelR = addSolidWithEdges(new THREE.BoxGeometry(0.09, 0.09, 0.46), ironMid, ironEdge);
+        const sgBarrelR = addSolidWithEdges(new THREE.BoxGeometry(0.09, 0.09, 0.46), ironMid, ironEdge, ironWireOverlay);
         sgBarrelR.position.set(0.12, 0.04, -0.22);
-        const sgShroud = addSolidWithEdges(new THREE.BoxGeometry(0.34, 0.1, 0.22), ironDark, ironEdge);
+        const sgShroud = addSolidWithEdges(new THREE.BoxGeometry(0.34, 0.1, 0.22), ironDark, ironEdge, ironWireOverlay);
         sgShroud.position.set(0.04, 0.1, -0.08);
         for (let i = 0; i < 5; i += 1) {
             const vent = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.12), orangeVentMat);
@@ -959,9 +964,10 @@
         revolverRailGlow.position.set(0.04, 0.04, -0.34);
         revolverRailGlow.visible = false;
         cyberRevolver.add(revolverRailGlow);
+        stampViewmodel(revolverRailGlow);
 
         const shotgunRocketTube = new THREE.Group();
-        const rocketBody = addSolidWithEdges(new THREE.BoxGeometry(0.22, 0.22, 0.72), ironDark, ironEdge);
+        const rocketBody = addSolidWithEdges(new THREE.BoxGeometry(0.22, 0.22, 0.72), ironDark, ironEdge, ironWireOverlay);
         rocketBody.position.set(0.04, 0.02, -0.28);
         const rocketGlow = new THREE.Mesh(
             new THREE.BoxGeometry(0.26, 0.26, 0.5),
