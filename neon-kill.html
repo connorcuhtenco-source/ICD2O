@@ -742,14 +742,19 @@
 
         const scene = new THREE.Scene();
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 200);
 
-        const viewFlags = { depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide };
+        const WORLD_LAYER = 0;
+        const VIEWMODEL_LAYER = 1;
+        camera.layers.enable(WORLD_LAYER);
+        camera.layers.enable(VIEWMODEL_LAYER);
+
+        const viewFlags = { depthTest: true, depthWrite: true, fog: false, side: THREE.DoubleSide };
         const VIEWMODEL_RENDER_ORDER = 2000;
-        const metalDark = new THREE.MeshBasicMaterial({ color: 0xd8e8ff, transparent: false, opacity: 1.0, ...viewFlags });
-        const metalMid = new THREE.MeshBasicMaterial({ color: 0xe8f4ff, transparent: false, opacity: 1.0, ...viewFlags });
-        const metalLight = new THREE.MeshBasicMaterial({ color: 0xf4fbff, transparent: false, opacity: 1.0, ...viewFlags });
-        const metalEdge = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, depthTest: false, depthWrite: false, fog: false });
+        const metalDark = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalMid = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalLight = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalEdge = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, depthTest: true, depthWrite: true, fog: false });
         const metalWireOverlay = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: false, opacity: 1.0, ...viewFlags });
         const cyanSlotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, ...viewFlags });
         const armFillMat = new THREE.MeshBasicMaterial({
@@ -762,8 +767,8 @@
             color: 0xffffff,
             transparent: false,
             opacity: 1.0,
-            depthTest: false,
-            depthWrite: false,
+            depthTest: true,
+            depthWrite: true,
             fog: false
         });
         const armWireOverlay = new THREE.MeshBasicMaterial({
@@ -774,11 +779,11 @@
             ...viewFlags
         });
 
-        const REVOLVER_BASE = { x: 0.35, y: -0.32, z: -0.52 };
-        const SHOTGUN_BASE = { x: 0.38, y: -0.34, z: -0.48 };
-        const ironDark = new THREE.MeshBasicMaterial({ color: 0xf0d8ff, transparent: false, opacity: 1.0, ...viewFlags });
-        const ironMid = new THREE.MeshBasicMaterial({ color: 0xf8e8ff, transparent: false, opacity: 1.0, ...viewFlags });
-        const ironEdge = new THREE.LineBasicMaterial({ color: 0xff66cc, transparent: false, opacity: 1.0, depthTest: false, depthWrite: false, fog: false });
+        const REVOLVER_BASE = { x: 0.35, y: -0.28, z: -0.42 };
+        const SHOTGUN_BASE = { x: 0.38, y: -0.30, z: -0.40 };
+        const ironDark = new THREE.MeshBasicMaterial({ color: 0xfff4ff, transparent: false, opacity: 1.0, ...viewFlags });
+        const ironMid = new THREE.MeshBasicMaterial({ color: 0xfff8ff, transparent: false, opacity: 1.0, ...viewFlags });
+        const ironEdge = new THREE.LineBasicMaterial({ color: 0xff44cc, transparent: false, opacity: 1.0, depthTest: true, depthWrite: true, fog: false });
         const ironWireOverlay = new THREE.MeshBasicMaterial({ color: 0xff66cc, wireframe: true, transparent: false, opacity: 1.0, ...viewFlags });
         const orangeVentMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: false, opacity: 1.0, ...viewFlags });
         const orangeGlowMat = new THREE.MeshBasicMaterial({
@@ -797,14 +802,15 @@
 
         function stampViewmodel(group, order = VIEWMODEL_RENDER_ORDER) {
             group.traverse((obj) => {
+                obj.layers.set(VIEWMODEL_LAYER);
                 if (!obj.isMesh && !obj.isLineSegments) return;
                 obj.renderOrder = order;
                 const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
                 mats.forEach((mat) => {
                     if (!mat) return;
                     mat.fog = false;
-                    mat.depthWrite = false;
-                    mat.depthTest = false;
+                    mat.depthWrite = true;
+                    mat.depthTest = true;
                     if (mat.wireframe !== true && mat.map == null) {
                         mat.transparent = false;
                         mat.opacity = 1;
@@ -1019,6 +1025,16 @@
         armGroup.position.copy(parryRestPos);
         stampViewmodel(armGroup, VIEWMODEL_RENDER_ORDER + 10);
         camera.add(armGroup);
+
+        function renderScene() {
+            const layerMask = camera.layers.mask;
+            camera.layers.set(WORLD_LAYER);
+            renderer.render(scene, camera);
+            renderer.clearDepth();
+            camera.layers.set(VIEWMODEL_LAYER);
+            renderer.render(scene, camera);
+            camera.layers.mask = layerMask;
+        }
 
         scene.add(camera);
 
@@ -6824,7 +6840,7 @@
                 updateBeamEffects(rawDt);
             }
 
-            renderer.render(scene, camera);
+            renderScene();
         }
         requestAnimationFrame(loop);
 
