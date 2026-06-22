@@ -48,7 +48,7 @@ const weaponStats = {
 const SPRITE_DIR = 'sprites/water royal stuff/';
 
 function spritePath(filename) {
-  return SPRITE_DIR + filename;
+  return encodeURI(`${SPRITE_DIR}${filename}`);
 }
 
 const weaponImages = {};
