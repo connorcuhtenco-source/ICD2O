@@ -998,6 +998,9 @@
         let coreLockHumGain = null;
         let coreLockActive = false;
         const ARCHITECT_FOG = { color: 0x14001c, near: 8, far: 68 };
+        const ARCHITECT_BODY_SCALE = 1.45;
+        const ARCHITECT_INTRO_SCALE = 1.15;
+        const ARCHITECT_ARM_SCALE = 2.0;
         const BASE_FOG = { color: 0x030006, near: 18, far: 95 };
         const weaponLabelEl = document.getElementById('weaponLabel');
 
@@ -4196,6 +4199,11 @@
             architectMortars = [];
             architectCrushCubes.forEach(c => { if (c.mesh) scene.remove(c.mesh); });
             architectCrushCubes = [];
+            if (architectBarkTimer) {
+                clearTimeout(architectBarkTimer);
+                architectBarkTimer = null;
+            }
+            architectBossPromptEl.classList.remove('visible', 'minos-bark');
             setArchitectCrimsonVeil(activeBoss && activeBoss.type === 'architect' ? 0.72 : 0);
         }
 
@@ -4293,11 +4301,11 @@
             upperArm.add(forearm);
             forearm.add(hand);
             root.add(shoulder);
-            root.scale.setScalar(3.6);
+            root.scale.setScalar(ARCHITECT_ARM_SCALE);
             return {
                 root, shoulder, upperArm, forearm, hand, segments, fingerArcs, seamCracks, side,
                 pose: { raise: 0, clench: 0, reach: 0, slamY: 0 },
-                hoverY: 13, targetX: side * ARENA * 0.84, targetZ: -ARENA * 0.06
+                hoverY: 8, targetX: side * ARENA * 0.58, targetZ: -ARENA * 0.04
             };
         }
 
@@ -4326,7 +4334,7 @@
         function buildDecrepitArchitect() {
             const mesh = new THREE.Group();
             const colossus = new THREE.Group();
-            colossus.position.set(0, 50, -ARENA * 0.68);
+            colossus.position.set(0, 24, -ARENA * 0.5);
 
             const maskGroup = new THREE.Group();
             const leftFace = buildMinosFaceHalf(-1);
@@ -4381,7 +4389,7 @@
 
             maskGroup.add(maskLeft, maskRight, bridge, mouth, singularityCore);
             colossus.add(maskGroup, torso, shoulderL, shoulderR, eyeLight);
-            colossus.scale.setScalar(3.4);
+            colossus.scale.setScalar(ARCHITECT_BODY_SCALE);
 
             const armL = buildMinosArm(-1);
             const armR = buildMinosArm(1);
@@ -4389,8 +4397,8 @@
             armR.root.position.set(armR.targetX, armR.hoverY, armR.targetZ);
 
             mesh.add(colossus, armL.root, armR.root);
-            mesh.position.set(0, -1, -ARENA * 0.92);
-            mesh.rotation.x = 0.16;
+            mesh.position.set(0, 1.5, -ARENA * 0.68);
+            mesh.rotation.x = 0.1;
             mesh.scale.setScalar(0.01);
             mesh.visible = false;
 
@@ -4690,7 +4698,7 @@
             b.judgementZ = playerPos.z;
             b.judgementTimer = 1.2;
             b.judgementPhase = 'track';
-            b.judgementSlamY = 58;
+            b.judgementSlamY = 34;
             architectJudgement = { phase: 'track', timer: 1.2 };
             barkArchitect('JUDGEMENT', 'JUMP THE SHOCKWAVE');
             setMinosEyeFlash(true);
@@ -4778,7 +4786,7 @@
             if (j.phase === 'track') {
                 b.judgementX = THREE.MathUtils.lerp(b.judgementX, playerPos.x, 0.14);
                 b.judgementZ = THREE.MathUtils.lerp(b.judgementZ, playerPos.z, 0.14);
-                b.judgementSlamY = THREE.MathUtils.lerp(b.judgementSlamY, 62, 0.06);
+                b.judgementSlamY = THREE.MathUtils.lerp(b.judgementSlamY, 36, 0.06);
                 if (arm) {
                     arm.root.position.x = THREE.MathUtils.lerp(arm.root.position.x, b.judgementX, 0.12);
                     arm.root.position.z = THREE.MathUtils.lerp(arm.root.position.z, b.judgementZ + 4, 0.1);
@@ -5090,19 +5098,19 @@
 
             if (architectIntroPhase === 'reveal') {
                 const progress = Math.min(1, architectIntroTimer / 2.8);
-                activeBoss.mesh.scale.setScalar(0.04 + progress * 2.96);
-                activeBoss.mesh.position.y = THREE.MathUtils.lerp(-4, -2, progress);
+                activeBoss.mesh.scale.setScalar(0.04 + progress * (ARCHITECT_INTRO_SCALE - 0.04));
+                activeBoss.mesh.position.y = THREE.MathUtils.lerp(-1, 1.5, progress);
                 if (activeBoss.armL) {
                     activeBoss.armL.root.position.set(
-                        THREE.MathUtils.lerp(-ARENA * 0.35, activeBoss.armL.targetX, progress),
-                        THREE.MathUtils.lerp(10, activeBoss.armL.hoverY, progress),
+                        THREE.MathUtils.lerp(-ARENA * 0.22, activeBoss.armL.targetX, progress),
+                        THREE.MathUtils.lerp(7, activeBoss.armL.hoverY, progress),
                         THREE.MathUtils.lerp(0, activeBoss.armL.targetZ, progress)
                     );
                 }
                 if (activeBoss.armR) {
                     activeBoss.armR.root.position.set(
-                        THREE.MathUtils.lerp(ARENA * 0.35, activeBoss.armR.targetX, progress),
-                        THREE.MathUtils.lerp(10, activeBoss.armR.hoverY, progress),
+                        THREE.MathUtils.lerp(ARENA * 0.22, activeBoss.armR.targetX, progress),
+                        THREE.MathUtils.lerp(7, activeBoss.armR.hoverY, progress),
                         THREE.MathUtils.lerp(0, activeBoss.armR.targetZ, progress)
                     );
                 }
