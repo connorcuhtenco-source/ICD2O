@@ -405,6 +405,57 @@
             padding: 5px 12px;
         }
         #weaponLabel.shotgun { color: #ff8833; text-shadow: 0 0 8px rgba(255, 120, 0, 0.55); border-color: rgba(255, 120, 0, 0.35); }
+        #pauseOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(10, 10, 12, 0.85);
+            pointer-events: auto;
+        }
+        #pausePanel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 18px;
+            padding: 42px 52px 36px;
+            background: rgba(6, 6, 10, 0.92);
+            border: 1px solid rgba(255, 34, 68, 0.45);
+            box-shadow:
+                0 0 28px rgba(255, 0, 68, 0.22),
+                0 0 64px rgba(255, 0, 85, 0.12),
+                inset 0 0 24px rgba(255, 0, 60, 0.06);
+        }
+        #pausePanel h2 {
+            font-size: 18px;
+            letter-spacing: 0.38em;
+            color: #ff2255;
+            text-shadow: 0 0 14px rgba(255, 34, 68, 0.85);
+            margin-bottom: 8px;
+        }
+        .pause-btn {
+            pointer-events: auto;
+            cursor: pointer;
+            min-width: 260px;
+            padding: 14px 28px;
+            border: 1px solid rgba(0, 255, 255, 0.55);
+            background: rgba(0, 255, 255, 0.06);
+            color: #00ffff;
+            font-family: inherit;
+            font-size: 12px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+            transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+        }
+        .pause-btn:hover {
+            background: rgba(0, 255, 255, 0.22);
+            border-color: rgba(0, 255, 255, 0.95);
+            box-shadow: 0 0 18px rgba(0, 255, 255, 0.45);
+            color: #e8ffff;
+        }
     </style>
 </head>
 <body>
@@ -475,6 +526,13 @@
             <p class="hint" id="finalStats"></p>
             <button class="btn" id="retryBtn">Retry</button>
         </div>
+        <div id="pauseOverlay" class="hidden" aria-hidden="true">
+            <div id="pausePanel">
+                <h2>SYSTEM PAUSED</h2>
+                <button id="pauseResumeBtn" class="pause-btn" type="button">Resume Play</button>
+                <button id="pauseMenuBtn" class="pause-btn" type="button">Return to Menu</button>
+            </div>
+        </div>
     </div>
 
     <script src="arcade-achievements.js"></script>
@@ -522,6 +580,7 @@
         const JUMP_V = 13;
 
         let gameRunning = false;
+        let isPaused = false;
         let pointerLocked = false;
         let yaw = 0;
         let pitch = 0;
@@ -826,6 +885,9 @@
         const crosshairEl = document.getElementById('crosshair');
         const hitmarkerEl = document.getElementById('hitmarker');
         const weaponDockEl = document.getElementById('weaponDock');
+        const pauseOverlayEl = document.getElementById('pauseOverlay');
+        const pauseResumeBtn = document.getElementById('pauseResumeBtn');
+        const pauseMenuBtn = document.getElementById('pauseMenuBtn');
         const crosshairRaycaster = new THREE.Raycaster();
         const HITMARKER_FADE_MS = 150;
         let hitmarkerTimer = 0;
@@ -892,6 +954,281 @@
         function connectAudioOut(node) {
             initAudio();
             node.connect(audioLimiter);
+        }
+
+        const MUSIC_BPM = 140;
+        const MUSIC_BEAT = 60 / MUSIC_BPM;
+        const MUSIC_SIXTEENTH = MUSIC_BEAT / 4;
+        const MUSIC_BASE_GAIN = 0.34;
+        const MUSIC_SCHEDULE_AHEAD = 0.35;
+        let musicGain = null;
+        let musicFilter = null;
+        let musicPlaying = false;
+        let musicScheduleTimer = null;
+        let musicNextStepTime = 0;
+        let musicStep = 0;
+        let musicDistortion = null;
+
+        function initMusicBus() {
+            const ctx = initAudio();
+            if (musicGain) return;
+            musicGain = ctx.createGain();
+            musicFilter = ctx.createBiquadFilter();
+            musicFilter.type = 'lowpass';
+            musicFilter.frequency.setValueAtTime(18000, ctx.currentTime);
+            musicFilter.Q.setValueAtTime(0.7, ctx.currentTime);
+            musicGain.gain.setValueAtTime(MUSIC_BASE_GAIN, ctx.currentTime);
+            musicGain.connect(musicFilter);
+            musicFilter.connect(audioLimiter);
+            musicDistortion = ctx.createWaveShaper();
+            const curve = new Float32Array(256);
+            for (let i = 0; i < 256; i += 1) {
+                const x = (i * 2) / 256 - 1;
+                curve[i] = Math.tanh(3.2 * x);
+            }
+            musicDistortion.curve = curve;
+            musicDistortion.oversample = '4x';
+        }
+
+        function connectMusicVoice(voiceGain) {
+            initMusicBus();
+            voiceGain.connect(musicGain);
+        }
+
+        function scheduleMusicKick(ctx, time) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(58, time);
+            osc.frequency.exponentialRampToValueAtTime(34, time + 0.08);
+            gain.gain.setValueAtTime(0.0001, time);
+            gain.gain.linearRampToValueAtTime(0.55, time + 0.004);
+            gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.11);
+            osc.connect(gain);
+            connectMusicVoice(gain);
+            osc.start(time);
+            osc.stop(time + 0.12);
+        }
+
+        function scheduleMusicHat(ctx, time) {
+            const len = Math.floor(ctx.sampleRate * 0.03);
+            const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+            const data = buf.getChannelData(0);
+            for (let i = 0; i < len; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+            const noise = ctx.createBufferSource();
+            noise.buffer = buf;
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(6200, time);
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.0001, time);
+            gain.gain.linearRampToValueAtTime(0.14, time + 0.002);
+            gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.035);
+            noise.connect(filter);
+            filter.connect(gain);
+            connectMusicVoice(gain);
+            noise.start(time);
+            noise.stop(time + 0.04);
+        }
+
+        function scheduleMusicBass(ctx, time, freq) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, time);
+            gain.gain.setValueAtTime(0.0001, time);
+            gain.gain.linearRampToValueAtTime(0.2, time + 0.01);
+            gain.gain.setValueAtTime(0.16, time + MUSIC_SIXTEENTH * 0.75);
+            gain.gain.exponentialRampToValueAtTime(0.0001, time + MUSIC_SIXTEENTH * 0.95);
+            const low = ctx.createBiquadFilter();
+            low.type = 'lowpass';
+            low.frequency.setValueAtTime(220, time);
+            osc.connect(musicDistortion);
+            musicDistortion.connect(low);
+            low.connect(gain);
+            connectMusicVoice(gain);
+            osc.start(time);
+            osc.stop(time + MUSIC_SIXTEENTH);
+        }
+
+        function scheduleMusicLead(ctx, time, freq) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, time);
+            gain.gain.setValueAtTime(0.0001, time);
+            gain.gain.linearRampToValueAtTime(0.07, time + 0.004);
+            gain.gain.exponentialRampToValueAtTime(0.0001, time + MUSIC_SIXTEENTH * 0.82);
+            osc.connect(gain);
+            connectMusicVoice(gain);
+            osc.start(time);
+            osc.stop(time + MUSIC_SIXTEENTH * 0.9);
+        }
+
+        function scheduleMusicStep(step, time) {
+            const ctx = initAudio();
+            const sixteenth = step % 16;
+            const bar = Math.floor(step / 16) % 4;
+            const bassRoots = [55, 55, 73.42, 82.41];
+            const arpNotes = [220, 261.63, 329.63, 392, 440, 392, 329.63, 261.63];
+
+            if (sixteenth % 4 === 0) scheduleMusicKick(ctx, time);
+            if (sixteenth % 2 === 1) scheduleMusicHat(ctx, time);
+            if ([0, 6, 8, 14].includes(sixteenth)) {
+                scheduleMusicBass(ctx, time, bassRoots[bar] * (sixteenth === 14 ? 1.5 : 1));
+            }
+            if (sixteenth % 2 === 0) {
+                scheduleMusicLead(ctx, time, arpNotes[(sixteenth / 2 + bar * 2) % arpNotes.length]);
+            }
+        }
+
+        function advanceMusicScheduler() {
+            if (!musicPlaying) return;
+            const ctx = initAudio();
+            while (musicNextStepTime < ctx.currentTime + MUSIC_SCHEDULE_AHEAD) {
+                scheduleMusicStep(musicStep, musicNextStepTime);
+                musicNextStepTime += MUSIC_SIXTEENTH;
+                musicStep = (musicStep + 1) % 64;
+            }
+        }
+
+        function startCombatMusic() {
+            initMusicBus();
+            if (musicPlaying) return;
+            const ctx = initAudio();
+            musicPlaying = true;
+            musicStep = 0;
+            musicNextStepTime = ctx.currentTime + 0.05;
+            if (musicScheduleTimer) clearInterval(musicScheduleTimer);
+            musicScheduleTimer = setInterval(advanceMusicScheduler, 25);
+            advanceMusicScheduler();
+        }
+
+        function stopCombatMusic() {
+            musicPlaying = false;
+            if (musicScheduleTimer) {
+                clearInterval(musicScheduleTimer);
+                musicScheduleTimer = null;
+            }
+        }
+
+        function applyPauseMusicFx(paused) {
+            if (!musicGain || !musicFilter) return;
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            if (paused) {
+                musicGain.gain.cancelScheduledValues(t);
+                musicGain.gain.setValueAtTime(musicGain.gain.value, t);
+                musicGain.gain.linearRampToValueAtTime(MUSIC_BASE_GAIN * 0.5, t + 0.2);
+                musicFilter.frequency.cancelScheduledValues(t);
+                musicFilter.frequency.setValueAtTime(musicFilter.frequency.value, t);
+                musicFilter.frequency.linearRampToValueAtTime(900, t + 0.2);
+            } else {
+                musicGain.gain.cancelScheduledValues(t);
+                musicGain.gain.setValueAtTime(MUSIC_BASE_GAIN, t);
+                musicFilter.frequency.cancelScheduledValues(t);
+                musicFilter.frequency.setValueAtTime(18000, t);
+            }
+        }
+
+        function clearInputState() {
+            Object.keys(keys).forEach(code => { keys[code] = false; });
+            mouseDown.left = false;
+            mouseDown.right = false;
+            player.isSliding = false;
+            isCharging = false;
+            chargeCommitted = false;
+            leftHoldTime = 0;
+        }
+
+        function setPaused(paused) {
+            if (isPaused === paused) return;
+            isPaused = paused;
+            pauseOverlayEl.classList.toggle('hidden', !paused);
+            pauseOverlayEl.setAttribute('aria-hidden', String(!paused));
+            if (paused) {
+                clearInputState();
+                document.exitPointerLock?.();
+                applyPauseMusicFx(true);
+            } else {
+                applyPauseMusicFx(false);
+                renderer.domElement.requestPointerLock();
+            }
+        }
+
+        function togglePause() {
+            if (!gameRunning || bossDefeatActive) return;
+            setPaused(!isPaused);
+        }
+
+        function resumeFromPause() {
+            if (!isPaused) return;
+            setPaused(false);
+        }
+
+        function unloadArena() {
+            enemies.forEach(e => scene.remove(e.mesh));
+            projectiles.forEach(p => scene.remove(p.mesh));
+            healParticles.forEach(h => scene.remove(h.mesh));
+            parryBursts.forEach(b => scene.remove(b.mesh));
+            parryBursts = [];
+            beamEffects.forEach(b => scene.remove(b.mesh));
+            beamEffects = [];
+            rockets.forEach(r => scene.remove(r.mesh));
+            rockets = [];
+            aoeBlasts.forEach(b => scene.remove(b.mesh));
+            aoeBlasts = [];
+            clearBossExtras();
+            clearBossDebris();
+            exitArchitectArena();
+            if (activeBoss) scene.remove(activeBoss.mesh);
+            activeBoss = null;
+            isBossWave = false;
+            endBossEncounterTracking();
+            bossIntroActive = false;
+            bossDefeatActive = false;
+            bossDefeatPhase = 'idle';
+            bossDefeatTimer = 0;
+            voidTransformActive = false;
+            voidTransformPhase = 'idle';
+            architectIntroActive = false;
+            architectIntroPhase = 'idle';
+            architectTransformActive = false;
+            cinematicDialogueActive = false;
+            lastDialogueCharCount = 0;
+            syncDialogueLock();
+            hideBossHud();
+            hideBossDialogue();
+            defeatFlashEl.style.opacity = '0';
+            hitFlashTimer = 0;
+            damageFlashEl.style.opacity = '0';
+            freezeTimer = 0;
+            flashTimer = 0;
+            screenShake = 0;
+            parryFlashEl.style.opacity = '0';
+            parryFlashEl.classList.remove('solid');
+            hitmarkerTimer = 0;
+            hitmarkerEl.style.opacity = '0';
+            hitmarkerEl.style.transform = 'translate(-50%, -50%) scale(1)';
+            crosshairEl.classList.remove('core-lock');
+            stopCoreLockHum();
+            coreLockActive = false;
+            stopArchitectAmbience();
+            enemies = [];
+            projectiles = [];
+            healParticles = [];
+        }
+
+        function returnToHub() {
+            stopCombatMusic();
+            unloadArena();
+            gameRunning = false;
+            isPaused = false;
+            pauseOverlayEl.classList.add('hidden');
+            pauseOverlayEl.setAttribute('aria-hidden', 'true');
+            clearInputState();
+            document.exitPointerLock?.();
+            window.location.href = 'index.html';
         }
 
         function playShootSound() {
@@ -5125,7 +5462,7 @@
         }
 
         function updateLeftMouse(dt) {
-            if (isDialogueActive || ultimateActive) return;
+            if (isDialogueActive || ultimateActive || isPaused) return;
             if (!mouseDown.left || !gameRunning || player.isParrying) return;
             leftHoldTime += dt;
             if (leftHoldTime >= TAP_HOLD_THRESHOLD) {
@@ -5467,6 +5804,9 @@
 
         function gameOver() {
             gameRunning = false;
+            isPaused = false;
+            pauseOverlayEl.classList.add('hidden');
+            stopCombatMusic();
             exitArchitectArena();
             document.exitPointerLock?.();
             document.getElementById('finalStats').textContent = `Score ${score} · Wave ${wave} · Rank ${styleRank}`;
@@ -5796,10 +6136,11 @@
             last = now;
             const cinematicFreeze = bossIntroActive || voidTransformActive || architectIntroActive || architectTransformActive ||
                 (bossDefeatActive && bossDefeatPhase === 'dyingwords');
-            const dt = (freezeTimer > 0 || cinematicFreeze) ? 0 : rawDt;
-            if (freezeTimer > 0) freezeTimer = Math.max(0, freezeTimer - rawDt);
+            const dt = (freezeTimer > 0 || cinematicFreeze || isPaused) ? 0 : rawDt;
+            if (freezeTimer > 0 && !isPaused) freezeTimer = Math.max(0, freezeTimer - rawDt);
+            advanceMusicScheduler();
 
-            if (gameRunning) {
+            if (gameRunning && !isPaused) {
                 updateArchitectIntro(rawDt);
                 updateBossDialogue(rawDt);
                 updateBossDefeat(rawDt);
@@ -5840,7 +6181,12 @@
 
         document.addEventListener('keydown', e => {
             keys[e.code] = true;
-            if (!gameRunning) return;
+            if (e.code === 'Escape') {
+                e.preventDefault();
+                if (gameRunning && !bossDefeatActive) togglePause();
+                return;
+            }
+            if (!gameRunning || isPaused) return;
             if (e.code === 'Space') {
                 e.preventDefault();
                 if (onGround) {
@@ -5862,6 +6208,7 @@
             if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') player.isSliding = false;
         });
         document.addEventListener('mousedown', e => {
+            if (isPaused) return;
             if (e.button === 0) {
                 mouseDown.left = true;
                 leftHoldTime = 0;
@@ -5883,13 +6230,13 @@
         document.addEventListener('contextmenu', e => e.preventDefault());
 
         renderer.domElement.addEventListener('click', () => {
-            if (gameRunning) renderer.domElement.requestPointerLock();
+            if (gameRunning && !isPaused) renderer.domElement.requestPointerLock();
         });
         document.addEventListener('pointerlockchange', () => {
             pointerLocked = document.pointerLockElement === renderer.domElement;
         });
         document.addEventListener('mousemove', e => {
-            if (!pointerLocked || !gameRunning) return;
+            if (!pointerLocked || !gameRunning || isPaused) return;
             yaw -= e.movementX * 0.002;
             pitch -= e.movementY * 0.002;
             pitch = Math.max(-1.2, Math.min(1.2, pitch));
@@ -5897,8 +6244,11 @@
 
         function beginGame() {
             initAudio();
+            isPaused = false;
+            pauseOverlayEl.classList.add('hidden');
             resetGame();
             gameRunning = true;
+            startCombatMusic();
             renderer.domElement.requestPointerLock();
         }
 
@@ -5914,8 +6264,10 @@
             beginGame();
         });
         document.getElementById('backHub').addEventListener('click', () => {
-            window.location.href = 'index.html';
+            returnToHub();
         });
+        pauseResumeBtn.addEventListener('click', () => resumeFromPause());
+        pauseMenuBtn.addEventListener('click', () => returnToHub());
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
