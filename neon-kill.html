@@ -333,6 +333,7 @@
             color: #d8f4ff;
             text-transform: uppercase;
             min-height: 1.6em;
+            white-space: pre-line;
         }
         #bossDialogueText::after {
             content: '▌';
@@ -401,13 +402,25 @@
             transition: opacity 0.25s ease;
         }
         #architectBossPrompt.visible { opacity: 1; }
+        #architectBossPrompt.minos-bark {
+            top: 22%;
+            font-size: clamp(28px, 5vw, 52px);
+            letter-spacing: 0.28em;
+            color: #ffffff;
+            text-shadow: 0 0 28px rgba(220, 120, 255, 0.95), 0 0 60px rgba(140, 40, 200, 0.75);
+            animation: minosBark 0.12s step-end 3;
+        }
+        @keyframes minosBark {
+            0%, 100% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.04); }
+        }
         #architectCrimsonVeil {
             position: fixed;
             inset: 0;
             pointer-events: none;
             z-index: 5;
             opacity: 0;
-            background: radial-gradient(circle at 50% 62%, rgba(90, 0, 18, 0.72) 0%, rgba(12, 0, 6, 0.55) 55%, rgba(0, 0, 0, 0.35) 100%);
+            background: radial-gradient(circle at 50% 62%, rgba(72, 0, 110, 0.68) 0%, rgba(10, 0, 22, 0.58) 55%, rgba(0, 0, 0, 0.38) 100%);
             transition: opacity 0.2s ease;
         }
         #ultimateMeterTrack {
@@ -666,6 +679,7 @@
         let architectStarrySky = null;
         let architectArenaGroup = null;
         let architectAmbience = null;
+        let architectBarkTimer = null;
         let isDialogueActive = false;
         let voidTransformActive = false;
         let voidTransformPhase = 'idle';
@@ -983,7 +997,7 @@
         let coreLockHumOsc = null;
         let coreLockHumGain = null;
         let coreLockActive = false;
-        const ARCHITECT_FOG = { color: 0x120002, near: 10, far: 72 };
+        const ARCHITECT_FOG = { color: 0x14001c, near: 8, far: 68 };
         const BASE_FOG = { color: 0x030006, near: 18, far: 95 };
         const weaponLabelEl = document.getElementById('weaponLabel');
 
@@ -1487,8 +1501,9 @@
                 crosshairRaycaster.set(camera.position, getAimDirection());
                 if (activeBoss.architectPhase === 2 && activeBoss.coreShell) {
                     locked = crosshairRaycaster.intersectObject(activeBoss.coreShell, false).length > 0;
-                } else if (activeBoss.weakpointEye && activeBoss.weakpointEye.visible !== false) {
-                    locked = crosshairRaycaster.intersectObject(activeBoss.weakpointEye, false).length > 0;
+                } else {
+                    const eyes = getArchitectWeakpointMeshes();
+                    locked = eyes.some(eye => crosshairRaycaster.intersectObject(eye, false).length > 0);
                 }
             }
             crosshairEl.classList.toggle('core-lock', locked);
@@ -4048,18 +4063,55 @@
                     fill: arenaFillLight ? arenaFillLight.color.getHex() : 0x00ffff,
                     fillInt: arenaFillLight ? arenaFillLight.intensity : 0.8
                 };
-                arenaAmbientLight.color.setHex(0x330000);
-                arenaAmbientLight.intensity = 0.92;
+                arenaAmbientLight.color.setHex(0x180028);
+                arenaAmbientLight.intensity = 0.78;
                 if (arenaKeyLight) {
-                    arenaKeyLight.color.setHex(0x660011);
-                    arenaKeyLight.intensity = 1.45;
+                    arenaKeyLight.color.setHex(0xbb55ee);
+                    arenaKeyLight.intensity = 1.65;
                 }
                 if (arenaFillLight) {
-                    arenaFillLight.color.setHex(0x330008);
-                    arenaFillLight.intensity = 0.35;
+                    arenaFillLight.color.setHex(0x440066);
+                    arenaFillLight.intensity = 0.55;
                 }
             }
             architectArenaGroup = new THREE.Group();
+            const gateGroup = new THREE.Group();
+            gateGroup.position.set(0, 0, -ARENA * 0.44);
+            for (let i = 0; i < 15; i += 1) {
+                const bar = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.42, 20, 0.55),
+                    new THREE.MeshBasicMaterial({ color: 0x0c0612, transparent: true, opacity: 0.94 })
+                );
+                bar.position.set(-ARENA * 0.58 + i * (ARENA * 1.16 / 14), 10, 0);
+                gateGroup.add(bar);
+            }
+            const postGeo = new THREE.BoxGeometry(1.1, 22, 1.1);
+            const postMat = new THREE.MeshBasicMaterial({ color: 0x150818 });
+            const postL = new THREE.Mesh(postGeo, postMat);
+            postL.position.set(-ARENA * 0.6, 11, 0);
+            const postR = postL.clone();
+            postR.position.x = ARENA * 0.6;
+            gateGroup.add(postL, postR);
+            architectArenaGroup.add(gateGroup);
+
+            for (const side of [-1, 1]) {
+                const pillar = new THREE.Mesh(
+                    new THREE.BoxGeometry(4, 58, 4),
+                    new THREE.MeshBasicMaterial({ color: 0x0a0510, transparent: true, opacity: 0.96 })
+                );
+                pillar.position.set(side * ARENA * 0.9, 29, -ARENA * 0.34);
+                const neon = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.55, 52, 0.55),
+                    new THREE.MeshBasicMaterial({ color: 0xdd66ff })
+                );
+                neon.position.set(side * ARENA * 0.87, 29, -ARENA * 0.28);
+                const neonCap = new THREE.Mesh(
+                    new THREE.BoxGeometry(3.2, 0.45, 3.2),
+                    new THREE.MeshBasicMaterial({ color: 0xff88ff, transparent: true, opacity: 0.85 })
+                );
+                neonCap.position.set(side * ARENA * 0.9, 57, -ARENA * 0.34);
+                architectArenaGroup.add(pillar, neon, neonCap);
+            }
             const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.35, transparent: true, opacity: 0.75 });
             const starVerts = [];
             for (let i = 0; i < 900; i += 1) {
@@ -4196,7 +4248,7 @@
             });
         }
 
-        function buildRiggedArm(side) {
+        function buildMinosArm(side) {
             const root = new THREE.Group();
             const shoulder = new THREE.Group();
             const upperArm = new THREE.Group();
@@ -4205,211 +4257,149 @@
             forearm.position.y = -7;
             const hand = new THREE.Group();
             hand.position.y = -5.5;
-            const plateMat = new THREE.MeshBasicMaterial({ color: 0x060408, transparent: true, opacity: 0.97 });
-            const edgeMat = new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.92 });
-            const arcMat = new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.88 });
+            const stoneMat = new THREE.MeshBasicMaterial({ color: 0x07040c, transparent: true, opacity: 0.99 });
+            const edgeMat = new THREE.LineBasicMaterial({ color: 0x8844cc, transparent: true, opacity: 0.35 });
             const segments = [];
             const seamCracks = [];
 
             function addLimb(group, geo, offsetY) {
-                const mesh = new THREE.Mesh(geo, plateMat.clone());
+                const mesh = new THREE.Mesh(geo, stoneMat.clone());
                 mesh.position.y = offsetY || 0;
                 const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat.clone());
                 wire.position.y = offsetY || 0;
                 group.add(mesh, wire);
                 segments.push({ joint: group, plate: mesh, edge: wire });
-                return mesh;
             }
 
-            const pauldronGeo = new THREE.SphereGeometry(2.6, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55);
-            addLimb(shoulder, pauldronGeo, 0);
-            addLimb(upperArm, new THREE.CylinderGeometry(1.55, 1.85, 7.2, 10), -3.6);
-            addLimb(forearm, new THREE.CylinderGeometry(1.2, 1.5, 6.4, 10), -3.2);
-            const palmGeo = new THREE.BoxGeometry(3.4, 1.2, 2.8);
-            addLimb(hand, palmGeo, -0.4);
+            addLimb(shoulder, new THREE.SphereGeometry(3.1, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.58), 0);
+            addLimb(upperArm, new THREE.CylinderGeometry(1.85, 2.2, 8.4, 12), -4.2);
+            addLimb(forearm, new THREE.CylinderGeometry(1.45, 1.8, 7.2, 12), -3.6);
+            addLimb(hand, new THREE.BoxGeometry(4.2, 1.6, 3.6), -0.5);
 
             const fingerArcs = [];
-            for (let f = 0; f < 5; f += 1) {
-                const spread = (f - 2) * 0.72;
-                const fingerGroup = new THREE.Group();
-                fingerGroup.position.set(spread, -1.4, 0.55);
-                let y = 0;
-                for (let seg = 0; seg < 3; seg += 1) {
-                    const len = 1.55 - seg * 0.22;
-                    const fg = new THREE.CylinderGeometry(0.28 - seg * 0.04, 0.34 - seg * 0.04, len, 6);
-                    const finger = new THREE.Mesh(fg, plateMat.clone());
-                    finger.position.y = y - len * 0.5;
-                    y -= len * 0.88;
-                    finger.rotation.x = 0.18 + seg * 0.08;
-                    fingerGroup.add(finger);
-                    const arcGeo = new THREE.BufferGeometry().setFromPoints([
-                        new THREE.Vector3(0, finger.position.y + len * 0.35, 0.1),
-                        new THREE.Vector3(0, finger.position.y - len * 0.35, 0.2)
-                    ]);
-                    const arc = new THREE.Line(arcGeo, arcMat.clone());
-                    fingerGroup.add(arc);
-                    if (seg === 0) fingerArcs.push({ finger, arc });
-                }
-                hand.add(fingerGroup);
+            for (let f = 0; f < 4; f += 1) {
+                const spread = (f - 1.5) * 0.85;
+                const finger = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.75, 2.4, 0.85),
+                    stoneMat.clone()
+                );
+                finger.position.set(spread, -2.1, 0.65);
+                finger.rotation.x = 0.22;
+                hand.add(finger);
+                fingerArcs.push({ finger, arc: null });
             }
-
-            const crackGeo = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(-0.5, 1.2, 1.2),
-                new THREE.Vector3(0.2, -2.4, 1.25)
-            ]);
-            const crack = new THREE.Line(crackGeo, arcMat.clone());
-            forearm.add(crack);
-            seamCracks.push(crack);
 
             shoulder.add(upperArm);
             upperArm.add(forearm);
             forearm.add(hand);
             root.add(shoulder);
-            root.scale.setScalar(3);
+            root.scale.setScalar(3.6);
             return {
                 root, shoulder, upperArm, forearm, hand, segments, fingerArcs, seamCracks, side,
                 pose: { raise: 0, clench: 0, reach: 0, slamY: 0 },
-                hoverY: 18, targetX: side * ARENA * 0.72, targetZ: -ARENA * 0.22
+                hoverY: 13, targetX: side * ARENA * 0.84, targetZ: -ARENA * 0.06
             };
         }
 
-        function buildSculptedMaskHalf(side) {
+        function buildMinosFaceHalf(side) {
             const group = new THREE.Group();
-            const porcelain = () => new THREE.MeshBasicMaterial({ color: 0x0c080a, transparent: true, opacity: 0.97 });
-            const wireFor = (geo) => new THREE.LineSegments(
-                new THREE.EdgesGeometry(geo),
-                new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.88 })
+            const stone = () => new THREE.MeshBasicMaterial({ color: 0x09060e, transparent: true, opacity: 0.99 });
+            const skull = new THREE.Mesh(new THREE.BoxGeometry(5.8, 11.5, 4.8), stone());
+            skull.position.set(side * 2.9, 5.5, 0);
+            const cheek = new THREE.Mesh(new THREE.BoxGeometry(4.2, 5.5, 3.4), stone());
+            cheek.position.set(side * 4.2, 1.5, 1.1);
+            cheek.rotation.z = side * -0.12;
+            const eye = new THREE.Mesh(
+                new THREE.CircleGeometry(1.55, 36),
+                new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
             );
-            const cracks = [];
-            const addPart = (geo, pos, rot = null) => {
-                const mesh = new THREE.Mesh(geo, porcelain());
-                mesh.position.copy(pos);
-                if (rot) mesh.rotation.set(rot.x || 0, rot.y || 0, rot.z || 0);
-                const w = wireFor(geo);
-                w.position.copy(pos);
-                if (rot) w.rotation.copy(mesh.rotation);
-                group.add(mesh, w);
-                return mesh;
-            };
-
-            const plateGeo = new THREE.BoxGeometry(4.4, 9.2, 2.4);
-            const plate = addPart(plateGeo, new THREE.Vector3(side * 2.15, 0, 0));
-            cracks.push(...addMaskSeamCracks(plate, 4.4, 9.2));
-
-            addPart(new THREE.BoxGeometry(3.2, 3.8, 1.9), new THREE.Vector3(side * 3.35, -1.4, 0.95), { z: side * -0.22, y: side * 0.12 });
-            addPart(new THREE.BoxGeometry(3.8, 1.5, 1.7), new THREE.Vector3(side * 2.5, 3.1, 0.75), { z: side * 0.18, x: -0.25 });
-            addPart(new THREE.ConeGeometry(0.65, 2.8, 6), new THREE.Vector3(side * 1.4, 4.8, -0.15), { x: -0.25, z: side * 0.35 });
-            addPart(new THREE.ConeGeometry(0.55, 2.2, 5), new THREE.Vector3(side * 2.8, 5.1, -0.35), { x: -0.15, z: side * 0.5 });
-            addPart(new THREE.ConeGeometry(0.48, 1.9, 5), new THREE.Vector3(side * 4.0, 4.5, -0.2), { x: -0.1, z: side * 0.25 });
-
-            const jawGeo = new THREE.BoxGeometry(3.6, 2.2, 2.0);
-            addPart(jawGeo, new THREE.Vector3(side * 2.0, -3.5, 0.55), { x: 0.2 });
-
-            const socket = new THREE.Mesh(
-                new THREE.SphereGeometry(1.15, 12, 10),
-                new THREE.MeshBasicMaterial({ color: 0x010001, transparent: true, opacity: 0.98 })
+            eye.position.set(side * 2.55, 6.4, 2.35);
+            const eyeGlow = new THREE.Mesh(
+                new THREE.CircleGeometry(2.45, 36),
+                new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.38, side: THREE.DoubleSide })
             );
-            socket.position.set(side * 1.85, 1.0, 1.05);
-            socket.scale.set(1.15, 0.9, 0.55);
-            group.add(socket);
-
-            return { group, cracks };
-        }
-
-        function addMaskSeamCracks(tile, w, h) {
-            const crackMat = new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.95 });
-            const cracks = [];
-            const paths = [
-                [[-w * 0.35, h * 0.2, 0.24], [0, -h * 0.15, 0.24], [w * 0.3, h * 0.25, 0.24]],
-                [[-w * 0.1, h * 0.35, 0.24], [w * 0.15, -h * 0.3, 0.24]]
-            ];
-            paths.forEach(pts => {
-                const geo = new THREE.BufferGeometry().setFromPoints(pts.map(p => new THREE.Vector3(...p)));
-                const line = new THREE.Line(geo, crackMat.clone());
-                tile.add(line);
-                cracks.push(line);
-            });
-            return cracks;
+            eyeGlow.position.set(side * 2.55, 6.4, 2.15);
+            group.add(skull, cheek, eye, eyeGlow);
+            return { group, eye, eyeGlow };
         }
 
         function buildDecrepitArchitect() {
             const mesh = new THREE.Group();
+            const colossus = new THREE.Group();
+            colossus.position.set(0, 50, -ARENA * 0.68);
+
             const maskGroup = new THREE.Group();
-            maskGroup.position.set(0, 54, -ARENA * 0.62);
+            const leftFace = buildMinosFaceHalf(-1);
+            const rightFace = buildMinosFaceHalf(1);
+            const maskLeft = leftFace.group;
+            const maskRight = rightFace.group;
+            const eyeL = leftFace.eye;
+            const eyeR = rightFace.eye;
+            const eyeGlowL = leftFace.eyeGlow;
+            const eyeGlowR = rightFace.eyeGlow;
 
-            const leftHalf = buildSculptedMaskHalf(-1);
-            const rightHalf = buildSculptedMaskHalf(1);
-            const maskLeft = leftHalf.group;
-            const maskRight = rightHalf.group;
+            const bridge = new THREE.Mesh(
+                new THREE.BoxGeometry(3.2, 2.4, 3.2),
+                new THREE.MeshBasicMaterial({ color: 0x07040c, transparent: true, opacity: 0.99 })
+            );
+            bridge.position.set(0, 4.8, 1.8);
+            const mouth = new THREE.Mesh(
+                new THREE.BoxGeometry(6.5, 1.4, 1.2),
+                new THREE.MeshBasicMaterial({ color: 0x010002, transparent: true, opacity: 0.95 })
+            );
+            mouth.position.set(0, 2.8, 2.5);
+            const torso = new THREE.Mesh(
+                new THREE.BoxGeometry(24, 16, 9),
+                new THREE.MeshBasicMaterial({ color: 0x050208, transparent: true, opacity: 0.99 })
+            );
+            torso.position.set(0, -5, -1.5);
+            const shoulderL = new THREE.Mesh(
+                new THREE.SphereGeometry(5.2, 12, 10),
+                new THREE.MeshBasicMaterial({ color: 0x08050c, transparent: true, opacity: 0.99 })
+            );
+            shoulderL.position.set(-12, 1, -0.5);
+            shoulderL.scale.set(1.25, 0.95, 1.1);
+            const shoulderR = shoulderL.clone();
+            shoulderR.position.x = 12;
 
-            const noseBridge = new THREE.Mesh(
-                new THREE.ConeGeometry(0.85, 3.2, 5),
-                new THREE.MeshBasicMaterial({ color: 0x0c080a, transparent: true, opacity: 0.97 })
-            );
-            noseBridge.rotation.x = Math.PI / 2;
-            noseBridge.position.set(0, 0.15, 2.35);
-            const noseWire = new THREE.LineSegments(
-                new THREE.EdgesGeometry(noseBridge.geometry),
-                new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.85 })
-            );
-            noseBridge.add(noseWire);
-
-            const weakpointEye = new THREE.Mesh(
-                new THREE.SphereGeometry(0.95, 16, 16),
-                new THREE.MeshBasicMaterial({ color: 0xff1133 })
-            );
-            weakpointEye.position.set(0, 0.85, 2.05);
-            const weakpointRing = new THREE.Mesh(
-                new THREE.RingGeometry(1.15, 1.55, 32),
-                new THREE.MeshBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
-            );
-            weakpointRing.position.set(0, 0.85, 1.92);
-            const weakpointGlow = new THREE.PointLight(0xff0033, 2.8, 42);
+            const eyeLight = new THREE.PointLight(0xffffff, 5.5, 100);
+            eyeLight.position.set(0, 6.4, 2.5);
 
             const singularityCore = new THREE.Group();
-            singularityCore.position.set(0, 0.3, 0.8);
+            singularityCore.position.set(0, 5.5, 1.2);
             singularityCore.visible = false;
             const coreInner = new THREE.Mesh(
-                new THREE.SphereGeometry(1.1, 24, 24),
+                new THREE.SphereGeometry(1.2, 24, 24),
                 new THREE.MeshBasicMaterial({ color: 0xffffff })
             );
             const coreShell = new THREE.Mesh(
-                new THREE.SphereGeometry(2.2, 28, 28),
-                new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })
+                new THREE.SphereGeometry(2.4, 28, 28),
+                new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.62 })
             );
-            const coreGlow = new THREE.PointLight(0xffffff, 0, 80);
+            const coreGlow = new THREE.PointLight(0xffffff, 0, 90);
             singularityCore.add(coreInner, coreShell, coreGlow);
 
-            maskGroup.add(maskLeft, maskRight, noseBridge, weakpointEye, weakpointRing, weakpointGlow, singularityCore);
-            maskGroup.scale.setScalar(3);
+            maskGroup.add(maskLeft, maskRight, bridge, mouth, singularityCore);
+            colossus.add(maskGroup, torso, shoulderL, shoulderR, eyeLight);
+            colossus.scale.setScalar(3.4);
 
-            const armL = buildRiggedArm(-1);
-            const armR = buildRiggedArm(1);
-            armL.root.position.set(-ARENA * 0.78, armL.hoverY, -ARENA * 0.18);
-            armR.root.position.set(ARENA * 0.78, armR.hoverY, -ARENA * 0.18);
+            const armL = buildMinosArm(-1);
+            const armR = buildMinosArm(1);
+            armL.root.position.set(armL.targetX, armL.hoverY, armL.targetZ);
+            armR.root.position.set(armR.targetX, armR.hoverY, armR.targetZ);
 
-            const ribGeo = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(-8, 20, -2), new THREE.Vector3(-14, 8, 0),
-                new THREE.Vector3(8, 20, -2), new THREE.Vector3(14, 8, 0),
-                new THREE.Vector3(0, 24, -4), new THREE.Vector3(0, 10, -1)
-            ]);
-            const ribs = new THREE.LineSegments(
-                ribGeo,
-                new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.35 })
-            );
-            ribs.position.set(0, 8, -ARENA * 0.35);
-
-            mesh.add(maskGroup, armL.root, armR.root, ribs);
-            mesh.position.set(0, -4, -ARENA * 1.05);
-            mesh.rotation.x = 0.22;
+            mesh.add(colossus, armL.root, armR.root);
+            mesh.position.set(0, -1, -ARENA * 0.92);
+            mesh.rotation.x = 0.16;
             mesh.scale.setScalar(0.01);
             mesh.visible = false;
+
+            const weakpointEyes = [eyeL, eyeR];
             return {
-                mesh, maskGroup, maskLeft, maskRight,
-                maskCracks: [...leftHalf.cracks, ...rightHalf.cracks],
-                weakpointEye, weakpointRing, weakpointGlow,
+                mesh, maskGroup, maskLeft, maskRight, maskCracks: [],
+                eyeL, eyeR, eyeGlowL, eyeGlowR, eyeLight, weakpointEyes,
                 singularityCore, coreInner, coreShell, coreGlow,
-                armL, armR, core: weakpointEye, crown: maskGroup
+                armL, armR, torso, core: eyeL, crown: maskGroup
             };
         }
 
@@ -4420,6 +4410,23 @@
         const architectCoreScaleScratch = new THREE.Vector3();
         const ARCHITECT_CORE_VISUAL_RADIUS = 2.2;
 
+        function getArchitectWeakpointMeshes() {
+            const b = activeBoss;
+            if (!b || b.type !== 'architect') return [];
+            if (b.architectPhase === 2) {
+                return b.coreShell && b.coreShell.visible !== false ? [b.coreShell] : [];
+            }
+            const eyes = [];
+            if (b.eyeL && b.eyeL.visible !== false) eyes.push(b.eyeL);
+            if (b.eyeR && b.eyeR.visible !== false) eyes.push(b.eyeR);
+            if (!eyes.length && b.weakpointEyes) {
+                b.weakpointEyes.forEach(eye => {
+                    if (eye && eye.visible !== false) eyes.push(eye);
+                });
+            }
+            return eyes;
+        }
+
         function getArchitectCoreHitRadius() {
             if (!activeBoss || activeBoss.type !== 'architect') return 5;
             if (activeBoss.architectPhase === 2 && activeBoss.coreShell) {
@@ -4428,12 +4435,39 @@
                     Math.max(architectCoreScaleScratch.x, architectCoreScaleScratch.y, architectCoreScaleScratch.z);
                 return worldVisual * 1.5;
             }
-            if (activeBoss.weakpointEye) {
-                activeBoss.weakpointEye.getWorldScale(architectCoreScaleScratch);
+            const eyes = getArchitectWeakpointMeshes();
+            if (eyes.length) {
+                eyes[0].getWorldScale(architectCoreScaleScratch);
                 const s = Math.max(architectCoreScaleScratch.x, architectCoreScaleScratch.y, architectCoreScaleScratch.z);
-                return 3.2 * s;
+                return 2.9 * s;
             }
             return 5.5;
+        }
+
+        function architectWeakpointHitByRay(origin, dir, margin = 0) {
+            if (!activeBoss || activeBoss.type !== 'architect') return false;
+            const hitRadius = getArchitectCoreHitRadius() + margin;
+            if (activeBoss.architectPhase === 2) {
+                return distPointToRay(getArchitectCoreWorld(), origin, dir) < hitRadius;
+            }
+            return getArchitectWeakpointMeshes().some(eye => {
+                const wp = new THREE.Vector3();
+                eye.getWorldPosition(wp);
+                return distPointToRay(wp, origin, dir) < hitRadius;
+            });
+        }
+
+        function architectProjectileHitsWeakpoint(pos) {
+            if (!activeBoss || activeBoss.type !== 'architect') return false;
+            const hitRadius = getArchitectCoreHitRadius();
+            if (activeBoss.architectPhase === 2) {
+                return pos.distanceTo(getArchitectCoreWorld()) < hitRadius;
+            }
+            return getArchitectWeakpointMeshes().some(eye => {
+                const wp = new THREE.Vector3();
+                eye.getWorldPosition(wp);
+                return pos.distanceTo(wp) < hitRadius;
+            });
         }
 
         function updateArchitectPhase2CoreFx(dt) {
@@ -4455,15 +4489,19 @@
             const b = activeBoss;
             if (!b || b.type !== 'architect') return;
             const time = performance.now() * 0.001;
-            if (b.architectPhase === 1 && b.weakpointEye && b.weakpointEye.visible !== false) {
-                const pulse = 1 + Math.sin(time * 9) * 0.18;
-                b.weakpointEye.material.color.setHex(Math.sin(time * 12) > 0 ? 0xff2244 : 0xff0033);
-                b.weakpointEye.scale.setScalar(pulse);
-                if (b.weakpointRing) {
-                    b.weakpointRing.rotation.z += dt * 3.2;
-                    b.weakpointRing.material.opacity = 0.65 + Math.sin(time * 10) * 0.3;
-                }
-                if (b.weakpointGlow) b.weakpointGlow.intensity = 2.4 + Math.sin(time * 8) * 1.2;
+            if (b.architectPhase === 1) {
+                const pulse = 1 + Math.sin(time * 7) * 0.1;
+                const glowPulse = 0.3 + Math.sin(time * 11) * 0.14;
+                [b.eyeL, b.eyeR].forEach(eye => {
+                    if (eye && eye.visible !== false) {
+                        eye.material.color.setHex(0xffffff);
+                        eye.scale.setScalar(pulse);
+                    }
+                });
+                [b.eyeGlowL, b.eyeGlowR].forEach(glow => {
+                    if (glow && glow.visible !== false) glow.material.opacity = glowPulse;
+                });
+                if (b.eyeLight) b.eyeLight.intensity = 5 + Math.sin(time * 9) * 2;
             }
             if (b.architectPhase === 2) updateArchitectPhase2CoreFx(dt);
         }
@@ -4473,12 +4511,16 @@
             const pos = new THREE.Vector3();
             if (activeBoss.architectPhase === 2 && activeBoss.singularityCore) {
                 activeBoss.singularityCore.getWorldPosition(pos);
-            } else if (activeBoss.weakpointEye) {
-                activeBoss.weakpointEye.getWorldPosition(pos);
-            } else if (activeBoss.maskGroup) {
-                activeBoss.maskGroup.getWorldPosition(pos);
             } else {
-                activeBoss.core.getWorldPosition(pos);
+                const eyes = getArchitectWeakpointMeshes();
+                if (eyes.length) {
+                    eyes.forEach(eye => pos.add(eye.getWorldPosition(new THREE.Vector3())));
+                    pos.divideScalar(eyes.length);
+                } else if (activeBoss.maskGroup) {
+                    activeBoss.maskGroup.getWorldPosition(pos);
+                } else if (activeBoss.core) {
+                    activeBoss.core.getWorldPosition(pos);
+                }
             }
             return pos;
         }
@@ -4498,9 +4540,36 @@
             return true;
         }
 
+        function setMinosEyeFlash(flash) {
+            const b = activeBoss;
+            if (!b || b.architectPhase !== 1) return;
+            [b.eyeL, b.eyeR].forEach(eye => {
+                if (eye && eye.visible !== false) {
+                    eye.material.color.setHex(0xffffff);
+                    eye.material.opacity = flash ? 1 : 0.95;
+                }
+            });
+            [b.eyeGlowL, b.eyeGlowR].forEach(glow => {
+                if (glow && glow.visible !== false) {
+                    glow.material.opacity = flash ? 0.72 : 0.34;
+                }
+            });
+            if (b.eyeLight) b.eyeLight.intensity = flash ? 16 : 5.5;
+        }
+
+        function barkArchitect(line, tacticalHint = '') {
+            architectBossPromptEl.textContent = line;
+            architectBossPromptEl.classList.add('visible', 'minos-bark');
+            if (architectBarkTimer) clearTimeout(architectBarkTimer);
+            architectBarkTimer = setTimeout(() => {
+                architectBossPromptEl.classList.remove('minos-bark');
+                if (tacticalHint) architectBossPromptEl.textContent = tacticalHint;
+            }, 620);
+        }
+
         function setArchitectSeamFlash(arm, flash) {
             if (!arm) return;
-            const color = flash ? 0xffffff : 0xff0033;
+            const color = flash ? 0xffffff : 0xbb55ee;
             arm.segments.forEach(seg => {
                 seg.edge.material.color.setHex(color);
             });
@@ -4513,7 +4582,7 @@
         function setArchitectMaskCrackFlash(flash) {
             const b = activeBoss;
             if (!b || !b.maskCracks) return;
-            const color = flash ? 0xffffff : 0xff0033;
+            const color = flash ? 0xffffff : 0xbb55ee;
             b.maskCracks.forEach(c => {
                 c.material.color.setHex(color);
             });
@@ -4545,8 +4614,10 @@
             b.maskRight.rotation.y = amount * 0.58;
             b.maskLeft.position.x = -amount * 1.45;
             b.maskRight.position.x = amount * 1.45;
-            if (b.weakpointEye) b.weakpointEye.visible = amount < 0.85 && b.architectPhase !== 2;
-            if (b.weakpointRing) b.weakpointRing.visible = b.weakpointEye ? b.weakpointEye.visible : false;
+            const showEyes = amount < 0.85 && b.architectPhase !== 2;
+            [b.eyeL, b.eyeR, b.eyeGlowL, b.eyeGlowR].forEach(part => {
+                if (part) part.visible = showEyes;
+            });
             if (b.singularityCore) b.singularityCore.visible = amount > 0.35 || b.architectPhase === 2;
         }
 
@@ -4574,7 +4645,7 @@
             const mesh = new THREE.Mesh(
                 geo,
                 new THREE.MeshBasicMaterial({
-                    color: 0xff0033,
+                    color: 0xcc66ff,
                     transparent: true,
                     opacity: 0.98,
                     side: THREE.DoubleSide
@@ -4621,8 +4692,8 @@
             b.judgementPhase = 'track';
             b.judgementSlamY = 58;
             architectJudgement = { phase: 'track', timer: 1.2 };
-            architectBossPromptEl.textContent = 'JUDGEMENT SLAM — JUMP THE SHOCKWAVE';
-            architectBossPromptEl.classList.add('visible');
+            barkArchitect('JUDGEMENT', 'JUMP THE SHOCKWAVE');
+            setMinosEyeFlash(true);
             setArchitectSeamFlash(b.judgementSide, true);
         }
 
@@ -4636,8 +4707,8 @@
             playArchitectMortarAlarm();
             if (b.armL) b.armL.pose.clench = 1;
             if (b.armR) b.armR.pose.clench = 1;
-            architectBossPromptEl.textContent = 'DIE! — STRAFE THE TRACKING PILLARS';
-            architectBossPromptEl.classList.add('visible');
+            barkArchitect('DIE!', 'STRAFE THE TRACKING PILLARS');
+            setMinosEyeFlash(true);
         }
 
         function spawnArchitectMortarWarning(x, z) {
@@ -4645,7 +4716,7 @@
             geo.rotateX(-Math.PI / 2);
             const warn = new THREE.Mesh(
                 geo,
-                new THREE.MeshBasicMaterial({ color: 0xff1133, transparent: true, opacity: 0.92, side: THREE.DoubleSide })
+                new THREE.MeshBasicMaterial({ color: 0xdd88ff, transparent: true, opacity: 0.92, side: THREE.DoubleSide })
             );
             warn.position.set(x, FLOOR_Y + 0.12, z);
             scene.add(warn);
@@ -4663,8 +4734,8 @@
             b.crushGapRow = Math.floor(Math.random() * 4);
             b.crushGapCol = Math.floor(Math.random() * 5);
             b.crushGapTop = Math.random() > 0.5;
-            architectBossPromptEl.textContent = 'CRUSH! — PARRY OR DASH THROUGH THE GAP';
-            architectBossPromptEl.classList.add('visible');
+            barkArchitect('CRUSH!', 'PARRY OR DASH THROUGH THE GAP');
+            setMinosEyeFlash(true);
             setArchitectSeamFlash(b.crushSide, true);
         }
 
@@ -4715,6 +4786,7 @@
                     updateArchitectArmRig(arm, time, true, false);
                 }
                 setArchitectSeamFlash(arm, Math.sin(performance.now() * 0.04) > 0);
+                setMinosEyeFlash(Math.sin(performance.now() * 0.05) > 0);
                 if (j.timer <= 0) {
                     j.phase = 'slam';
                     j.timer = 0.08;
@@ -4736,6 +4808,7 @@
                 j.timer = 0.65;
                 if (arm) updateArchitectArmRig(arm, time, false, true);
                 setArchitectSeamFlash(arm, false);
+                setMinosEyeFlash(false);
             } else {
                 if (arm) {
                     arm.root.position.y = THREE.MathUtils.lerp(arm.root.position.y, arm.hoverY, 0.08);
@@ -4745,7 +4818,8 @@
                 if (j.timer <= 0) {
                     architectJudgement = null;
                     b.movePhase = 'idle';
-                    architectBossPromptEl.classList.remove('visible');
+                    architectBossPromptEl.classList.remove('visible', 'minos-bark');
+                    setMinosEyeFlash(false);
                     finishArchitectAttack(b);
                 }
             }
@@ -4772,7 +4846,7 @@
                     const pillarGeo = new THREE.CylinderGeometry(2.8, 2.8, 38, 20);
                     const pillar = new THREE.Mesh(
                         pillarGeo,
-                        new THREE.MeshBasicMaterial({ color: 0xff2244, transparent: true, opacity: 0.92 })
+                        new THREE.MeshBasicMaterial({ color: 0xeeccff, transparent: true, opacity: 0.94 })
                     );
                     pillar.position.set(m.x, FLOOR_Y + 19, m.z);
                     scene.add(pillar);
@@ -4804,7 +4878,9 @@
                 b.movePhase = 'idle';
                 if (b.armL) b.armL.pose.clench = 0.15;
                 if (b.armR) b.armR.pose.clench = 0.15;
+                setMinosEyeFlash(false);
                 architectBossPromptEl.classList.remove('visible');
+                architectBossPromptEl.classList.remove('minos-bark');
                 finishArchitectAttack(b);
             }
         }
@@ -4858,6 +4934,7 @@
                     b.crushPhase = 'done';
                     b.crushTimer = 0;
                     setArchitectSeamFlash(arm, false);
+                    setMinosEyeFlash(false);
                     if (arm) {
                         arm.root.position.x = THREE.MathUtils.lerp(arm.root.position.x, arm.targetX, 0.2);
                         arm.upperArm.rotation.y = THREE.MathUtils.lerp(arm.upperArm.rotation.y, 0, 0.15);
@@ -4865,7 +4942,8 @@
                 }
             } else {
                 b.movePhase = 'idle';
-                architectBossPromptEl.classList.remove('visible');
+                architectBossPromptEl.classList.remove('visible', 'minos-bark');
+                setMinosEyeFlash(false);
                 finishArchitectAttack(b);
             }
         }
@@ -4892,9 +4970,10 @@
                 b.attackTimer = 1.2;
                 b.label = bossWaveLabel('THE ARCHITECT — SINGULARITY');
                 b.name = 'THE ARCHITECT — SINGULARITY';
-                if (b.weakpointEye) b.weakpointEye.visible = false;
-                if (b.weakpointRing) b.weakpointRing.visible = false;
-                if (b.weakpointGlow) b.weakpointGlow.intensity = 0;
+                [b.eyeL, b.eyeR, b.eyeGlowL, b.eyeGlowR].forEach(part => {
+                    if (part) part.visible = false;
+                });
+                if (b.eyeLight) b.eyeLight.intensity = 0;
                 architectBossPromptEl.textContent = 'SHOOT THE WHITE SINGULARITY CORE';
                 architectBossPromptEl.classList.add('visible');
                 b.core = b.singularityCore || b.core;
@@ -4989,7 +5068,7 @@
                 activeBoss.attackMode = 'judgement';
                 activeBoss.attackTimer = 3.5;
             }
-            architectBossPromptEl.textContent = 'AIM AT THE PULSING CRIMSON EYE IN THE MASK';
+            architectBossPromptEl.textContent = 'AIM AT THE GLOWING WHITE EYES';
             architectBossPromptEl.classList.add('visible');
             if (activeBoss) activeBoss.weakpointPrompt = true;
         }
@@ -5034,7 +5113,7 @@
                     showBossDialogue();
                     showBossHud();
                     startCinematicDialogue(
-                        'CRADLED IN CODE... YET YOU CHOSE TO ASYNC FROM THE ARCHITECTURE.\nDIE.',
+                        'YOU DARED ENTER THE VAULT OF THE DEAD KING.\nDIE.',
                         true,
                         () => {
                             architectIntroPhase = 'hold';
@@ -5070,9 +5149,9 @@
             activeBoss = {
                 type: 'architect',
                 architectPhase: 1,
-                name: 'THE DECREPIT ARCHITECT',
-                label: bossWaveLabel('THE DECREPIT ARCHITECT'),
-                dialogue: 'CRADLED IN CODE... YET YOU CHOSE TO ASYNC FROM THE ARCHITECTURE.\nDIE.',
+                name: 'THE CORPSE OF THE ARCHITECT',
+                label: bossWaveLabel('THE CORPSE OF THE ARCHITECT'),
+                dialogue: 'YOU DARED ENTER THE VAULT OF THE DEAD KING.\nDIE.',
                 transformDialogue: 'THE SINGULARITY OPENS. GRAVITY BENDS. YOU WILL NOT ESCAPE THE REWRITE.',
                 dyingMessage: 'THE INERTIALLY BOUND CANNOT REWRITE THE ARCHITECTURE... IMPOSSIBLE!...',
                 mesh: colossus.mesh,
@@ -5080,9 +5159,12 @@
                 maskLeft: colossus.maskLeft,
                 maskRight: colossus.maskRight,
                 maskCracks: colossus.maskCracks,
-                weakpointEye: colossus.weakpointEye,
-                weakpointRing: colossus.weakpointRing,
-                weakpointGlow: colossus.weakpointGlow,
+                eyeL: colossus.eyeL,
+                eyeR: colossus.eyeR,
+                eyeGlowL: colossus.eyeGlowL,
+                eyeGlowR: colossus.eyeGlowR,
+                eyeLight: colossus.eyeLight,
+                weakpointEyes: colossus.weakpointEyes,
                 singularityCore: colossus.singularityCore,
                 coreInner: colossus.coreInner,
                 coreShell: colossus.coreShell,
@@ -6046,9 +6128,7 @@
                 const voidP1 = activeBoss.type === 'void' && activeBoss.voidPhase === 1;
                 const voidCoreExposed = activeBoss.type === 'void' && activeBoss.voidPhase === 2 && activeBoss.coreExposed;
                 if (activeBoss.type === 'architect') {
-                    const corePos = getArchitectCoreWorld();
-                    const hitRadius = getArchitectCoreHitRadius();
-                    if (distPointToRay(corePos, origin, dir) < hitRadius) {
+                    if (architectWeakpointHitByRay(origin, dir)) {
                         damageBoss(bossSource === 'ultimate' ? 0 : BOSS_PIERCE_DMG, bossSource);
                     }
                 } else {
@@ -6312,8 +6392,7 @@
             hitSet.forEach(enemy => damageEnemy(enemy, PIERCE_DAMAGE, !onGround));
             if (activeBoss) {
                 if (activeBoss.type === 'architect') {
-                    const corePos = getArchitectCoreWorld();
-                    if (distPointToRay(corePos, origin, dir) < getArchitectCoreHitRadius()) {
+                    if (architectWeakpointHitByRay(origin, dir)) {
                         damageBoss(BOSS_PIERCE_DMG, 'pierce');
                     }
                 } else {
@@ -6961,9 +7040,7 @@
                 if (p.owner === 'player') {
                     if (activeBoss) {
                         if (activeBoss.type === 'architect') {
-                            const corePos = getArchitectCoreWorld();
-                            const hitRadius = getArchitectCoreHitRadius();
-                            if (p.mesh.position.distanceTo(corePos) < hitRadius) {
+                            if (architectProjectileHitsWeakpoint(p.mesh.position)) {
                                 damageBoss(0, p.bossParry ? 'parry' : 'primary');
                                 scene.remove(p.mesh);
                                 return false;
