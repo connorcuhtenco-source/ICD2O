@@ -1,3 +1,6 @@
+/* Arcade Arena — shared styles for hub, embedded games, shop, Neon Kill iframe page, Water Royale */
+
+/* --- :root and theme variants --- */
 :root {
     color-scheme: dark;
     font-family: 'Courier New', Courier, monospace;
@@ -117,6 +120,7 @@ body.theme-void .terminal-void-grid {
     filter: hue-rotate(35deg);
 }
 
+/* --- Hub / landing (#menu, landing) --- */
 .hub-token-bar {
     display: none;
 }
@@ -205,6 +209,7 @@ body.theme-void .terminal-void-grid {
     50% { background-position: 100% 50%; }
 }
 
+/* --- Shop / inventory pages --- */
 .shop-page {
     background: var(--shop-page-overlay);
 }
@@ -1295,6 +1300,7 @@ body.boot-sequence-active .landing-reveal {
     box-shadow: 0 0 18px rgba(255, 230, 109, 0.28);
 }
 
+/* --- Games page --- */
 .games-page-card {
     justify-content: flex-start;
     padding-top: 40px;
@@ -1427,6 +1433,7 @@ body.boot-sequence-active .landing-reveal {
     font-size: 12px;
 }
 
+/* --- Settings drawer --- */
 .drawer-backdrop {
     position: fixed;
     inset: 0;
@@ -1640,6 +1647,7 @@ kbd {
     box-shadow: 0 0 14px rgba(255, 230, 109, 0.28);
 }
 
+/* --- Achievements modal --- */
 .modal-backdrop {
     position: fixed;
     inset: 0;
@@ -1757,6 +1765,7 @@ kbd {
     color: #ff9bd2;
 }
 
+/* --- Game container / canvas games --- */
 .canvas-wrapper {
     position: relative;
     width: min(96vw, 1000px);
@@ -1806,6 +1815,7 @@ canvas {
     line-height: 1.6;
 }
 
+/* --- Tag Zone HUD --- */
 .tag-hud {
     position: absolute;
     inset: 32px;
@@ -1953,10 +1963,12 @@ canvas {
     line-height: 1.45;
 }
 
+/* --- Utilities --- */
 .hidden {
     display: none !important;
 }
 
+/* --- Space Runner UI --- */
 .space-runner-ui {
     position: absolute;
     inset: 0;
@@ -2034,7 +2046,7 @@ canvas {
     display: none;
 }
 
-/* Water Royale standalone page */
+/* --- Water Royale --- */
 html.water-royale-root,
 html.water-royale-root body.water-royale-page {
     height: auto;

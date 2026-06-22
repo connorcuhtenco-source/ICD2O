@@ -1,4 +1,6 @@
 <!DOCTYPE html>
+<!-- Water Royale standalone page — backyard brawl loaded outside the hub canvas.
+     Class select lobby, match canvas, and win/respawn overlays. Returns to index.html via backHub. -->
 <html lang="en" class="water-royale-root">
 <head>
     <meta charset="UTF-8">
@@ -8,6 +10,7 @@
 </head>
 <body class="water-royale-page">
     <main class="water-shell">
+        <!-- Match HUD: selected class, weapon, ammo, and remaining fighters -->
         <section class="water-topbar">
             <div>
                 <button id="backHub" class="water-hub-btn">← Hub</button>
@@ -22,9 +25,11 @@
             </div>
         </section>
 
+        <!-- Game canvas and overlay stack (menu → message → respawn) -->
         <section class="water-game-wrap">
             <canvas id="game" width="1280" height="760" tabindex="0" aria-label="Water Royale game arena"></canvas>
 
+            <!-- Pre-match lobby: class cards and W/L record (localStorage in water-royale.js) -->
             <div id="menu" class="water-overlay">
                 <div class="water-panel">
                     <h2>Water Royale</h2>
@@ -54,18 +59,21 @@
                 </div>
             </div>
 
+            <!-- End-of-match result panel -->
             <div id="message" class="water-message hidden">
                 <strong id="messageTitle">Victory!</strong>
                 <span id="messageBody">You ruled the backyard.</span>
                 <button id="restartBtn">Play Again</button>
             </div>
 
+            <!-- Death countdown before respawn (hidden during full elimination) -->
             <div id="respawn" class="water-message hidden">
                 <strong id="respawnTitle">Soaked!</strong>
                 <span id="respawnBody">Respawning in <span id="respawnTimer">3</span>...</span>
             </div>
         </section>
 
+        <!-- Quick control reference footer -->
         <section class="water-lower">
             <div class="water-stat"><b>Move</b><span>WASD</span></div>
             <div class="water-stat"><b>Shoot</b><span>Left click</span></div>
@@ -76,11 +84,13 @@
         </section>
     </main>
 
+    <!-- Achievement toasts (arcade-achievements.js); Tank unlock uses Juggernaut kills -->
     <div id="achievementToastHost" class="achievement-toast-host"></div>
 
     <script src="arcade-achievements.js"></script>
     <script src="arcade-music.js"></script>
     <script src="water-royale.js"></script>
+    <!-- Stop hub music and navigate back to Arcade Arena landing -->
     <script>
         document.getElementById('backHub').addEventListener('click', () => {
             if (window.ArcadeMusic) ArcadeMusic.stop();

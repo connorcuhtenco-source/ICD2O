@@ -1,6 +1,7 @@
 /**
  * Procedural themed background music for Arcade Arena.
  * Routes all music voices through a shared dynamics compressor.
+ * Hub and standalone game pages call start(trackId) / stop(); volume follows localStorage "arcadeSound".
  */
 window.ArcadeMusic = (function ArcadeMusicModule() {
     let ctx = null;
@@ -16,6 +17,7 @@ window.ArcadeMusic = (function ArcadeMusicModule() {
     let volumeMult = 0.8;
   const SCHEDULE_AHEAD = 0.35;
 
+    // --- Track timing (BPM, gain, loop length in 16th-note steps) ---
     const TRACKS = {
         hub: { bpm: 92, baseGain: 0.26, loopSteps: 64 },
         tagZone: { bpm: 128, baseGain: 0.3, loopSteps: 64 },
@@ -32,6 +34,7 @@ window.ArcadeMusic = (function ArcadeMusicModule() {
         return beatDur(track) / 4;
     }
 
+    // --- Audio graph: compressor limiter → destination; voices → gain → lowpass → limiter ---
     function init() {
         if (ctx) return ctx;
         ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -86,6 +89,7 @@ window.ArcadeMusic = (function ArcadeMusicModule() {
         else if (musicGain && ctx) musicGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.12);
     }
 
+    // Reads hub sound slider value (0–100) from localStorage key "arcadeSound".
     function readStoredVolume() {
         try {
             return Math.max(0, Math.min(1, Number(localStorage.getItem('arcadeSound') ?? 80) / 100));
@@ -94,6 +98,7 @@ window.ArcadeMusic = (function ArcadeMusicModule() {
         }
     }
 
+    // --- Voice scheduling helpers (one-shot oscillators / noise bursts) ---
     function scheduleNoise(ctxRef, time, dur, level, filterType, filterFreq) {
         const len = Math.max(1, Math.floor(ctxRef.sampleRate * dur));
         const buf = ctxRef.createBuffer(1, len, ctxRef.sampleRate);
@@ -145,6 +150,7 @@ window.ArcadeMusic = (function ArcadeMusicModule() {
         osc.stop(time + dur + 0.02);
     }
 
+    // --- Per-track step composers (each schedules notes for one 16th-note step) ---
     function scheduleHub(step, time) {
         const sixteenth = step % 16;
         const bar = Math.floor(step / 16) % 4;
@@ -203,6 +209,7 @@ window.ArcadeMusic = (function ArcadeMusicModule() {
         waterRoyale: scheduleWaterRoyale
     };
 
+    // --- Playback scheduler (lookahead buffer keeps Web Audio ahead of real time) ---
     function advance() {
         if (!playing || !currentTrack || !ctx) return;
         const track = currentTrack;
@@ -215,6 +222,7 @@ window.ArcadeMusic = (function ArcadeMusicModule() {
         }
     }
 
+    // --- Public transport controls ---
     function start(trackId) {
         if (!TRACKS[trackId]) return;
         resume();

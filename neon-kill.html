@@ -6497,6 +6497,7 @@
             beamEffects.push({ mesh: beam, life });
         }
 
+        // --- Raycast damage (pierce beams, shotgun focus slug, ultimates) ---
         function damageAlongRay(origin, dir, maxDist, radius, enemyDamage, bossSource) {
             const hitSet = new Set();
             for (const enemy of enemies) {
@@ -7365,6 +7366,7 @@
             updateRegularEnemies(dt);
         }
 
+        // --- Projectile simulation (player shots, enemy fire, parry reflect) ---
         function updateProjectiles(dt) {
             projectiles = projectiles.filter(p => {
                 if (p.gravity) p.vel.y -= p.gravity * dt;

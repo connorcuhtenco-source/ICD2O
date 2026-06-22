@@ -1,8 +1,13 @@
+// Arcade Arena — meta progression layer
+// Cross-game economy: Arcade Tokens, shop/inventory, daily quests, themes, and mouse trails.
+// Persists to localStorage key "arcadeMeta". Games call tickPlayTime and on*End hooks;
+// Space Runner checks hasEquippedUpgrade for Neon Shield spawns.
 const ArcadeMeta = (() => {
     const STORAGE_KEY = 'arcadeMeta';
-    const PLAY_REWARD_SECONDS = 300;
+    const PLAY_REWARD_SECONDS = 300; // grant PLAY_REWARD_TOKENS every 5 minutes of active play
     const PLAY_REWARD_TOKENS = 25;
 
+    // --- Catalog: trails, shop items, promo codes, daily quest pool ---
     const TRAIL_STYLES = {
         'trail-cyan': { fill: 'rgba(0, 255, 204, {a})', stroke: 'rgba(255, 77, 141, {a})', preview: 'preview-trail-cyan' },
         'trail-pink': { fill: 'rgba(255, 77, 141, {a})', stroke: 'rgba(255, 230, 109, {a})', preview: 'preview-trail-pink' },
@@ -43,6 +48,7 @@ const ArcadeMeta = (() => {
     let state = null;
     let glitchPlaying = false;
 
+    // --- Persistence ---
     function todayKey() {
         return new Date().toISOString().slice(0, 10);
     }
@@ -83,6 +89,7 @@ const ArcadeMeta = (() => {
     }
 
     function syncOwnedUpgrades() {
+        // Upgrades auto-enable when owned (no separate equip step after purchase).
         if (isOwned('tag-time-accel')) state.equipped.tagTimeAccel = true;
         if (isOwned('space-shield')) state.equipped.spaceShield = true;
         if (isOwned('kill-overclock-core')) state.equipped.killOverclock = true;
@@ -94,6 +101,7 @@ const ArcadeMeta = (() => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
 
+    // --- Daily quests (two random quests rolled each calendar day) ---
     function ensureDailyQuests() {
         if (state.daily.date === todayKey() && state.daily.quests.length) return;
 
@@ -113,6 +121,7 @@ const ArcadeMeta = (() => {
         return DAILY_QUEST_POOL.find(q => q.id === id);
     }
 
+    // --- Tokens & hub chrome ---
     function addTokens(amount, reason) {
         if (amount <= 0) return;
         state.tokens += amount;
@@ -175,6 +184,7 @@ const ArcadeMeta = (() => {
         return false;
     }
 
+    // --- Shop & inventory rendering ---
     function getItemsByCategory(category) {
         return SHOP_ITEMS.filter(item => item.category === category);
     }
@@ -321,6 +331,7 @@ const ArcadeMeta = (() => {
         renderInventorySection('inventoryBackgrounds', 'theme');
     }
 
+    // --- Purchases & equip state ---
     function buyItem(id) {
         const item = SHOP_ITEMS.find(i => i.id === id);
         if (!item || isOwned(id)) return false;
@@ -375,6 +386,7 @@ const ArcadeMeta = (() => {
         renderShop();
     }
 
+    // --- Hub page navigation (shop / inventory with glitch transition) ---
     function hideAllHubPages() {
         document.getElementById('menu')?.classList.add('hidden');
         document.getElementById('gamesPage')?.classList.add('hidden');
@@ -426,6 +438,8 @@ const ArcadeMeta = (() => {
         }, 620);
     }
 
+    // --- Quest progress & passive token rewards ---
+    // playTime / tagSurvivalRun accumulate; score tracks use Math.max for best run.
     function updateDailyProgress(track, value) {
         let changed = false;
         state.daily.quests.forEach(quest => {
@@ -464,6 +478,7 @@ const ArcadeMeta = (() => {
         save();
     }
 
+    // --- Per-game hooks (called from individual game modules) ---
     function onTagZoneStart() {
         state.tagMatchCount += 1;
         save();
@@ -564,6 +579,7 @@ const ArcadeMeta = (() => {
         return false;
     }
 
+    // --- Init & public API ---
     function setupControls() {
         document.getElementById('shopBtn')?.addEventListener('click', () => {
             playGlitchTransition(showShopPage);

@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<!-- Arcade Arena hub (index.html)
+     Landing menu, game picker, shop/inventory, settings drawer, and embedded game canvas.
+     Loads meta/music modules plus script.js for navigation and in-hub games. -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -10,6 +13,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Global overlays: brightness dimmer and boot-sequence CRT sweep -->
     <div id="brightnessOverlay" aria-hidden="true"></div>
 
     <div id="bootOverlay" class="boot-overlay" aria-hidden="true">
@@ -17,6 +21,7 @@
         <div class="boot-scanlines"></div>
     </div>
 
+    <!-- Animated landing backdrop and cursor trail (theme/trail from ArcadeMeta) -->
     <div class="landing-bg" aria-hidden="true">
         <canvas id="landingCanvas"></canvas>
         <div class="terminal-void-grid"></div>
@@ -25,6 +30,7 @@
 
     <canvas id="mouseTrailCanvas" class="mouse-trail-canvas" aria-hidden="true"></canvas>
 
+    <!-- Main hub menu: games, shop, inventory, settings, keybinds, achievements -->
     <div id="menu">
         <div class="menu-card landing-card">
             <div class="title-glitch-wrap landing-reveal" data-title="ARCADE ARENA" data-reveal-order="0">
@@ -49,6 +55,7 @@
         </div>
     </div>
 
+    <!-- Page transition effect when opening shop or inventory -->
     <div id="glitchTransition" class="glitch-transition hidden" aria-hidden="true">
         <div class="glitch-layer glitch-rgb"></div>
         <div class="glitch-layer glitch-noise"></div>
@@ -57,6 +64,7 @@
 
     <div id="tokenToastHost" class="token-toast-host"></div>
 
+    <!-- Achievements modal (list populated by script.js) -->
     <div id="achievementsBackdrop" class="modal-backdrop hidden"></div>
     <aside id="achievementsModal" class="achievements-modal hidden" aria-hidden="true">
         <button id="closeAchievementsBtn" class="modal-close" aria-label="Close achievements">×</button>
@@ -64,6 +72,7 @@
         <div id="achievementsList" class="achievements-list"></div>
     </aside>
 
+    <!-- Game picker grid; each tile launches a mode via script.js -->
     <div id="gamesPage" class="hidden hub-page">
         <div class="games-page-card">
             <button id="backToMenuBtn" class="menuBtn back-link">← Back to Hub</button>
@@ -119,6 +128,7 @@
         </div>
     </div>
 
+    <!-- Token shop: power-ups, trails, themes, promo codes (rendered by arcade-meta.js) -->
     <div id="shopPage" class="hidden hub-page shop-page">
         <div class="shop-shell">
             <header class="shop-header">
@@ -159,6 +169,7 @@
         </div>
     </div>
 
+    <!-- Owned items — equip/unequip upgrades, trails, and themes -->
     <div id="inventoryPage" class="hidden hub-page shop-page inventory-page">
         <div class="shop-shell">
             <header class="shop-header">
@@ -185,6 +196,7 @@
         </div>
     </div>
 
+    <!-- Slide-out panel for brightness/sound and per-game keybind reference -->
     <div id="drawerBackdrop" class="drawer-backdrop drawer-closed"></div>
     <aside id="sideDrawer" class="side-drawer drawer-closed" aria-hidden="true">
         <button id="closeDrawerBtn" class="drawer-close" aria-label="Close panel">×</button>
@@ -250,6 +262,7 @@
         </div>
     </aside>
 
+    <!-- In-hub game shell: canvas, Space Runner UI, Tag Zone HUD, restart/back controls -->
     <div id="gameContainer" class="hidden">
         <div class="game-card">
             <h2 id="gameTitle">Game</h2>
@@ -257,6 +270,7 @@
             <div class="canvas-wrapper">
                 <canvas id="gameCanvas" width="480" height="720" class="hidden"></canvas>
 
+                <!-- Space Runner overlays (1prompt.js); score is survival time in ms -->
                 <div id="spaceRunnerUi" class="space-runner-ui hidden">
                     <div id="scoreDisplay" class="space-runner-score hidden"></div>
 
@@ -276,6 +290,7 @@
                     </div>
                 </div>
 
+                <!-- Tag Zone hearts, timer, level, and power-up inventory slots -->
                 <div id="tagHud" class="tag-hud hidden">
                     <div class="hud-box">
                         <span>Hearts</span>
@@ -314,6 +329,7 @@
         </div>
     </div>
 
+    <!-- Boot fallback: reveal landing UI if CSS animation does not finish -->
     <script>
         window.setTimeout(function () {
             var overlay = document.getElementById('bootOverlay');
@@ -330,6 +346,7 @@
             });
         }, 4500);
     </script>
+    <!-- Core modules: Space Runner, meta economy, procedural music, hub controller -->
     <script src="1prompt.js"></script>
     <script src="arcade-meta.js"></script>
     <script src="arcade-music.js"></script>

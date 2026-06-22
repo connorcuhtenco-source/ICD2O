@@ -1,6 +1,10 @@
+// Arcade Arena — achievement unlock system
+// Shared across hub games. Unlocked IDs persist in localStorage key "arcadeAchievements".
+// Games call ArcadeAchievements.unlock(id); Water Royale and Neon Kill define the feats.
 (function () {
     const STORAGE_KEY = 'arcadeAchievements';
 
+    // --- Achievement catalog ---
     const DETAILS = {
         tank: {
             id: 'tank',
@@ -16,6 +20,7 @@
         }
     };
 
+    // --- Persistence (array of unlocked achievement IDs) ---
     function loadUnlocked() {
         try {
             const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -29,6 +34,7 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify([...unlocked]));
     }
 
+    // --- Toast UI (injected styles + host element) ---
     function ensureToastStyles() {
         if (document.getElementById('arcadeAchievementToastStyles')) return;
         const style = document.createElement('style');
@@ -105,6 +111,7 @@
         }, 3800);
     }
 
+    // --- Unlock API (no-op if already earned) ---
     function unlock(id) {
         const unlocked = loadUnlocked();
         if (unlocked.has(id)) return false;
@@ -120,6 +127,7 @@
         return loadUnlocked().has(id);
     }
 
+    // --- Global export (merge onto existing ArcadeAchievements if present) ---
     const api = window.ArcadeAchievements || {};
     api.unlock = unlock;
     api.has = has;

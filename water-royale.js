@@ -1,3 +1,11 @@
+/**
+ * Water Royale — top-down backyard water-gun battle royale.
+ *
+ * Procedurally styled tile arena with destructible walls, bush stealth, speed pads,
+ * and weapon drops. Player picks a class (Default, Juggernaut, Speedster), fights
+ * AI brawlers, and wins by being the last fighter standing.
+ */
+// --- Constants and config: arena size, classes, weapons, sprites, and draw helpers ---
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = false;
@@ -306,6 +314,7 @@ function updateRecordDisplay() {
   if (l) l.textContent = String(record.losses);
 }
 
+// --- Map building: tile grid, mirrored layout, collision rects, and spawn points ---
 const tiles = [];
 const wallRects = [];
 const bushes = [];
@@ -477,6 +486,7 @@ function buildMap() {
   }
 }
 
+// --- Fighters and combat: spawning, movement, wall jumps, line-of-sight, and firing ---
 function makeFighter(type, x, y, name, ai = false) {
   const spec = classes[type];
   return {
@@ -773,6 +783,7 @@ function fire(fighter, targetX, targetY) {
   if (fighter.ammo <= 0) fighter.reloadTimer = getReloadTime(fighter, w.reload);
 }
 
+// --- Bullets: spawn projectiles, distance falloff, wall destruction, and hit resolution ---
 function addBullet(fighter, targetX, targetY, spread) {
   const w = weaponStats[fighter.weapon];
   const ang = Math.atan2(targetY - fighter.y, targetX - fighter.x) + spread;
@@ -858,6 +869,7 @@ function updatePlayer(dt) {
   }
 }
 
+// --- AI bots: warmup wandering, drop pickup, pursuit, and combat decisions ---
 function updateBots(dt) {
   for (const bot of state.bots) {
     if (!bot.alive) continue;
@@ -977,6 +989,7 @@ function splash(x, y, color) {
   state.splashes.push({ x, y, color, r: 6 + Math.random() * 14, life: 0.45 });
 }
 
+// --- Rendering: tile map, fighters, drops, camera world draw, and minimap ---
 function drawTileMap() {
   const grassGrad = ctx.createLinearGradient(0, 0, arena.w, arena.h);
   grassGrad.addColorStop(0, "#7ad86a");
@@ -1336,6 +1349,7 @@ function drawMinimap() {
   }
 }
 
+// --- Game loop: update tick, draw pass, win/loss end states, and respawn countdown ---
 function update(dt) {
   if (!state.running || state.over) return;
   state.time += dt;
@@ -1444,6 +1458,7 @@ function resizeCanvas() {
   canvas.height = Math.max(520, Math.floor(rect.height * scale));
 }
 
+// --- Input: class selection, keyboard/mouse controls, and lobby navigation ---
 document.querySelectorAll(".water-class-card").forEach(button => {
   button.addEventListener("click", () => {
     document.querySelectorAll(".water-class-card").forEach(item => item.classList.remove("active"));

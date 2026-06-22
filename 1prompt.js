@@ -1,8 +1,12 @@
-// Space Runner Infinite Runner Game
+// Arcade Arena — Space Runner
+// Three-lane infinite runner embedded in the hub (index.html). script.js calls open(),
+// stop(), and handleKey(); score is elapsed milliseconds. Hooks ArcadeMeta for play-time
+// tokens and the Neon Shield upgrade; reports game-over to ArcadeAchievements.
 const SpaceRunner = (() => {
     let canvas;
     let ctx;
 
+    // --- DOM references (overlays live in #spaceRunnerUi on index.html) ---
     const startScreen = document.getElementById('startScreen');
     const gameOverScreen = document.getElementById('gameOverScreen');
     const startButton = document.getElementById('startButton');
@@ -13,6 +17,7 @@ const SpaceRunner = (() => {
     const newHighscore = document.getElementById('newHighscore');
     const scoreDisplay = document.getElementById('scoreDisplay');
 
+    // --- Layout & tuning constants ---
     const GAME_WIDTH = 600;
     const GAME_HEIGHT = 800;
     const LANES = 3;
@@ -30,7 +35,9 @@ const SpaceRunner = (() => {
     const ROLL_HEIGHT = 58;
     const ROLL_DURATION = 520;
     const IMMUNITY_DURATION = 12000;
+    // OBSTACLE_HIT_RADIUS is smaller than the sprite — tighter lane collision than visuals.
 
+    // --- Sprite assets ---
     const playerImage = new Image();
     playerImage.src = 'sprites/astronautsprite.png';
 
@@ -44,6 +51,7 @@ const SpaceRunner = (() => {
     const starImage = new Image();
     starImage.src = 'sprites/star_sprite.png';
 
+    // --- Runtime state (gameState: idle | start | playing | gameover) ---
     let gameState = 'idle';
     let animationId = null;
     let player;
@@ -61,6 +69,7 @@ const SpaceRunner = (() => {
     let lastShieldSpawnCheck;
     let neonShieldHits;
 
+    // --- Session reset ---
     function resetGame() {
         player = {
             lane: 1,
@@ -92,6 +101,7 @@ const SpaceRunner = (() => {
         scoreDisplay.classList.remove('hidden');
     }
 
+    // --- Rendering ---
     function drawBackground() {
         ctx.fillStyle = '#111';
         ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
@@ -217,6 +227,7 @@ const SpaceRunner = (() => {
     function draw() {
         drawBackground();
 
+        // While rolling, split obstacle draw order so the player sits between layers.
         if (player.rolling) {
             drawStars();
             drawShieldPickups();
@@ -247,6 +258,7 @@ const SpaceRunner = (() => {
         ctx.fillText('Press Start to Play', GAME_WIDTH / 2, GAME_HEIGHT / 2);
     }
 
+    // --- Player motion (jump / lane change / roll / star immunity timer) ---
     function updatePlayer() {
         if (player.jumping) {
             const t = (Date.now() - player.jumpStart) / JUMP_DURATION;
@@ -285,6 +297,7 @@ const SpaceRunner = (() => {
         }
     }
 
+    // --- World entities (obstacles, stars, shield pickups) ---
     function updateObstacles(dt) {
         for (const obs of obstacles) {
             obs.y += speed * dt;
@@ -304,6 +317,7 @@ const SpaceRunner = (() => {
         const roll = Math.random();
         let lanes;
 
+        // Weighted patterns: full block (2%), double lane (15%), single lane (rest).
         if (roll < 0.02) {
             lanes = [0, 1, 2];
         } else if (roll < 0.17) {
@@ -363,6 +377,9 @@ const SpaceRunner = (() => {
         });
     }
 
+    // --- Collision & game-over ---
+    // Jump/roll pass through obstacles. Neon shield (shop upgrade pickup) absorbs hits;
+    // star pickup grants timed immunity (IMMUNITY_DURATION). Lane + Y distance only.
     function checkCollisions() {
         for (let i = 0; i < shieldPickups.length; i++) {
             const pickup = shieldPickups[i];
@@ -413,7 +430,7 @@ const SpaceRunner = (() => {
         const prevHighscore = highscore || 0;
         if (score > prevHighscore) {
             highscore = Math.floor(score);
-            localStorage.setItem('spaceRunnerHighscore', highscore);
+            localStorage.setItem('spaceRunnerHighscore', highscore); // per-game highscore key
             newHighscore.style.display = 'block';
         } else {
             newHighscore.style.display = 'none';
@@ -431,6 +448,7 @@ const SpaceRunner = (() => {
         window.ArcadeSettings?.playSound('gameOver');
     }
 
+    // --- Main loop ---
     function gameLoop() {
         if (gameState !== 'playing') return;
 
@@ -438,7 +456,7 @@ const SpaceRunner = (() => {
         const dt = (now - (gameLoop.lastTime || now)) / 16.67;
         const dtSeconds = (now - (gameLoop.lastTime || now)) / 1000;
         gameLoop.lastTime = now;
-        score = now - gameStartTime;
+        score = now - gameStartTime; // score tracks survival time, not collectibles
 
         window.ArcadeMeta?.tickPlayTime?.(Math.min(dtSeconds, 0.05));
 
@@ -447,6 +465,7 @@ const SpaceRunner = (() => {
         updateStars(dt);
         updateShieldPickups(dt);
 
+        // Neon Shield upgrade: periodic chance to spawn an in-run shield pickup.
         if (window.ArcadeMeta?.hasEquippedUpgrade?.('space-shield') && now - lastShieldSpawnCheck >= 20000) {
             lastShieldSpawnCheck = now;
             if (Math.random() < 0.35) {
@@ -477,6 +496,7 @@ const SpaceRunner = (() => {
         }
     }
 
+    // --- Input & lifecycle ---
     function startGame() {
         resetGame();
         gameState = 'playing';
@@ -528,6 +548,7 @@ const SpaceRunner = (() => {
         ctx = gameCtx;
         canvas.width = GAME_WIDTH;
         canvas.height = GAME_HEIGHT;
+        // Highscore persisted under localStorage key "spaceRunnerHighscore".
         highscore = parseInt(localStorage.getItem('spaceRunnerHighscore') || '0', 10);
         highscoreValue.textContent = highscore;
         gameState = 'start';
@@ -537,6 +558,7 @@ const SpaceRunner = (() => {
         drawPreview();
     }
 
+    // --- Boot wiring ---
     startButton.addEventListener('click', startGame);
     playAgainButton.addEventListener('click', startGame);
 

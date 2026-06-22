@@ -1,3 +1,12 @@
+/**
+ * Arcade Arena — main hub launcher and embedded canvas games.
+ *
+ * This file drives the landing menu, game picker, settings drawer, and achievement
+ * system. Two mini-games run inline on the shared canvas: Fast Eagle (Flappy-style)
+ * and Tag Zone (top-down survival/tag). Other titles (Water Royale, Neon Kill,
+ * Space Runner) are launched via navigation or delegated modules.
+ */
+// --- DOM references, shared game state, and per-game constants ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -175,6 +184,7 @@ function getFastEagleSpeed() {
     return starPowerTimer > 0 ? PIPE_SPEED * STAR_SPEED_MULTIPLIER : PIPE_SPEED;
 }
 
+// --- Achievements: definitions, persistence, unlock checks, and modal UI ---
 const ACHIEVEMENTS_STORAGE_KEY = 'arcadeAchievements';
 const ACHIEVEMENTS = [
     {
@@ -318,6 +328,7 @@ function checkSpaceRunnerAchievements(highscore) {
     }
 }
 
+// --- Settings and audio: brightness overlay, volume sliders, and Web Audio UI SFX ---
 const settings = {
     brightness: 100,
     sound: 80
@@ -508,6 +519,7 @@ function playUiSound(type = 'click') {
     }
 }
 
+// --- Hub navigation: side drawer, menu/games page transitions, and screen helpers ---
 function openDrawer(type) {
     settingsDrawerContent.classList.toggle('hidden', type !== 'settings');
     keybindsDrawerContent.classList.toggle('hidden', type !== 'keybinds');
@@ -594,6 +606,7 @@ function stopGame() {
     }
 }
 
+// --- Main game loop: requestAnimationFrame driver for embedded canvas games ---
 function startLoop() {
     stopGame();
     gameRunning = true;
@@ -624,6 +637,7 @@ function loop(timestamp) {
     animationId = requestAnimationFrame(loop);
 }
 
+// --- Fast Eagle: Flappy-style pipe dodger with star power-ups and high score ---
 function initFastEagle() {
     currentGame = 'fastEagle';
     canvas.width = 600;
@@ -1086,6 +1100,7 @@ function endFastEagle() {
     playUiSound('gameOver');
 }
 
+// --- Tag Zone: top-down survival — dodge taggers, collect powers, clear timed levels ---
 function startTagZone() {
     spaceRunnerUi.classList.add('hidden');
     SpaceRunner.stop();
@@ -2199,6 +2214,7 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
+// --- Game launchers: redirect to standalone pages or open delegated modules ---
 function startWaterRoyale() {
     ArcadeMusic.stop();
     window.location.href = 'water-royale.html';
@@ -2226,6 +2242,7 @@ function startSpaceRunner() {
     ArcadeMusic.start('spaceRunner');
 }
 
+// --- Event listeners and boot: keyboard/game buttons, achievements API, landing init ---
 document.addEventListener('keydown', e => {
     keys[e.code] = true;
 
