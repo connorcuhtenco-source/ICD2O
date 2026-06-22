@@ -1386,6 +1386,7 @@ function loop(time) {
   state.lastTime = time;
   update(dt);
   draw();
+  if (window.ArcadeMusic) ArcadeMusic.advance();
   requestAnimationFrame(loop);
 }
 
@@ -1561,4 +1562,8 @@ window.addEventListener("resize", resizeCanvas);
 loadRecord();
 buildMap();
 resizeCanvas();
+if (window.ArcadeMusic) {
+  ArcadeMusic.init();
+  ArcadeMusic.start("waterRoyale");
+}
 requestAnimationFrame(loop);

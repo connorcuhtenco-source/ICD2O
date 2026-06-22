@@ -552,7 +552,9 @@ function setupHubControls() {
         updateSettingsLabels();
         saveSettings();
         playUiSound('click');
-        LandingEffects.setDroneVolume();
+        ArcadeMusic.setVolumeMult(getSoundVolume());
+        if (settings.sound <= 0) ArcadeMusic.stop();
+        else if (!currentGame) ArcadeMusic.start('hub');
     });
 }
 
@@ -568,6 +570,7 @@ function showMenu() {
     tagHud.classList.add('hidden');
     spaceRunnerUi.classList.add('hidden');
     gameMessage.classList.remove('hidden');
+    if (settings.sound > 0) ArcadeMusic.start('hub');
 }
 
 function showGameScreen(name, message, useCanvas = false, showRestart = false) {
@@ -662,6 +665,7 @@ function startFastEagle() {
     showGameScreen('Fast Eagle', '', true, false);
     initFastEagle();
     restartBtn.classList.add('hidden');
+    ArcadeMusic.start('fastEagle');
     startLoop();
 }
 
@@ -1106,6 +1110,7 @@ function startTagZone() {
     tagHud.classList.remove('hidden');
     showGameScreen('Tag Zone', 'Get ready...', true, false);
     restartBtn.classList.add('hidden');
+    ArcadeMusic.start('tagZone');
     startLoop();
 }
 
@@ -2195,10 +2200,12 @@ function clamp(value, min, max) {
 }
 
 function startWaterRoyale() {
+    ArcadeMusic.stop();
     window.location.href = 'water-royale.html';
 }
 
 function startNeonKill() {
+    ArcadeMusic.stop();
     sessionStorage.setItem('neonKillUpgrades', JSON.stringify({
         overclock: ArcadeMeta.hasEquippedUpgrade('kill-overclock-core'),
         siphon: ArcadeMeta.hasEquippedUpgrade('kill-siphon-nanites'),
@@ -2216,6 +2223,7 @@ function startSpaceRunner() {
     restartBtn.classList.add('hidden');
     spaceRunnerUi.classList.remove('hidden');
     SpaceRunner.open(canvas, ctx);
+    ArcadeMusic.start('spaceRunner');
 }
 
 document.addEventListener('keydown', e => {
@@ -2307,8 +2315,6 @@ const LandingEffects = (() => {
     let bootPlayed = false;
     let mouse = { x: -1000, y: -1000 };
     let gridGlitchTimer = 2.5;
-    let droneMaster = null;
-    let droneStarted = false;
 
     const shards = [];
     const trail = [];
@@ -2394,54 +2400,13 @@ const LandingEffects = (() => {
         }
     }
 
-    function startAmbientDrone() {
-        if (droneStarted || settings.sound <= 0) return;
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    function syncHubMusic() {
+        if (settings.sound <= 0) {
+            ArcadeMusic.stop();
+            return;
         }
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-
-        droneMaster = audioContext.createGain();
-        droneMaster.gain.setValueAtTime(0.0001, audioContext.currentTime);
-        droneMaster.connect(audioContext.destination);
-
-        [
-            { freq: 52, type: 'sine', level: 0.55 },
-            { freq: 78, type: 'triangle', level: 0.22 },
-            { freq: 104, type: 'sine', level: 0.14 },
-            { freq: 156, type: 'triangle', level: 0.08 }
-        ].forEach(cfg => {
-            const osc = audioContext.createOscillator();
-            osc.type = cfg.type;
-            osc.frequency.setValueAtTime(cfg.freq, audioContext.currentTime);
-            const gain = audioContext.createGain();
-            gain.gain.value = cfg.level;
-            osc.connect(gain);
-            gain.connect(droneMaster);
-            osc.start();
-        });
-
-        const lfo = audioContext.createOscillator();
-        lfo.type = 'sine';
-        lfo.frequency.value = 0.07;
-        const lfoGain = audioContext.createGain();
-        lfoGain.gain.value = 0.018;
-        lfo.connect(lfoGain);
-        lfoGain.connect(droneMaster.gain);
-        lfo.start();
-
-        droneStarted = true;
-        setDroneVolume(true);
-    }
-
-    function setDroneVolume(forceOn) {
-        if (!droneMaster || !audioContext) return;
-        const target = (forceOn || isMenuVisible()) && settings.sound > 0
-            ? 0.032 * getSoundVolume()
-            : 0.0001;
-        droneMaster.gain.setTargetAtTime(target, audioContext.currentTime, 0.35);
+        ArcadeMusic.setVolumeMult(getSoundVolume());
+        if (!currentGame) ArcadeMusic.start('hub');
     }
 
     function buildTitleLetters() {
@@ -2600,13 +2565,16 @@ const LandingEffects = (() => {
             landingCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
             drawShards();
             updateGridGlitch(dt);
-            setDroneVolume();
-        } else {
-            setDroneVolume();
+            syncHubMusic();
+        } else if (!currentGame) {
+            syncHubMusic();
             if (landingCtx) {
                 landingCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
             }
+        } else if (landingCtx) {
+            landingCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         }
+        ArcadeMusic.advance();
 
         if (isHubTrailActive()) {
             drawMouseTrail();
@@ -2650,7 +2618,8 @@ const LandingEffects = (() => {
             initShards();
             setupButtonHovers();
             runBootSequence();
-            startAmbientDrone();
+            ArcadeMusic.init();
+            syncHubMusic();
 
             window.addEventListener('resize', () => {
                 resizeCanvases();
@@ -2677,7 +2646,7 @@ const LandingEffects = (() => {
         }
     }
 
-    return { init, clearMouseTrail, setDroneVolume };
+    return { init, clearMouseTrail, syncHubMusic };
 })();
 
 loadSettings();
@@ -2685,6 +2654,8 @@ loadAchievements();
 ArcadeMeta.init();
 setupHubControls();
 showMenu();
+ArcadeMusic.setVolumeMult(getSoundVolume());
+if (settings.sound > 0) ArcadeMusic.start('hub');
 
 window.ArcadeSettings = {
     playSound: playUiSound

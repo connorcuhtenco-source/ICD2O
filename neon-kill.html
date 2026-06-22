@@ -960,6 +960,18 @@
         const MUSIC_BEAT = 60 / MUSIC_BPM;
         const MUSIC_SIXTEENTH = MUSIC_BEAT / 4;
         const MUSIC_BASE_GAIN = 0.34;
+
+        function getArcadeSoundVolume() {
+            try {
+                return Math.max(0, Math.min(1, Number(localStorage.getItem('arcadeSound') ?? 80) / 100));
+            } catch (_) {
+                return 0.8;
+            }
+        }
+
+        function getMusicBaseGain() {
+            return MUSIC_BASE_GAIN * getArcadeSoundVolume();
+        }
         const MUSIC_SCHEDULE_AHEAD = 0.35;
         let musicGain = null;
         let musicFilter = null;
@@ -977,7 +989,7 @@
             musicFilter.type = 'lowpass';
             musicFilter.frequency.setValueAtTime(18000, ctx.currentTime);
             musicFilter.Q.setValueAtTime(0.7, ctx.currentTime);
-            musicGain.gain.setValueAtTime(MUSIC_BASE_GAIN, ctx.currentTime);
+            musicGain.gain.setValueAtTime(getMusicBaseGain(), ctx.currentTime);
             musicGain.connect(musicFilter);
             musicFilter.connect(audioLimiter);
             musicDistortion = ctx.createWaveShaper();
@@ -1094,7 +1106,7 @@
 
         function startCombatMusic() {
             initMusicBus();
-            if (musicPlaying) return;
+            if (musicPlaying || getArcadeSoundVolume() <= 0) return;
             const ctx = initAudio();
             musicPlaying = true;
             musicStep = 0;
@@ -1119,13 +1131,13 @@
             if (paused) {
                 musicGain.gain.cancelScheduledValues(t);
                 musicGain.gain.setValueAtTime(musicGain.gain.value, t);
-                musicGain.gain.linearRampToValueAtTime(MUSIC_BASE_GAIN * 0.5, t + 0.2);
+                musicGain.gain.linearRampToValueAtTime(getMusicBaseGain() * 0.5, t + 0.2);
                 musicFilter.frequency.cancelScheduledValues(t);
                 musicFilter.frequency.setValueAtTime(musicFilter.frequency.value, t);
                 musicFilter.frequency.linearRampToValueAtTime(900, t + 0.2);
             } else {
                 musicGain.gain.cancelScheduledValues(t);
-                musicGain.gain.setValueAtTime(MUSIC_BASE_GAIN, t);
+                musicGain.gain.setValueAtTime(getMusicBaseGain(), t);
                 musicFilter.frequency.cancelScheduledValues(t);
                 musicFilter.frequency.setValueAtTime(18000, t);
             }

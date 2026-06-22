@@ -79,9 +79,11 @@
     <div id="achievementToastHost" class="achievement-toast-host"></div>
 
     <script src="arcade-achievements.js"></script>
+    <script src="arcade-music.js"></script>
     <script src="water-royale.js"></script>
     <script>
         document.getElementById('backHub').addEventListener('click', () => {
+            if (window.ArcadeMusic) ArcadeMusic.stop();
             window.location.href = 'index.html';
         });
     </script>
