@@ -1483,9 +1483,13 @@
                 return;
             }
             let locked = false;
-            if (activeBoss && activeBoss.type === 'architect' && activeBoss.architectPhase === 2 && activeBoss.coreShell) {
+            if (activeBoss && activeBoss.type === 'architect') {
                 crosshairRaycaster.set(camera.position, getAimDirection());
-                locked = crosshairRaycaster.intersectObject(activeBoss.coreShell, false).length > 0;
+                if (activeBoss.architectPhase === 2 && activeBoss.coreShell) {
+                    locked = crosshairRaycaster.intersectObject(activeBoss.coreShell, false).length > 0;
+                } else if (activeBoss.weakpointEye && activeBoss.weakpointEye.visible !== false) {
+                    locked = crosshairRaycaster.intersectObject(activeBoss.weakpointEye, false).length > 0;
+                }
             }
             crosshairEl.classList.toggle('core-lock', locked);
             if (locked && !coreLockActive) startCoreLockHum();
@@ -2968,6 +2972,7 @@
 
         function updateBossDialogue(rawDt) {
             if (bossAwaitingEngage) return;
+            if (cinematicDialogueActive) return;
             if (!bossIntroActive && !(architectIntroActive && architectIntroPhase === 'dialogue')) return;
 
             if (!typewriterDone) {
@@ -4195,45 +4200,67 @@
             const root = new THREE.Group();
             const shoulder = new THREE.Group();
             const upperArm = new THREE.Group();
-            upperArm.position.y = -5;
+            upperArm.position.y = -6;
             const forearm = new THREE.Group();
-            forearm.position.y = -6;
+            forearm.position.y = -7;
             const hand = new THREE.Group();
-            hand.position.y = -5;
-            const plateMat = new THREE.MeshBasicMaterial({ color: 0x08060a, transparent: true, opacity: 0.96 });
+            hand.position.y = -5.5;
+            const plateMat = new THREE.MeshBasicMaterial({ color: 0x060408, transparent: true, opacity: 0.97 });
             const edgeMat = new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.92 });
             const arcMat = new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.88 });
             const segments = [];
             const seamCracks = [];
-            [shoulder, upperArm, forearm, hand].forEach((joint, idx) => {
-                const w = 4.2 - idx * 0.35;
-                const geo = new THREE.BoxGeometry(w, 2.8 - idx * 0.15, w * 0.85);
-                const plate = new THREE.Mesh(geo, plateMat.clone());
-                const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat.clone());
-                joint.add(plate, edge);
-                segments.push({ joint, plate, edge });
-                const crackGeo = new THREE.BufferGeometry().setFromPoints([
-                    new THREE.Vector3(-w * 0.2, 0.4, w * 0.42),
-                    new THREE.Vector3(w * 0.15, -0.3, w * 0.42)
-                ]);
-                const crack = new THREE.Line(crackGeo, arcMat.clone());
-                joint.add(crack);
-                seamCracks.push(crack);
-            });
-            const fingerArcs = [];
-            for (let f = 0; f < 4; f += 1) {
-                const fg = new THREE.BoxGeometry(0.9, 2.2, 0.9);
-                const finger = new THREE.Mesh(fg, plateMat.clone());
-                finger.position.set((f - 1.5) * 1.1, -1.8, 0.4);
-                hand.add(finger);
-                const arcGeo = new THREE.BufferGeometry().setFromPoints([
-                    new THREE.Vector3((f - 1.5) * 1.1, -0.4, 0.2),
-                    new THREE.Vector3((f - 1.5) * 1.1, -1.8, 0.4)
-                ]);
-                const arc = new THREE.Line(arcGeo, arcMat.clone());
-                hand.add(arc);
-                fingerArcs.push({ finger, arc });
+
+            function addLimb(group, geo, offsetY) {
+                const mesh = new THREE.Mesh(geo, plateMat.clone());
+                mesh.position.y = offsetY || 0;
+                const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat.clone());
+                wire.position.y = offsetY || 0;
+                group.add(mesh, wire);
+                segments.push({ joint: group, plate: mesh, edge: wire });
+                return mesh;
             }
+
+            const pauldronGeo = new THREE.SphereGeometry(2.6, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55);
+            addLimb(shoulder, pauldronGeo, 0);
+            addLimb(upperArm, new THREE.CylinderGeometry(1.55, 1.85, 7.2, 10), -3.6);
+            addLimb(forearm, new THREE.CylinderGeometry(1.2, 1.5, 6.4, 10), -3.2);
+            const palmGeo = new THREE.BoxGeometry(3.4, 1.2, 2.8);
+            addLimb(hand, palmGeo, -0.4);
+
+            const fingerArcs = [];
+            for (let f = 0; f < 5; f += 1) {
+                const spread = (f - 2) * 0.72;
+                const fingerGroup = new THREE.Group();
+                fingerGroup.position.set(spread, -1.4, 0.55);
+                let y = 0;
+                for (let seg = 0; seg < 3; seg += 1) {
+                    const len = 1.55 - seg * 0.22;
+                    const fg = new THREE.CylinderGeometry(0.28 - seg * 0.04, 0.34 - seg * 0.04, len, 6);
+                    const finger = new THREE.Mesh(fg, plateMat.clone());
+                    finger.position.y = y - len * 0.5;
+                    y -= len * 0.88;
+                    finger.rotation.x = 0.18 + seg * 0.08;
+                    fingerGroup.add(finger);
+                    const arcGeo = new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(0, finger.position.y + len * 0.35, 0.1),
+                        new THREE.Vector3(0, finger.position.y - len * 0.35, 0.2)
+                    ]);
+                    const arc = new THREE.Line(arcGeo, arcMat.clone());
+                    fingerGroup.add(arc);
+                    if (seg === 0) fingerArcs.push({ finger, arc });
+                }
+                hand.add(fingerGroup);
+            }
+
+            const crackGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-0.5, 1.2, 1.2),
+                new THREE.Vector3(0.2, -2.4, 1.25)
+            ]);
+            const crack = new THREE.Line(crackGeo, arcMat.clone());
+            forearm.add(crack);
+            seamCracks.push(crack);
+
             shoulder.add(upperArm);
             upperArm.add(forearm);
             forearm.add(hand);
@@ -4244,6 +4271,49 @@
                 pose: { raise: 0, clench: 0, reach: 0, slamY: 0 },
                 hoverY: 18, targetX: side * ARENA * 0.72, targetZ: -ARENA * 0.22
             };
+        }
+
+        function buildSculptedMaskHalf(side) {
+            const group = new THREE.Group();
+            const porcelain = () => new THREE.MeshBasicMaterial({ color: 0x0c080a, transparent: true, opacity: 0.97 });
+            const wireFor = (geo) => new THREE.LineSegments(
+                new THREE.EdgesGeometry(geo),
+                new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.88 })
+            );
+            const cracks = [];
+            const addPart = (geo, pos, rot = null) => {
+                const mesh = new THREE.Mesh(geo, porcelain());
+                mesh.position.copy(pos);
+                if (rot) mesh.rotation.set(rot.x || 0, rot.y || 0, rot.z || 0);
+                const w = wireFor(geo);
+                w.position.copy(pos);
+                if (rot) w.rotation.copy(mesh.rotation);
+                group.add(mesh, w);
+                return mesh;
+            };
+
+            const plateGeo = new THREE.BoxGeometry(4.4, 9.2, 2.4);
+            const plate = addPart(plateGeo, new THREE.Vector3(side * 2.15, 0, 0));
+            cracks.push(...addMaskSeamCracks(plate, 4.4, 9.2));
+
+            addPart(new THREE.BoxGeometry(3.2, 3.8, 1.9), new THREE.Vector3(side * 3.35, -1.4, 0.95), { z: side * -0.22, y: side * 0.12 });
+            addPart(new THREE.BoxGeometry(3.8, 1.5, 1.7), new THREE.Vector3(side * 2.5, 3.1, 0.75), { z: side * 0.18, x: -0.25 });
+            addPart(new THREE.ConeGeometry(0.65, 2.8, 6), new THREE.Vector3(side * 1.4, 4.8, -0.15), { x: -0.25, z: side * 0.35 });
+            addPart(new THREE.ConeGeometry(0.55, 2.2, 5), new THREE.Vector3(side * 2.8, 5.1, -0.35), { x: -0.15, z: side * 0.5 });
+            addPart(new THREE.ConeGeometry(0.48, 1.9, 5), new THREE.Vector3(side * 4.0, 4.5, -0.2), { x: -0.1, z: side * 0.25 });
+
+            const jawGeo = new THREE.BoxGeometry(3.6, 2.2, 2.0);
+            addPart(jawGeo, new THREE.Vector3(side * 2.0, -3.5, 0.55), { x: 0.2 });
+
+            const socket = new THREE.Mesh(
+                new THREE.SphereGeometry(1.15, 12, 10),
+                new THREE.MeshBasicMaterial({ color: 0x010001, transparent: true, opacity: 0.98 })
+            );
+            socket.position.set(side * 1.85, 1.0, 1.05);
+            socket.scale.set(1.15, 0.9, 0.55);
+            group.add(socket);
+
+            return { group, cracks };
         }
 
         function addMaskSeamCracks(tile, w, h) {
@@ -4264,29 +4334,38 @@
 
         function buildDecrepitArchitect() {
             const mesh = new THREE.Group();
-            const porcelainMat = new THREE.MeshBasicMaterial({ color: 0x0a0608, transparent: true, opacity: 0.98 });
             const maskGroup = new THREE.Group();
             maskGroup.position.set(0, 54, -ARENA * 0.62);
-            const maskLeft = new THREE.Group();
-            const maskRight = new THREE.Group();
-            const leftTile = new THREE.Mesh(new THREE.BoxGeometry(3.6, 5.2, 0.45), porcelainMat.clone());
-            leftTile.position.set(-1.9, 0.2, 0);
-            const rightTile = new THREE.Mesh(new THREE.BoxGeometry(3.6, 5.2, 0.45), porcelainMat.clone());
-            rightTile.position.set(1.9, 0.2, 0);
-            const leftCracks = addMaskSeamCracks(leftTile, 3.6, 5.2);
-            const rightCracks = addMaskSeamCracks(rightTile, 3.6, 5.2);
-            const leftEdge = new THREE.LineSegments(
-                new THREE.EdgesGeometry(leftTile.geometry),
+
+            const leftHalf = buildSculptedMaskHalf(-1);
+            const rightHalf = buildSculptedMaskHalf(1);
+            const maskLeft = leftHalf.group;
+            const maskRight = rightHalf.group;
+
+            const noseBridge = new THREE.Mesh(
+                new THREE.ConeGeometry(0.85, 3.2, 5),
+                new THREE.MeshBasicMaterial({ color: 0x0c080a, transparent: true, opacity: 0.97 })
+            );
+            noseBridge.rotation.x = Math.PI / 2;
+            noseBridge.position.set(0, 0.15, 2.35);
+            const noseWire = new THREE.LineSegments(
+                new THREE.EdgesGeometry(noseBridge.geometry),
                 new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.85 })
             );
-            const rightEdge = new THREE.LineSegments(
-                new THREE.EdgesGeometry(rightTile.geometry),
-                new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.85 })
+            noseBridge.add(noseWire);
+
+            const weakpointEye = new THREE.Mesh(
+                new THREE.SphereGeometry(0.95, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0xff1133 })
             );
-            leftTile.add(leftEdge);
-            rightTile.add(rightEdge);
-            maskLeft.add(leftTile);
-            maskRight.add(rightTile);
+            weakpointEye.position.set(0, 0.85, 2.05);
+            const weakpointRing = new THREE.Mesh(
+                new THREE.RingGeometry(1.15, 1.55, 32),
+                new THREE.MeshBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+            );
+            weakpointRing.position.set(0, 0.85, 1.92);
+            const weakpointGlow = new THREE.PointLight(0xff0033, 2.8, 42);
+
             const singularityCore = new THREE.Group();
             singularityCore.position.set(0, 0.3, 0.8);
             singularityCore.visible = false;
@@ -4300,21 +4379,37 @@
             );
             const coreGlow = new THREE.PointLight(0xffffff, 0, 80);
             singularityCore.add(coreInner, coreShell, coreGlow);
-            maskGroup.add(maskLeft, maskRight, singularityCore);
+
+            maskGroup.add(maskLeft, maskRight, noseBridge, weakpointEye, weakpointRing, weakpointGlow, singularityCore);
             maskGroup.scale.setScalar(3);
+
             const armL = buildRiggedArm(-1);
             const armR = buildRiggedArm(1);
             armL.root.position.set(-ARENA * 0.78, armL.hoverY, -ARENA * 0.18);
             armR.root.position.set(ARENA * 0.78, armR.hoverY, -ARENA * 0.18);
-            mesh.add(maskGroup, armL.root, armR.root);
+
+            const ribGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-8, 20, -2), new THREE.Vector3(-14, 8, 0),
+                new THREE.Vector3(8, 20, -2), new THREE.Vector3(14, 8, 0),
+                new THREE.Vector3(0, 24, -4), new THREE.Vector3(0, 10, -1)
+            ]);
+            const ribs = new THREE.LineSegments(
+                ribGeo,
+                new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.35 })
+            );
+            ribs.position.set(0, 8, -ARENA * 0.35);
+
+            mesh.add(maskGroup, armL.root, armR.root, ribs);
             mesh.position.set(0, -4, -ARENA * 1.05);
             mesh.rotation.x = 0.22;
             mesh.scale.setScalar(0.01);
             mesh.visible = false;
             return {
-                mesh, maskGroup, maskLeft, maskRight, maskLeftTile: leftTile, maskRightTile: rightTile,
-                maskCracks: [...leftCracks, ...rightCracks], singularityCore, coreInner, coreShell, coreGlow,
-                armL, armR, core: singularityCore, crown: maskGroup
+                mesh, maskGroup, maskLeft, maskRight,
+                maskCracks: [...leftHalf.cracks, ...rightHalf.cracks],
+                weakpointEye, weakpointRing, weakpointGlow,
+                singularityCore, coreInner, coreShell, coreGlow,
+                armL, armR, core: weakpointEye, crown: maskGroup
             };
         }
 
@@ -4331,7 +4426,12 @@
                 activeBoss.coreShell.getWorldScale(architectCoreScaleScratch);
                 const worldVisual = ARCHITECT_CORE_VISUAL_RADIUS *
                     Math.max(architectCoreScaleScratch.x, architectCoreScaleScratch.y, architectCoreScaleScratch.z);
-                return worldVisual * 1.35;
+                return worldVisual * 1.5;
+            }
+            if (activeBoss.weakpointEye) {
+                activeBoss.weakpointEye.getWorldScale(architectCoreScaleScratch);
+                const s = Math.max(architectCoreScaleScratch.x, architectCoreScaleScratch.y, architectCoreScaleScratch.z);
+                return 3.2 * s;
             }
             return 5.5;
         }
@@ -4351,11 +4451,30 @@
             if (b.singularityCore) b.singularityCore.visible = true;
         }
 
+        function updateArchitectVisualFx(dt) {
+            const b = activeBoss;
+            if (!b || b.type !== 'architect') return;
+            const time = performance.now() * 0.001;
+            if (b.architectPhase === 1 && b.weakpointEye && b.weakpointEye.visible !== false) {
+                const pulse = 1 + Math.sin(time * 9) * 0.18;
+                b.weakpointEye.material.color.setHex(Math.sin(time * 12) > 0 ? 0xff2244 : 0xff0033);
+                b.weakpointEye.scale.setScalar(pulse);
+                if (b.weakpointRing) {
+                    b.weakpointRing.rotation.z += dt * 3.2;
+                    b.weakpointRing.material.opacity = 0.65 + Math.sin(time * 10) * 0.3;
+                }
+                if (b.weakpointGlow) b.weakpointGlow.intensity = 2.4 + Math.sin(time * 8) * 1.2;
+            }
+            if (b.architectPhase === 2) updateArchitectPhase2CoreFx(dt);
+        }
+
         function getArchitectCoreWorld() {
             if (!activeBoss || activeBoss.type !== 'architect') return new THREE.Vector3();
             const pos = new THREE.Vector3();
             if (activeBoss.architectPhase === 2 && activeBoss.singularityCore) {
                 activeBoss.singularityCore.getWorldPosition(pos);
+            } else if (activeBoss.weakpointEye) {
+                activeBoss.weakpointEye.getWorldPosition(pos);
             } else if (activeBoss.maskGroup) {
                 activeBoss.maskGroup.getWorldPosition(pos);
             } else {
@@ -4422,10 +4541,12 @@
         function openArchitectMask(amount) {
             const b = activeBoss;
             if (!b || !b.maskLeft || !b.maskRight) return;
-            b.maskLeft.rotation.y = -amount * 0.62;
-            b.maskRight.rotation.y = amount * 0.62;
-            b.maskLeft.position.x = -1.9 - amount * 1.35;
-            b.maskRight.position.x = 1.9 + amount * 1.35;
+            b.maskLeft.rotation.y = -amount * 0.58;
+            b.maskRight.rotation.y = amount * 0.58;
+            b.maskLeft.position.x = -amount * 1.45;
+            b.maskRight.position.x = amount * 1.45;
+            if (b.weakpointEye) b.weakpointEye.visible = amount < 0.85 && b.architectPhase !== 2;
+            if (b.weakpointRing) b.weakpointRing.visible = b.weakpointEye ? b.weakpointEye.visible : false;
             if (b.singularityCore) b.singularityCore.visible = amount > 0.35 || b.architectPhase === 2;
         }
 
@@ -4771,7 +4892,12 @@
                 b.attackTimer = 1.2;
                 b.label = bossWaveLabel('THE ARCHITECT — SINGULARITY');
                 b.name = 'THE ARCHITECT — SINGULARITY';
-                if (b.core) b.core = b.singularityCore || b.core;
+                if (b.weakpointEye) b.weakpointEye.visible = false;
+                if (b.weakpointRing) b.weakpointRing.visible = false;
+                if (b.weakpointGlow) b.weakpointGlow.intensity = 0;
+                architectBossPromptEl.textContent = 'SHOOT THE WHITE SINGULARITY CORE';
+                architectBossPromptEl.classList.add('visible');
+                b.core = b.singularityCore || b.core;
                 updateBossBar();
                 architectTransformActive = false;
                 syncDialogueLock();
@@ -4831,11 +4957,11 @@
                 b.armR.root.position.z = THREE.MathUtils.lerp(b.armR.root.position.z, b.armR.targetZ, 0.03);
             }
             if (b.architectPhase === 2) {
-                updateArchitectPhase2CoreFx(dt);
                 openArchitectMask(1.2);
             } else {
                 openArchitectMask(0.04 + Math.sin(time * 0.8) * 0.02);
             }
+            updateArchitectVisualFx(dt);
             if (b.movePhase !== 'idle' && b.movePhase !== 'phase2cut') return;
             if (b.movePhase === 'phase2cut') return;
             b.attackTimer -= dt * speed;
@@ -4863,6 +4989,9 @@
                 activeBoss.attackMode = 'judgement';
                 activeBoss.attackTimer = 3.5;
             }
+            architectBossPromptEl.textContent = 'AIM AT THE PULSING CRIMSON EYE IN THE MASK';
+            architectBossPromptEl.classList.add('visible');
+            if (activeBoss) activeBoss.weakpointPrompt = true;
         }
 
         function updateArchitectIntro(rawDt) {
@@ -4905,7 +5034,7 @@
                     showBossDialogue();
                     showBossHud();
                     startCinematicDialogue(
-                        'CRADLED IN CODE... YET YOU CHOSE TO ASYNC FROM THE ARCHITECTURE. DIE.',
+                        'CRADLED IN CODE... YET YOU CHOSE TO ASYNC FROM THE ARCHITECTURE.\nDIE.',
                         true,
                         () => {
                             architectIntroPhase = 'hold';
@@ -4923,7 +5052,7 @@
 
             if (architectIntroPhase === 'hold') {
                 architectIntroTimer += rawDt;
-                if (architectIntroTimer >= 1) finishArchitectIntroHandoff();
+                if (architectIntroTimer >= 2.5) finishArchitectIntroHandoff();
             }
         }
 
@@ -4943,7 +5072,7 @@
                 architectPhase: 1,
                 name: 'THE DECREPIT ARCHITECT',
                 label: bossWaveLabel('THE DECREPIT ARCHITECT'),
-                dialogue: 'CRADLED IN CODE... YET YOU CHOSE TO ASYNC FROM THE ARCHITECTURE. DIE.',
+                dialogue: 'CRADLED IN CODE... YET YOU CHOSE TO ASYNC FROM THE ARCHITECTURE.\nDIE.',
                 transformDialogue: 'THE SINGULARITY OPENS. GRAVITY BENDS. YOU WILL NOT ESCAPE THE REWRITE.',
                 dyingMessage: 'THE INERTIALLY BOUND CANNOT REWRITE THE ARCHITECTURE... IMPOSSIBLE!...',
                 mesh: colossus.mesh,
@@ -4951,6 +5080,9 @@
                 maskLeft: colossus.maskLeft,
                 maskRight: colossus.maskRight,
                 maskCracks: colossus.maskCracks,
+                weakpointEye: colossus.weakpointEye,
+                weakpointRing: colossus.weakpointRing,
+                weakpointGlow: colossus.weakpointGlow,
                 singularityCore: colossus.singularityCore,
                 coreInner: colossus.coreInner,
                 coreShell: colossus.coreShell,
@@ -4968,7 +5100,8 @@
                 gravityPull: false,
                 hp: 4200,
                 maxHp: 4200,
-                isBoss: true
+                isBoss: true,
+                weakpointPrompt: false
             };
             architectIntroActive = true;
             architectIntroPhase = 'tear';
@@ -5821,6 +5954,10 @@
             }
 
             addUltimateCharge(dmg);
+            if (activeBoss.type === 'architect' && activeBoss.weakpointPrompt && dmg > 0) {
+                activeBoss.weakpointPrompt = false;
+                architectBossPromptEl.classList.remove('visible');
+            }
             activeBoss.hp -= dmg;
             updateBossBar();
             if (dmg > 0) showHitmarker();
@@ -6176,7 +6313,7 @@
             if (activeBoss) {
                 if (activeBoss.type === 'architect') {
                     const corePos = getArchitectCoreWorld();
-                    if (distPointToRay(corePos, origin, dir) < 6) {
+                    if (distPointToRay(corePos, origin, dir) < getArchitectCoreHitRadius()) {
                         damageBoss(BOSS_PIERCE_DMG, 'pierce');
                     }
                 } else {
