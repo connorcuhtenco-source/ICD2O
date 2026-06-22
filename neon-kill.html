@@ -744,30 +744,37 @@
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
 
-        const viewFlags = { depthTest: false, depthWrite: false, fog: false };
-        const metalDark = new THREE.MeshBasicMaterial({ color: 0x3a4250, transparent: false, opacity: 1.0, ...viewFlags });
-        const metalMid = new THREE.MeshBasicMaterial({ color: 0x4d5868, transparent: false, opacity: 1.0, ...viewFlags });
-        const metalLight = new THREE.MeshBasicMaterial({ color: 0x5f6d80, transparent: false, opacity: 1.0, ...viewFlags });
-        const metalEdge = new THREE.LineBasicMaterial({ color: 0x99ccee, transparent: false, opacity: 1.0, ...viewFlags });
+        const viewFlags = { depthTest: true, depthWrite: false, fog: false };
+        const VIEWMODEL_RENDER_ORDER = 2000;
+        const metalDark = new THREE.MeshBasicMaterial({ color: 0x8a9ab8, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalMid = new THREE.MeshBasicMaterial({ color: 0xa8b8d0, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalLight = new THREE.MeshBasicMaterial({ color: 0xc8d8f0, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalEdge = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, ...viewFlags });
         const cyanSlotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, ...viewFlags });
         const armFillMat = new THREE.MeshBasicMaterial({
-            color: 0x110005,
+            color: 0xff007f,
+            transparent: true,
+            opacity: 0.62,
+            ...viewFlags
+        });
+        const armWireMat = new THREE.LineBasicMaterial({
+            color: 0xffffff,
             transparent: false,
             opacity: 1.0,
             ...viewFlags
         });
-        const armWireMat = new THREE.LineBasicMaterial({
-            color: 0xff007f,
-            transparent: false,
-            opacity: 1.0,
+        const armGlowMat = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.28,
             ...viewFlags
         });
 
         const REVOLVER_BASE = { x: 0.35, y: -0.35, z: -0.7 };
         const SHOTGUN_BASE = { x: 0.38, y: -0.38, z: -0.62 };
-        const ironDark = new THREE.MeshBasicMaterial({ color: 0x282830, transparent: false, opacity: 1.0, ...viewFlags });
-        const ironMid = new THREE.MeshBasicMaterial({ color: 0x3a3a44, transparent: false, opacity: 1.0, ...viewFlags });
-        const ironEdge = new THREE.LineBasicMaterial({ color: 0x88aacc, transparent: false, opacity: 1.0, ...viewFlags });
+        const ironDark = new THREE.MeshBasicMaterial({ color: 0x9a8aa8, transparent: false, opacity: 1.0, ...viewFlags });
+        const ironMid = new THREE.MeshBasicMaterial({ color: 0xb8a8c8, transparent: false, opacity: 1.0, ...viewFlags });
+        const ironEdge = new THREE.LineBasicMaterial({ color: 0xff88dd, transparent: false, opacity: 1.0, ...viewFlags });
         const orangeVentMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: false, opacity: 1.0, ...viewFlags });
         const orangeGlowMat = new THREE.MeshBasicMaterial({
             color: 0xff8833,
@@ -783,19 +790,39 @@
         const parryWindRot = { x: 0, y: -0.28, z: 0 };
         const parryStrikeRot = { x: -0.15, y: 0.18, z: Math.PI / 4 };
 
+        function stampViewmodel(group, order = VIEWMODEL_RENDER_ORDER) {
+            group.traverse((obj) => {
+                if (!obj.isMesh && !obj.isLineSegments) return;
+                obj.renderOrder = order;
+                const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                mats.forEach((mat) => {
+                    if (!mat) return;
+                    mat.fog = false;
+                    mat.depthWrite = false;
+                    mat.depthTest = true;
+                });
+            });
+        }
+
         function addSolidWithEdges(geo, fillMat, edgeMat) {
             const mesh = new THREE.Mesh(geo, fillMat);
             const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+            const wireGlow = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+            wireGlow.scale.setScalar(1.012);
             const g = new THREE.Group();
-            g.add(mesh, wire);
+            g.add(mesh, wire, wireGlow);
             return g;
         }
 
         function addWireHologram(geo) {
+            const glow = new THREE.Mesh(geo, armGlowMat);
+            glow.scale.setScalar(1.06);
             const mesh = new THREE.Mesh(geo, armFillMat);
             const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), armWireMat);
+            const wireGlow = new THREE.LineSegments(new THREE.EdgesGeometry(geo), armWireMat);
+            wireGlow.scale.setScalar(1.015);
             const g = new THREE.Group();
-            g.add(mesh, wire);
+            g.add(glow, mesh, wire, wireGlow);
             return g;
         }
 
@@ -885,7 +912,7 @@
         cyberRevolver.add(topStrap, receiver, grip, triggerGuard, chamber, chamberWire, heavyBarrel, barrelShroud, muzzlePoint, batteryHUD);
         cyberRevolver.position.set(REVOLVER_BASE.x, REVOLVER_BASE.y, REVOLVER_BASE.z);
         cyberRevolver.rotation.set(-0.1, 0.04, 0.02);
-        cyberRevolver.renderOrder = 999;
+        stampViewmodel(cyberRevolver);
         camera.add(cyberRevolver);
         drawBatteryHUD();
 
@@ -921,7 +948,7 @@
         cyberShotgun.add(sgStock, sgReceiver, sgGrip, sgBarrelL, sgBarrelR, sgShroud, shotgunMuzzlePoint, shotgunBatteryHUD);
         cyberShotgun.position.set(SHOTGUN_BASE.x, SHOTGUN_BASE.y, SHOTGUN_BASE.z);
         cyberShotgun.rotation.set(-0.12, 0.03, -0.02);
-        cyberShotgun.renderOrder = 999;
+        stampViewmodel(cyberShotgun);
         cyberShotgun.visible = false;
         camera.add(cyberShotgun);
 
@@ -946,6 +973,7 @@
         shotgunRocketTube.add(rocketBody, rocketGlow, rocketMuzzlePoint);
         shotgunRocketTube.position.copy(cyberShotgun.position);
         shotgunRocketTube.rotation.copy(cyberShotgun.rotation);
+        stampViewmodel(shotgunRocketTube);
         shotgunRocketTube.visible = false;
         camera.add(shotgunRocketTube);
 
@@ -983,7 +1011,7 @@
         armGroup.add(forearm, fist);
         armGroup.visible = false;
         armGroup.position.copy(parryRestPos);
-        armGroup.renderOrder = 1000;
+        stampViewmodel(armGroup, VIEWMODEL_RENDER_ORDER + 10);
         camera.add(armGroup);
 
         scene.add(camera);
