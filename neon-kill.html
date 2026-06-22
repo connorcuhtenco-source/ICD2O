@@ -745,21 +745,38 @@
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
 
         const viewFlags = { depthTest: false, depthWrite: false, fog: false };
-        const metalDark = new THREE.MeshBasicMaterial({ color: 0x2a2f35, ...viewFlags });
-        const metalMid = new THREE.MeshBasicMaterial({ color: 0x3d454d, ...viewFlags });
-        const metalLight = new THREE.MeshBasicMaterial({ color: 0x4a525a, ...viewFlags });
-        const metalEdge = new THREE.LineBasicMaterial({ color: 0x667788, transparent: false, opacity: 1, ...viewFlags });
-        const cyanSlotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, ...viewFlags });
-        const armFillMat = new THREE.MeshBasicMaterial({ color: 0xff007f, transparent: false, opacity: 1, ...viewFlags });
-        const armWireMat = new THREE.LineBasicMaterial({ color: 0xff007f, transparent: false, opacity: 1, ...viewFlags });
+        const metalDark = new THREE.MeshBasicMaterial({ color: 0x3a4250, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalMid = new THREE.MeshBasicMaterial({ color: 0x4d5868, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalLight = new THREE.MeshBasicMaterial({ color: 0x5f6d80, transparent: false, opacity: 1.0, ...viewFlags });
+        const metalEdge = new THREE.LineBasicMaterial({ color: 0x99ccee, transparent: false, opacity: 1.0, ...viewFlags });
+        const cyanSlotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, ...viewFlags });
+        const armFillMat = new THREE.MeshBasicMaterial({
+            color: 0x110005,
+            transparent: false,
+            opacity: 1.0,
+            ...viewFlags
+        });
+        const armWireMat = new THREE.LineBasicMaterial({
+            color: 0xff007f,
+            transparent: false,
+            opacity: 1.0,
+            ...viewFlags
+        });
 
         const REVOLVER_BASE = { x: 0.35, y: -0.35, z: -0.7 };
         const SHOTGUN_BASE = { x: 0.38, y: -0.38, z: -0.62 };
-        const ironDark = new THREE.MeshBasicMaterial({ color: 0x18181c, ...viewFlags });
-        const ironMid = new THREE.MeshBasicMaterial({ color: 0x2a2a30, ...viewFlags });
-        const ironEdge = new THREE.LineBasicMaterial({ color: 0x555566, transparent: false, opacity: 1, ...viewFlags });
-        const orangeVentMat = new THREE.MeshBasicMaterial({ color: 0xff6600, ...viewFlags });
-        const orangeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff8833, transparent: false, opacity: 1, ...viewFlags });
+        const ironDark = new THREE.MeshBasicMaterial({ color: 0x282830, transparent: false, opacity: 1.0, ...viewFlags });
+        const ironMid = new THREE.MeshBasicMaterial({ color: 0x3a3a44, transparent: false, opacity: 1.0, ...viewFlags });
+        const ironEdge = new THREE.LineBasicMaterial({ color: 0x88aacc, transparent: false, opacity: 1.0, ...viewFlags });
+        const orangeVentMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: false, opacity: 1.0, ...viewFlags });
+        const orangeGlowMat = new THREE.MeshBasicMaterial({
+            color: 0xff8833,
+            transparent: false,
+            opacity: 1.0,
+            ...viewFlags
+        });
+        const weaponGlowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, ...viewFlags });
+        const rocketGlowMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: false, opacity: 1.0, ...viewFlags });
         const parryRestPos = new THREE.Vector3(-0.5, -0.4, -0.6);
         const parryWindPos = new THREE.Vector3(-0.52, -0.41, -0.52);
         const parryStrikePos = new THREE.Vector3(0.1, -0.32, -0.36);
@@ -910,7 +927,7 @@
 
         const revolverRailGlow = new THREE.Mesh(
             new THREE.BoxGeometry(0.18, 0.18, 0.52),
-            new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1, ...viewFlags })
+            weaponGlowMat
         );
         revolverRailGlow.position.set(0.04, 0.04, -0.34);
         revolverRailGlow.visible = false;
@@ -921,7 +938,7 @@
         rocketBody.position.set(0.04, 0.02, -0.28);
         const rocketGlow = new THREE.Mesh(
             new THREE.BoxGeometry(0.26, 0.26, 0.5),
-            new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: false, opacity: 1, ...viewFlags })
+            rocketGlowMat
         );
         rocketGlow.position.set(0.04, 0.02, -0.24);
         const rocketMuzzlePoint = new THREE.Object3D();
@@ -5794,14 +5811,18 @@
             ultimateResetTimer = 0;
             cyberRevolver.scale.set(1, 1, 1);
             revolverRailGlow.visible = false;
-            revolverRailGlow.material.opacity = 0.55;
+            revolverRailGlow.material.opacity = 1;
+            revolverRailGlow.material.transparent = false;
+            revolverRailGlow.material.color.setHex(0x00ffff);
             setWeaponVisibility();
         }
 
         function fireRevolverUltimate() {
             ultimateActive = true;
             cyberRevolver.scale.set(1.28, 1.28, 1.55);
-            revolverRailGlow.material.opacity = 0.95;
+            revolverRailGlow.material.opacity = 1;
+            revolverRailGlow.material.transparent = false;
+            revolverRailGlow.material.color.setHex(0x00ffff);
             setWeaponVisibility();
 
             const origin = getMuzzleWorldPosition();
@@ -6180,7 +6201,10 @@
             const baseRotX = currentWeapon === 'shotgun' ? -0.12 : -0.1;
 
             if (ultimateActive && currentWeapon === 'revolver') {
-                revolverRailGlow.material.opacity = 0.55 + Math.sin(performance.now() * 0.02) * 0.35;
+                const pulse = 0.72 + Math.sin(performance.now() * 0.02) * 0.28;
+                revolverRailGlow.material.opacity = 1;
+                revolverRailGlow.material.transparent = false;
+                revolverRailGlow.material.color.setRGB(0, pulse, 1);
             }
 
             if (gunRecoil > 0) {
