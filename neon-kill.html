@@ -712,6 +712,7 @@
         let lastDialogueCharCount = 0;
         let chargeWasFull = false;
         let currentWeapon = 'revolver';
+        let weaponSwitchTimer = 0;
         let ultimateCharge = 0;
         let ultimateActive = false;
         let ultimateResetTimer = 0;
@@ -747,18 +748,18 @@
         const metalDark = new THREE.MeshBasicMaterial({ color: 0x2a2f35, ...viewFlags });
         const metalMid = new THREE.MeshBasicMaterial({ color: 0x3d454d, ...viewFlags });
         const metalLight = new THREE.MeshBasicMaterial({ color: 0x4a525a, ...viewFlags });
-        const metalEdge = new THREE.LineBasicMaterial({ color: 0x667788, transparent: true, opacity: 0.8, ...viewFlags });
+        const metalEdge = new THREE.LineBasicMaterial({ color: 0x667788, transparent: false, opacity: 1, ...viewFlags });
         const cyanSlotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, ...viewFlags });
-        const armFillMat = new THREE.MeshBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.02, ...viewFlags });
-        const armWireMat = new THREE.LineBasicMaterial({ color: 0xff007f, transparent: true, opacity: 0.95, ...viewFlags });
+        const armFillMat = new THREE.MeshBasicMaterial({ color: 0xff007f, transparent: false, opacity: 1, ...viewFlags });
+        const armWireMat = new THREE.LineBasicMaterial({ color: 0xff007f, transparent: false, opacity: 1, ...viewFlags });
 
         const REVOLVER_BASE = { x: 0.35, y: -0.35, z: -0.7 };
         const SHOTGUN_BASE = { x: 0.38, y: -0.38, z: -0.62 };
         const ironDark = new THREE.MeshBasicMaterial({ color: 0x18181c, ...viewFlags });
         const ironMid = new THREE.MeshBasicMaterial({ color: 0x2a2a30, ...viewFlags });
-        const ironEdge = new THREE.LineBasicMaterial({ color: 0x555566, transparent: true, opacity: 0.85, ...viewFlags });
+        const ironEdge = new THREE.LineBasicMaterial({ color: 0x555566, transparent: false, opacity: 1, ...viewFlags });
         const orangeVentMat = new THREE.MeshBasicMaterial({ color: 0xff6600, ...viewFlags });
-        const orangeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff8833, transparent: true, opacity: 0.92, ...viewFlags });
+        const orangeGlowMat = new THREE.MeshBasicMaterial({ color: 0xff8833, transparent: false, opacity: 1, ...viewFlags });
         const parryRestPos = new THREE.Vector3(-0.5, -0.4, -0.6);
         const parryWindPos = new THREE.Vector3(-0.52, -0.41, -0.52);
         const parryStrikePos = new THREE.Vector3(0.1, -0.32, -0.36);
@@ -909,7 +910,7 @@
 
         const revolverRailGlow = new THREE.Mesh(
             new THREE.BoxGeometry(0.18, 0.18, 0.52),
-            new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.55, ...viewFlags })
+            new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1, ...viewFlags })
         );
         revolverRailGlow.position.set(0.04, 0.04, -0.34);
         revolverRailGlow.visible = false;
@@ -920,7 +921,7 @@
         rocketBody.position.set(0.04, 0.02, -0.28);
         const rocketGlow = new THREE.Mesh(
             new THREE.BoxGeometry(0.26, 0.26, 0.5),
-            new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.45, ...viewFlags })
+            new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: false, opacity: 1, ...viewFlags })
         );
         rocketGlow.position.set(0.04, 0.02, -0.24);
         const rocketMuzzlePoint = new THREE.Object3D();
@@ -2314,6 +2315,7 @@
         function switchWeapon(weapon) {
             if (ultimateActive || isDialogueActive || weapon === currentWeapon) return;
             currentWeapon = weapon;
+            weaponSwitchTimer = 0.25;
             isCharging = false;
             chargeLevel = 0;
             chargeCommitted = false;
@@ -5883,6 +5885,14 @@
                 r.mesh.position.add(r.vel.clone().multiplyScalar(dt));
                 r.life -= dt;
 
+                if (r.mesh.position.y <= FLOOR_Y) {
+                    const impact = r.mesh.position.clone();
+                    impact.y = FLOOR_Y;
+                    spawnApocalypseExplosion(impact);
+                    scene.remove(r.mesh);
+                    return false;
+                }
+
                 let hit = false;
                 for (const enemy of enemies) {
                     if (r.mesh.position.distanceTo(enemy.mesh.position) < 1.8) {
@@ -6132,7 +6142,15 @@
             }
         }
 
+        function getWeaponSwitchOffset() {
+            if (weaponSwitchTimer <= 0) return 0;
+            return Math.sin((weaponSwitchTimer / 0.25) * Math.PI) * -0.6;
+        }
+
         function updateWeaponRig(dt) {
+            if (weaponSwitchTimer > 0) weaponSwitchTimer = Math.max(0, weaponSwitchTimer - dt);
+            const switchOffset = getWeaponSwitchOffset();
+
             if (isDialogueActive) {
                 gunRecoil = 0;
                 isCharging = false;
@@ -6141,9 +6159,9 @@
                 chargeWasFull = false;
                 leftHoldTime = 0;
                 drawBatteryHUD();
-                cyberRevolver.position.set(REVOLVER_BASE.x, REVOLVER_BASE.y, REVOLVER_BASE.z);
+                cyberRevolver.position.set(REVOLVER_BASE.x, REVOLVER_BASE.y + switchOffset, REVOLVER_BASE.z);
                 cyberRevolver.rotation.set(-0.1, 0.04, 0.02);
-                cyberShotgun.position.set(SHOTGUN_BASE.x, SHOTGUN_BASE.y, SHOTGUN_BASE.z);
+                cyberShotgun.position.set(SHOTGUN_BASE.x, SHOTGUN_BASE.y + switchOffset, SHOTGUN_BASE.z);
                 cyberShotgun.rotation.set(-0.12, 0.03, -0.02);
                 batteryHUD.scale.set(1, 1, 1);
                 shotgunBatteryHUD.scale.set(1, 1, 1);
@@ -6168,15 +6186,15 @@
             if (gunRecoil > 0) {
                 gunRecoil = Math.max(0, gunRecoil - dt * 0.55);
                 if (!ultimateActive) {
-                    activeGroup.position.z = base.z + gunRecoil * 0.35;
+                    activeGroup.position.set(base.x, base.y + switchOffset, base.z + gunRecoil * 0.35);
                     activeGroup.rotation.x = baseRotX - gunRecoil * 0.6;
                 }
             } else if (!ultimateActive) {
                 if (currentWeapon === 'shotgun') {
-                    cyberShotgun.position.set(SHOTGUN_BASE.x, SHOTGUN_BASE.y, SHOTGUN_BASE.z);
+                    cyberShotgun.position.set(SHOTGUN_BASE.x, SHOTGUN_BASE.y + switchOffset, SHOTGUN_BASE.z);
                     cyberShotgun.rotation.set(-0.12, 0.03, -0.02);
                 } else {
-                    cyberRevolver.position.set(REVOLVER_BASE.x, REVOLVER_BASE.y, REVOLVER_BASE.z);
+                    cyberRevolver.position.set(REVOLVER_BASE.x, REVOLVER_BASE.y + switchOffset, REVOLVER_BASE.z);
                     cyberRevolver.rotation.set(-0.1, 0.04, 0.02);
                 }
             }
@@ -6351,6 +6369,7 @@
             ultimateActive = false;
             ultimateResetTimer = 0;
             currentWeapon = 'revolver';
+            weaponSwitchTimer = 0;
             rockets.forEach(r => scene.remove(r.mesh));
             rockets = [];
             aoeBlasts.forEach(b => scene.remove(b.mesh));
