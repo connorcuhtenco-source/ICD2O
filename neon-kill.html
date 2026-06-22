@@ -6315,6 +6315,13 @@
             isBossWave = false;
             endBossEncounterTracking();
             bossIntroActive = false;
+            bossCinematicActive = false;
+            bossCinematicKind = null;
+            bossCinematicPhase = 'idle';
+            bossCinematicTimer = 0;
+            bossAwaitingEngage = false;
+            canShoot = true;
+            bossCinematicGlitchEl.classList.remove('active');
             bossDefeatActive = false;
             bossDefeatPhase = 'idle';
             bossDefeatTimer = 0;
