@@ -410,11 +410,20 @@ function buildHumanoidRig(opts){
     isAI = false
   } = opts;
 
+  const h = buildH;
+  const s = buildScale;
+  // Proportions tuned so feet sit on y=0 with neutral leg pose
+  const HIP_Y = 0.82 * h;
+  const HIP_X = 0.17 * s;
+  const THIGH = 0.40 * h;
+  const SHIN  = 0.36 * h;
+
   const group = new THREE.Group();
   const rig = {
-    group, buildH,
+    group, buildH: h,
     body: null, head: null, shorts: null,
     legL: null, legR: null, kneeL: null, kneeR: null,
+    shoeL: null, shoeR: null,
     armL: null, armR: null, elbowL: null, elbowR: null,
     handL: null, handR: null,
     ballAnchorL: null, ballAnchorR: null,
@@ -436,116 +445,128 @@ function buildHumanoidRig(opts){
   const dkMat = () => new THREE.MeshStandardMaterial({ color: darken(jerseyCol, 0.38), roughness: 0.7 });
 
   const pelvis = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.32 * buildScale, 0.28 * buildScale, 0.22 * buildH, 16),
+    new THREE.CylinderGeometry(0.30 * s, 0.26 * s, 0.18 * h, 14),
     dkMat()
   );
-  pelvis.position.y = 0.88 * buildH;
+  pelvis.position.y = 0.86 * h;
   pelvis.castShadow = true;
   group.add(pelvis);
 
-  const torsoGeo = new THREE.CylinderGeometry(0.40 * buildScale, 0.28 * buildScale, 1.0 * buildH, 16);
-  rig.body = new THREE.Mesh(torsoGeo, jMat());
-  rig.body.position.y = 1.38 * buildH;
+  rig.body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.38 * s, 0.26 * s, 0.88 * h, 14),
+    jMat()
+  );
+  rig.body.position.y = 1.30 * h;
   rig.body.castShadow = true;
   group.add(rig.body);
   pushJersey(rig.body);
 
   const stripeCol = isAI ? accentCol : C_CYAN;
   const stripe = new THREE.Mesh(
-    new THREE.BoxGeometry(0.44 * buildScale, 0.13, 0.42 * buildScale),
+    new THREE.BoxGeometry(0.40 * s, 0.11, 0.38 * s),
     new THREE.MeshBasicMaterial({ color: stripeCol })
   );
-  stripe.position.set(0, 1.38 * buildH, 0.01);
+  stripe.position.set(0, 1.30 * h, 0.01);
   group.add(stripe);
 
-  const shortsGeo = new THREE.CylinderGeometry(0.36 * buildScale, 0.33 * buildScale, 0.44 * buildH, 16);
-  rig.shorts = new THREE.Mesh(shortsGeo, dkMat());
-  rig.shorts.position.y = 0.68 * buildH;
+  rig.shorts = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.34 * s, 0.30 * s, 0.36 * h, 14),
+    dkMat()
+  );
+  rig.shorts.position.y = 0.64 * h;
   group.add(rig.shorts);
   pushJersey(rig.shorts);
 
-  rig.head = new THREE.Mesh(new THREE.SphereGeometry(0.295, 20, 16), sMat());
-  rig.head.position.y = 2.0 * buildH;
+  rig.head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 18, 14), sMat());
+  rig.head.position.y = 1.88 * h;
   rig.head.castShadow = true;
   group.add(rig.head);
   pushSkin(rig.head);
 
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.13, 0.2, 12), sMat());
-  neck.position.y = 1.78 * buildH;
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.11, 0.16, 10), sMat());
+  neck.position.y = 1.68 * h;
   group.add(neck);
   pushSkin(neck);
 
   if(isAI){
     const eyeMat = new THREE.MeshBasicMaterial({ color: accentCol });
-    [-0.09, 0.09].forEach(x => {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), eyeMat.clone());
-      e.position.set(x, 1.90 * buildH, 0.27);
+    [-0.08, 0.08].forEach(x => {
+      const e = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), eyeMat.clone());
+      e.position.set(x, 1.79 * h, 0.24);
       group.add(e);
     });
     const glow = new THREE.PointLight(accentCol, 0.8, 4);
-    glow.position.y = 1.2 * buildH;
+    glow.position.y = 1.1 * h;
     group.add(glow);
   }
 
   function makeShoe(){
     const g = new THREE.Group();
-    const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * buildScale, 0.13 * buildScale, 0.1, 14), shMat());
-    sole.position.y = 0.05; g.add(sole);
-    const toe = new THREE.Mesh(new THREE.SphereGeometry(0.13 * buildScale, 14, 10), shMat());
-    toe.scale.set(1, 0.6, 1.4); toe.position.set(0, 0.06, 0.1 * buildScale); g.add(toe);
-    const heel = new THREE.Mesh(new THREE.SphereGeometry(0.115 * buildScale, 10, 8), shMat());
-    heel.scale.set(1, 0.65, 1.0); heel.position.set(0, 0.05, -0.08 * buildScale); g.add(heel);
-    pushShoe(sole, toe, heel);
+    const sole = new THREE.Mesh(new THREE.BoxGeometry(0.20 * s, 0.06, 0.30 * s), shMat());
+    sole.position.set(0, 0.03, 0.04 * s);
+    g.add(sole);
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.16 * s, 0.10, 0.22 * s), shMat());
+    upper.position.set(0, 0.09, 0.02 * s);
+    g.add(upper);
+    pushShoe(sole, upper);
     return g;
   }
 
-  const thighGeo = new THREE.CylinderGeometry(0.145 * buildScale, 0.125 * buildScale, 0.42 * buildH, 12);
-  const shinGeo  = new THREE.CylinderGeometry(0.115 * buildScale, 0.095 * buildScale, 0.38 * buildH, 12);
-  const kneeSphGeo = new THREE.SphereGeometry(0.11 * buildScale, 10, 8);
-
   function makeLeg(isLeft){
     const leg = new THREE.Group();
-    const thigh = new THREE.Mesh(thighGeo.clone(), dkMat());
-    thigh.position.y = -0.21 * buildH; leg.add(thigh);
+    const thigh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13 * s, 0.11 * s, THIGH, 10),
+      dkMat()
+    );
+    thigh.position.y = -THIGH * 0.5;
+    leg.add(thigh);
+
     const knee = new THREE.Group();
-    knee.position.y = -0.43 * buildH;
-    knee.add(new THREE.Mesh(kneeSphGeo.clone(), sMat()));
-    const shin = new THREE.Mesh(shinGeo.clone(), dkMat());
-    shin.position.y = -0.20 * buildH; knee.add(shin);
+    knee.position.y = -THIGH;
+    knee.add(new THREE.Mesh(new THREE.SphereGeometry(0.09 * s, 8, 8), sMat()));
+
+    const shin = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.10 * s, 0.085 * s, SHIN, 10),
+      dkMat()
+    );
+    shin.position.y = -SHIN * 0.5;
+    knee.add(shin);
+
     const shoe = makeShoe();
-    shoe.position.set(0, -0.40 * buildH, 0.02); knee.add(shoe);
+    shoe.position.set(0, -SHIN, 0.02 * s);
+    knee.add(shoe);
+
     leg.add(knee);
-    leg.position.set(isLeft ? -0.19 * buildScale : 0.19 * buildScale, 0.78 * buildH, 0);
+    leg.position.set(isLeft ? -HIP_X : HIP_X, HIP_Y, 0);
     group.add(leg);
     return { leg, knee, shoe };
   }
 
   const leftLeg = makeLeg(true);
-  rig.legL = leftLeg.leg; rig.kneeL = leftLeg.knee;
+  rig.legL = leftLeg.leg; rig.kneeL = leftLeg.knee; rig.shoeL = leftLeg.shoe;
   const rightLeg = makeLeg(false);
-  rig.legR = rightLeg.leg; rig.kneeR = rightLeg.knee;
+  rig.legR = rightLeg.leg; rig.kneeR = rightLeg.knee; rig.shoeR = rightLeg.shoe;
 
   function makeArm(isLeft){
     const g = new THREE.Group();
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.115 * buildScale, 12, 10), jMat());
-    cap.position.y = 0; g.add(cap); pushJersey(cap);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.10 * s, 10, 8), jMat());
+    g.add(cap); pushJersey(cap);
     const upper = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.105 * buildScale, 0.095 * buildScale, 0.42 * buildH, 12), jMat());
-    upper.position.y = -0.22 * buildH; g.add(upper); pushJersey(upper);
+      new THREE.CylinderGeometry(0.095 * s, 0.085 * s, 0.36 * h, 10), jMat());
+    upper.position.y = -0.19 * h; g.add(upper); pushJersey(upper);
     const elbowGrp = new THREE.Group();
-    elbowGrp.position.y = -0.44 * buildH;
-    const elbowSph = new THREE.Mesh(new THREE.SphereGeometry(0.095 * buildScale, 10, 8), sMat());
-    elbowGrp.add(elbowSph); pushSkin(elbowSph);
+    elbowGrp.position.y = -0.38 * h;
+    elbowGrp.add(new THREE.Mesh(new THREE.SphereGeometry(0.085 * s, 8, 8), sMat()));
     const fore = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.090 * buildScale, 0.075 * buildScale, 0.38 * buildH, 12), sMat());
-    fore.position.y = -0.20 * buildH; elbowGrp.add(fore); pushSkin(fore);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.078 * buildScale, 10, 8), sMat());
-    hand.position.y = -0.40 * buildH; elbowGrp.add(hand); pushSkin(hand);
+      new THREE.CylinderGeometry(0.08 * s, 0.07 * s, 0.32 * h, 10), sMat());
+    fore.position.y = -0.17 * h; elbowGrp.add(fore); pushSkin(fore);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.07 * s, 8, 8), sMat());
+    hand.position.y = -0.34 * h; elbowGrp.add(hand); pushSkin(hand);
     const handAnchor = new THREE.Object3D();
-    handAnchor.position.set(0, -0.40 * buildH, 0.04 * buildScale);
+    handAnchor.position.set(0, -0.34 * h, 0.03 * s);
     elbowGrp.add(handAnchor);
     g.add(elbowGrp);
-    g.position.set(isLeft ? -0.50 * buildScale : 0.50 * buildScale, 1.60 * buildH, 0);
+    g.position.set(isLeft ? -0.46 * s : 0.46 * s, 1.52 * h, 0);
     group.add(g);
     return { arm: g, elbow: elbowGrp, hand: handAnchor };
   }
@@ -556,10 +577,10 @@ function buildHumanoidRig(opts){
   rig.armR = armR.arm; rig.elbowR = armR.elbow; rig.handR = armR.hand;
 
   rig.ballAnchorR = new THREE.Object3D();
-  rig.ballAnchorR.position.set(0.78 * buildScale, 0.82 * buildH, 0.28);
+  rig.ballAnchorR.position.set(0.72 * s, 0.78 * h, 0.24);
   group.add(rig.ballAnchorR);
   rig.ballAnchorL = new THREE.Object3D();
-  rig.ballAnchorL.position.set(-0.78 * buildScale, 0.82 * buildH, 0.28);
+  rig.ballAnchorL.position.set(-0.72 * s, 0.78 * h, 0.24);
   group.add(rig.ballAnchorL);
 
   return rig;
@@ -579,176 +600,47 @@ function bindPlayerRigFromGlobals(){
 }
 
 function buildPlayer(){
-  playerGroup = new THREE.Group();
+  if(playerGroup) scene.remove(playerGroup);
 
   const buildScale = [0.85, 1.0, 1.15, 1.0][custom.build];
   const buildH     = [1.0,  1.0, 1.0,  1.2][custom.build];
-
-  const skinCol   = SKIN_COLORS[custom.skin];
-  const jerseyCol = JERSEY_COLORS[custom.jersey];
-  const shoeCol   = SHOE_COLORS[custom.shoes];
 
   skinMeshes   = [];
   jerseyMeshes = [];
   shoeMeshes   = [];
 
-  const jMat  = () => new THREE.MeshStandardMaterial({ color:jerseyCol, emissive:jerseyCol, emissiveIntensity:.22, roughness:.55, metalness:.05 });
-  const sMat  = () => new THREE.MeshStandardMaterial({ color:skinCol,   roughness:.65, metalness:.0 });
-  const shMat = () => new THREE.MeshStandardMaterial({ color:shoeCol,   emissive:shoeCol, emissiveIntensity:.35, roughness:.45, metalness:.1 });
-  const dkMat = () => new THREE.MeshStandardMaterial({ color:darken(jerseyCol,.38), roughness:.7 });
+  playerRig = buildHumanoidRig({
+    skinCol: SKIN_COLORS[custom.skin],
+    jerseyCol: JERSEY_COLORS[custom.jersey],
+    shoeCol: SHOE_COLORS[custom.shoes],
+    accentCol: C_CYAN,
+    buildScale, buildH,
+    skinMeshes, jerseyMeshes, shoeMeshes,
+    isAI: false
+  });
 
-  // ── Pelvis base (anchors legs, gives hips)
-  const pelvis = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.32*buildScale, 0.28*buildScale, 0.22*buildH, 16),
-    dkMat()
-  );
-  pelvis.position.y = 0.88*buildH;
-  pelvis.castShadow = true;
-  playerGroup.add(pelvis);
+  playerGroup = playerRig.group;
+  pBody = playerRig.body;
+  pHead = playerRig.head;
+  shortsRef = playerRig.shorts;
+  pLegL = playerRig.legL;
+  pLegR = playerRig.legR;
+  pKneeL = playerRig.kneeL;
+  pKneeR = playerRig.kneeR;
+  pShoeL = playerRig.shoeL;
+  pShoeR = playerRig.shoeR;
+  pArmL = playerRig.armL;
+  pArmR = playerRig.armR;
+  pElbowL = playerRig.elbowL;
+  pElbowR = playerRig.elbowR;
+  pHandL = playerRig.handL;
+  pHandR = playerRig.handR;
+  playerBallAnchorR = playerRig.ballAnchorR;
+  playerBallAnchorL = playerRig.ballAnchorL;
 
-  // ── Torso — more segments, athletic V-taper
-  const torsoGeo = new THREE.CylinderGeometry(0.40*buildScale, 0.28*buildScale, 1.0*buildH, 16);
-  pBody = new THREE.Mesh(torsoGeo, jMat());
-  pBody.position.y = 1.38*buildH;
-  pBody.castShadow = true;
-  playerGroup.add(pBody);
-  jerseyMeshes.push(pBody);
-
-  // Jersey side stripe (thin box on front face)
-  const stripe = new THREE.Mesh(
-    new THREE.BoxGeometry(0.44*buildScale, 0.13, 0.42*buildScale),
-    new THREE.MeshBasicMaterial({ color:C_CYAN })
-  );
-  stripe.position.set(0, 1.38*buildH, 0.01);
-  playerGroup.add(stripe);
-
-  // ── Shorts — slightly flared
-  const shortsGeo = new THREE.CylinderGeometry(0.36*buildScale, 0.33*buildScale, 0.44*buildH, 16);
-  shortsRef = new THREE.Mesh(shortsGeo, dkMat());
-  shortsRef.position.y = 0.68*buildH;
-  playerGroup.add(shortsRef);
-  jerseyMeshes.push(shortsRef);
-
-  // ── Head — rounder sphere, more segments
-  const headGeo = new THREE.SphereGeometry(0.295, 20, 16);
-  pHead = new THREE.Mesh(headGeo, sMat());
-  pHead.position.y = 2.0*buildH;
-  pHead.castShadow = true;
-  playerGroup.add(pHead);
-  skinMeshes.push(pHead);
-
-  // Neck — short smooth cylinder
-  const neck = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.115, 0.13, 0.2, 12),
-    sMat()
-  );
-  neck.position.y = 1.78*buildH;
-  playerGroup.add(neck);
-  skinMeshes.push(neck);
-
-  // ── Face
   buildFace(buildH);
-
-  // ── Hair
   buildHairMesh(buildH);
-
-  // ── Hat
   buildHatMesh(buildH);
-
-  // ── Shoe factory (used inside leg groups)
-  function makeShoe(){
-    const g = new THREE.Group();
-    const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.12*buildScale,0.13*buildScale,0.1,14), shMat());
-    sole.position.y = 0.05; g.add(sole);
-    const toe = new THREE.Mesh(new THREE.SphereGeometry(0.13*buildScale,14,10), shMat());
-    toe.scale.set(1,0.6,1.4); toe.position.set(0,0.06,0.1*buildScale); g.add(toe);
-    const heel = new THREE.Mesh(new THREE.SphereGeometry(0.115*buildScale,10,8), shMat());
-    heel.scale.set(1,0.65,1.0); heel.position.set(0,0.05,-0.08*buildScale); g.add(heel);
-    shoeMeshes.push(sole,toe,heel);
-    return g;
-  }
-
-  // ── Legs — thigh group pivoting at hip, knee sub-group pivoting mid-leg
-  const thighGeo = new THREE.CylinderGeometry(0.145*buildScale, 0.125*buildScale, 0.42*buildH, 12);
-  const shinGeo  = new THREE.CylinderGeometry(0.115*buildScale, 0.095*buildScale, 0.38*buildH, 12);
-  const legColMat = dkMat;
-  const kneeSphGeo = new THREE.SphereGeometry(0.11*buildScale, 10, 8);
-
-  // Left leg
-  pLegL = new THREE.Group();
-  const thighL = new THREE.Mesh(thighGeo, legColMat());
-  thighL.position.y = -0.21*buildH; pLegL.add(thighL);
-  pKneeL = new THREE.Group();
-  pKneeL.position.y = -0.43*buildH;
-  pKneeL.add(new THREE.Mesh(kneeSphGeo, sMat()));
-  const shinL = new THREE.Mesh(shinGeo, legColMat());
-  shinL.position.y = -0.20*buildH; pKneeL.add(shinL);
-  pShoeL = makeShoe();
-  pShoeL.position.set(0,-0.40*buildH,0.02); pKneeL.add(pShoeL);
-  pLegL.add(pKneeL);
-  pLegL.position.set(-0.19*buildScale, 0.78*buildH, 0);
-  playerGroup.add(pLegL);
-
-  // Right leg
-  pLegR = new THREE.Group();
-  const thighR = new THREE.Mesh(thighGeo.clone(), legColMat());
-  thighR.position.y = -0.21*buildH; pLegR.add(thighR);
-  pKneeR = new THREE.Group();
-  pKneeR.position.y = -0.43*buildH;
-  pKneeR.add(new THREE.Mesh(kneeSphGeo.clone(), sMat()));
-  const shinR = new THREE.Mesh(shinGeo.clone(), legColMat());
-  shinR.position.y = -0.20*buildH; pKneeR.add(shinR);
-  pShoeR = makeShoe();
-  pShoeR.position.set(0,-0.40*buildH,0.02); pKneeR.add(pShoeR);
-  pLegR.add(pKneeR);
-  pLegR.position.set(0.19*buildScale, 0.78*buildH, 0);
-  playerGroup.add(pLegR);
-
-  // ── Arms — shoulder group (upper arm) + elbow pivot (forearm+hand)
-  function makeArm(isLeft){
-    const g = new THREE.Group();  // shoulder pivot
-    // Shoulder sphere
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.115*buildScale,12,10), jMat());
-    cap.position.y = 0; g.add(cap); jerseyMeshes.push(cap);
-    // Upper arm
-    const upper = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.105*buildScale,0.095*buildScale,0.42*buildH,12), jMat());
-    upper.position.y = -0.22*buildH; g.add(upper); jerseyMeshes.push(upper);
-    // Elbow pivot group
-    const elbowGrp = new THREE.Group();
-    elbowGrp.position.y = -0.44*buildH;
-    const elbowSph = new THREE.Mesh(new THREE.SphereGeometry(0.095*buildScale,10,8), sMat());
-    elbowGrp.add(elbowSph); skinMeshes.push(elbowSph);
-    const fore = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.090*buildScale,0.075*buildScale,0.38*buildH,12), sMat());
-    fore.position.y = -0.20*buildH; elbowGrp.add(fore); skinMeshes.push(fore);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.078*buildScale,10,8), sMat());
-    hand.position.y = -0.40*buildH; elbowGrp.add(hand); skinMeshes.push(hand);
-    const handAnchor = new THREE.Object3D();
-    handAnchor.position.set(0, -0.40*buildH, 0.04*buildScale);
-    elbowGrp.add(handAnchor);
-    if(isLeft) pHandL = handAnchor; else pHandR = handAnchor;
-    g.add(elbowGrp);
-    if(isLeft) pElbowL = elbowGrp; else pElbowR = elbowGrp;
-    return g;
-  }
-
-  pArmL = makeArm(true);
-  pArmL.position.set(-0.50*buildScale, 1.60*buildH, 0);
-  playerGroup.add(pArmL);
-
-  pArmR = makeArm(false);
-  pArmR.position.set(0.50*buildScale, 1.60*buildH, 0);
-  playerGroup.add(pArmR);
-
-  // Ball anchor points — at hip level, pushed well outside body and forward
-  playerBallAnchorR = new THREE.Object3D();
-  playerBallAnchorR.position.set(0.78*buildScale, 0.82*buildH, 0.28);
-  playerGroup.add(playerBallAnchorR);
-
-  playerBallAnchorL = new THREE.Object3D();
-  playerBallAnchorL.position.set(-0.78*buildScale, 0.82*buildH, 0.28);
-  playerGroup.add(playerBallAnchorL);
 
   playerGroup.position.set(playerPos.x, playerPos.y, playerPos.z);
   scene.add(playerGroup);
@@ -771,7 +663,7 @@ function buildFace(buildH){
         new THREE.BoxGeometry(0.38, 0.07, 0.03),
         new THREE.MeshBasicMaterial({ color:C_CYAN })
       );
-      visor.position.set(0, 1.90*buildH, 0.27);
+      visor.position.set(0, 1.78*buildH, 0.24);
       faceGroup.add(visor);
     },
     // 3: happy — curved mouth
@@ -788,20 +680,20 @@ function buildFace(buildH){
 function addEyes(group, ox, bH, r, squint){
   const mat = new THREE.MeshBasicMaterial({ color:0xffffff });
   const eyeL = new THREE.Mesh(new THREE.SphereGeometry(r,8,8), mat);
-  eyeL.position.set(-0.09, 1.91*bH, 0.26);
+  eyeL.position.set(-0.09, 1.79*bH, 0.24);
   if(squint) eyeL.scale.y = 0.5;
   group.add(eyeL);
   const eyeR = new THREE.Mesh(new THREE.SphereGeometry(r,8,8), mat.clone());
-  eyeR.position.set(0.09, 1.91*bH, 0.26);
+  eyeR.position.set(0.09, 1.79*bH, 0.24);
   if(squint) eyeR.scale.y = 0.5;
   group.add(eyeR);
   // Pupils
   const pMat = new THREE.MeshBasicMaterial({ color:0x111111 });
   const pL = new THREE.Mesh(new THREE.SphereGeometry(r*0.55,6,6), pMat);
-  pL.position.set(-0.09, 1.91*bH, 0.295);
+  pL.position.set(-0.09, 1.79*bH, 0.27);
   group.add(pL);
   const pR = new THREE.Mesh(new THREE.SphereGeometry(r*0.55,6,6), pMat.clone());
-  pR.position.set(0.09, 1.91*bH, 0.295);
+  pR.position.set(0.09, 1.79*bH, 0.27);
   group.add(pR);
 }
 
@@ -809,7 +701,7 @@ function addBrow(group, bH, yOff){
   const mat = new THREE.MeshBasicMaterial({ color:0x222222 });
   [-0.09, 0.09].forEach(x=>{
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.03,0.03), mat.clone());
-    b.position.set(x, (1.96+yOff)*bH, 0.27);
+    b.position.set(x, (1.84+yOff)*bH, 0.25);
     b.rotation.z = x < 0 ? 0.3 : -0.3;
     group.add(b);
   });
@@ -825,7 +717,7 @@ function addSmile(group, bH){
 
 function buildHairMesh(buildH){
   if(hairMesh){ playerGroup.remove(hairMesh); hairMesh=null; }
-  const headY = 2.0*buildH;  // centre of head sphere
+  const headY = 1.88*buildH;  // centre of head sphere
   const headR = 0.295;
 
   const hairConfigs = [
@@ -966,7 +858,7 @@ function buildHairMesh(buildH){
 
 function buildHatMesh(buildH){
   if(hatMesh){ playerGroup.remove(hatMesh); hatMesh=null; }
-  const y = 2.12*buildH;
+  const y = 2.0*buildH;
   const hatConfigs = [
     null,
     ()=>{ // 1: top hat
@@ -1091,11 +983,11 @@ function sampleStride(phase){
   return { sin, cos, strike: Math.max(0, cos), ang };
 }
 
-/** Single-leg run/dribble drive pose — crouch adds knee flex without sinking root. */
+/** Single-leg run/dribble drive pose — positive knee rotation = natural forward flex. */
 function applyLegStride(leg, knee, phase, intensity, crouch = 0){
   const s = sampleStride(phase);
-  const thigh = s.sin * 0.50 * intensity + 0.16 * intensity + crouch * 0.30;
-  const kneeBend = -Math.abs(s.sin) * 0.64 * intensity - s.strike * 0.30 * intensity - crouch * 0.58;
+  const thigh = s.sin * 0.38 * intensity + crouch * 0.10;
+  const kneeBend = Math.abs(s.sin) * 0.48 * intensity + s.strike * 0.18 * intensity + crouch * 0.38;
   if(leg) leg.rotation.x = thigh;
   if(knee) knee.rotation.x = kneeBend;
   return s.strike;
@@ -1222,10 +1114,10 @@ function applyOffBallReadyStance(rig, dt){
   rig.locoPhase = (rig.locoPhase + dt * 0.5) % 1;
   const breathe = Math.sin(rig.locoPhase * Math.PI * 2) * 0.018;
 
-  if(rig.legL) rig.legL.rotation.x = 0.14 + breathe;
-  if(rig.legR) rig.legR.rotation.x = 0.14 - breathe;
-  if(rig.kneeL) rig.kneeL.rotation.x = -0.28 - OFF_BALL_CROUCH * 0.35;
-  if(rig.kneeR) rig.kneeR.rotation.x = -0.28 - OFF_BALL_CROUCH * 0.35;
+  if(rig.legL) rig.legL.rotation.x = 0.03 + breathe;
+  if(rig.legR) rig.legR.rotation.x = 0.03 - breathe;
+  if(rig.kneeL) rig.kneeL.rotation.x = 0.16 + OFF_BALL_CROUCH * 0.22;
+  if(rig.kneeR) rig.kneeR.rotation.x = 0.16 + OFF_BALL_CROUCH * 0.22;
 
   const up = -0.58;
   if(rig.armL){ rig.armL.rotation.x = up; rig.armL.rotation.z = 0.62; rig.armL.rotation.y = 0; }
@@ -1247,10 +1139,10 @@ function applyOffBallReadyStance(rig, dt){
 function applyStealWindupPose(rig, progress){
   const t = clamp(progress, 0, 1);
   const reach = Math.sin(t * Math.PI * 0.85);
-  if(rig.legL){ rig.legL.rotation.x = 0.42 + t * 0.35; }
-  if(rig.legR){ rig.legR.rotation.x = -0.18 - t * 0.22; }
-  if(rig.kneeL) rig.kneeL.rotation.x = -0.72 - t * 0.38;
-  if(rig.kneeR) rig.kneeR.rotation.x = -0.38 - t * 0.18;
+  if(rig.legL){ rig.legL.rotation.x = 0.28 + t * 0.30; }
+  if(rig.legR){ rig.legR.rotation.x = -0.08 - t * 0.12; }
+  if(rig.kneeL) rig.kneeL.rotation.x = 0.58 + t * 0.32;
+  if(rig.kneeR) rig.kneeR.rotation.x = 0.28 + t * 0.14;
   if(rig.armL){ rig.armL.rotation.x = -0.35 - reach * 0.55; rig.armL.rotation.z = 0.45; }
   if(rig.armR){ rig.armR.rotation.x = -0.30 - reach * 0.70; rig.armR.rotation.z = -0.35; }
   if(rig.elbowL) rig.elbowL.rotation.x = -1.05 - reach * 0.35;
@@ -2183,8 +2075,8 @@ function physicsStep(dt){
     tgt.armRZ   = -0.32 - Math.sin(T * 1.2) * 0.05;
     tgt.elbLX   = -0.18;
     tgt.elbRX   = -0.18;
-    tgt.kneeLX  = -0.06;
-    tgt.kneeRX  = -0.06;
+    tgt.kneeLX  = 0.08;
+    tgt.kneeRX  = 0.08;
   }
 
   if(animState === 'run' && !procLoco){
@@ -2195,8 +2087,8 @@ function physicsStep(dt){
     const contactR = Math.max(0, Math.sin(cycle + Math.PI));
     tgt.legLX  =  Math.sin(cycle) * legSwing;
     tgt.legRX  =  Math.sin(cycle + Math.PI) * legSwing;
-    tgt.kneeLX = -Math.abs(Math.sin(cycle)) * kneeSwing - contactL * 0.08;
-    tgt.kneeRX = -Math.abs(Math.sin(cycle + Math.PI)) * kneeSwing - contactR * 0.08;
+    tgt.kneeLX = Math.abs(Math.sin(cycle)) * kneeSwing + contactL * 0.08;
+    tgt.kneeRX = Math.abs(Math.sin(cycle + Math.PI)) * kneeSwing + contactR * 0.08;
     tgt.armLX = Math.sin(cycle + Math.PI) * 0.48;
     tgt.armRX = Math.sin(cycle) * 0.48;
     tgt.elbLX = -0.22 - contactL * 0.12;
@@ -2212,10 +2104,10 @@ function physicsStep(dt){
     if(airT < 0){
       // Rising: tuck knees up, arms raise
       const tuck = clamp(-airT, 0, 1);
-      tgt.legLX  = -0.45 * tuck;
-      tgt.legRX  = -0.45 * tuck;
-      tgt.kneeLX = -0.55 * tuck;
-      tgt.kneeRX = -0.55 * tuck;
+      tgt.legLX  = 0.35 * tuck;
+      tgt.legRX  = 0.35 * tuck;
+      tgt.kneeLX = 0.55 * tuck;
+      tgt.kneeRX = 0.55 * tuck;
       tgt.armLX  = -0.8 * tuck;
       tgt.armRX  = -0.8 * tuck;
       tgt.armLZ  =  0.15;
@@ -2224,18 +2116,18 @@ function physicsStep(dt){
     } else {
       // Falling: extend legs to land
       const ext = clamp(airT, 0, 1);
-      tgt.legLX  =  0.20 * ext;
-      tgt.legRX  =  0.20 * ext;
-      tgt.kneeLX = -0.20 * ext;
-      tgt.kneeRX = -0.20 * ext;
+      tgt.legLX  = 0.12 * ext;
+      tgt.legRX  = 0.12 * ext;
+      tgt.kneeLX = 0.18 * ext;
+      tgt.kneeRX = 0.18 * ext;
       tgt.armLX  = -0.20;
       tgt.armRX  = -0.20;
       tgt.torsoX =  0.06 * ext;
     }
     // On just landing — brief squat
     if(playerOnGround && animTimer < 0.18){
-      tgt.kneeLX = -0.5;
-      tgt.kneeRX = -0.5;
+      tgt.kneeLX = 0.42;
+      tgt.kneeRX = 0.42;
       tgt.torsoX =  0.12;
     }
   }
@@ -2254,8 +2146,8 @@ function physicsStep(dt){
     tgt.torsoX = -0.10 - charge*0.12;  // lean forward into shot
     tgt.legLX  = -0.10;
     tgt.legRX  = -0.10;
-    tgt.kneeLX = -0.25 - charge*0.15;
-    tgt.kneeRX = -0.25 - charge*0.15;
+    tgt.kneeLX = 0.22 + charge * 0.12;
+    tgt.kneeRX = 0.22 + charge * 0.12;
   }
 
   if(animState === 'dunk'){
@@ -2271,8 +2163,8 @@ function physicsStep(dt){
     tgt.torsoX = -0.20 - dp*0.25;     // lean over the rim
     tgt.legLX  = -0.40 * Math.sin(dp*Math.PI*0.8);
     tgt.legRX  = -0.30 * Math.sin(dp*Math.PI*0.8);
-    tgt.kneeLX = -0.40;
-    tgt.kneeRX = -0.35;
+    tgt.kneeLX = 0.38;
+    tgt.kneeRX = 0.32;
   }
 
   if(animState === 'steal'){
@@ -2281,8 +2173,8 @@ function physicsStep(dt){
       const reach = Math.sin(t * Math.PI * 0.95);
       tgt.torsoX = 0.18 + t * 0.14;
       tgt.torsoZ = -0.08;
-      tgt.kneeLX = -0.42 - t * 0.28;
-      tgt.kneeRX = -0.38 - t * 0.22;
+      tgt.kneeLX = 0.38 + t * 0.24;
+      tgt.kneeRX = 0.34 + t * 0.18;
       tgt.armRX  = -0.15 - reach * 1.05;
       tgt.elbRX  = -0.08 - reach * 0.85;
       tgt.armRZ  = -0.35 - reach * 0.55;
@@ -2295,8 +2187,8 @@ function physicsStep(dt){
       tgt.elbRX  = -0.55 * swipe;
       tgt.armRZ  = -0.65 * swipe;
       tgt.torsoZ = -0.18 * swipe;
-      tgt.kneeLX = -0.25 * swipe;
-      tgt.kneeRX = -0.22 * swipe;
+      tgt.kneeLX = 0.22 * swipe;
+      tgt.kneeRX = 0.18 * swipe;
     }
   }
 
