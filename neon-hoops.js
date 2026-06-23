@@ -881,17 +881,87 @@ function headSurfaceOffset(headR, azimuth, polar){
   };
 }
 
+/** Scalp attach point slightly outside the skull mesh with outward normal. */
+function scalpAttach(headY, headR, azimuth, polar, lift = 0.040){
+  const o = headSurfaceOffset(headR + lift, azimuth, polar);
+  const nLen = Math.sqrt(o.x * o.x + o.y * o.y + o.z * o.z) || 0.001;
+  return {
+    pos: new THREE.Vector3(o.x, headY + o.y, o.z),
+    normal: new THREE.Vector3(o.x / nLen, o.y / nLen, o.z / nLen)
+  };
+}
+
 function addHairTube(group, points, radius, mat, tubularSegs){
   if(points.length < 2) return;
-  const curve = new THREE.CatmullRomCurve3(points);
+  const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.35);
   const segs = tubularSegs || Math.max(8, points.length * 2);
   const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, segs, radius, 5, false), mat);
   group.add(tube);
 }
 
+/** One dread loc — chained tapered cylinders hanging down/outside the head. */
+function addDreadLoc(group, attach, locLen, mat, seed){
+  const segments = 8;
+  const segLen = locLen / segments;
+  const swayX = Math.sin(seed * 1.73) * 0.014;
+  const swayZ = Math.cos(seed * 2.11) * 0.010;
+  let pos = attach.pos.clone();
+
+  for(let i = 0; i < segments; i++){
+    const t = (i + 0.5) / segments;
+    const rTop = 0.023 * (1 - t * 0.42);
+    const rBot = 0.023 * (1 - (t + 1 / segments) * 0.42);
+    const dir = new THREE.Vector3(
+      swayX + attach.normal.x * 0.12,
+      -0.94 + attach.normal.y * 0.08,
+      0.05 + swayZ + attach.normal.z * 0.10
+    ).normalize();
+    const end = pos.clone().add(dir.multiplyScalar(segLen));
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, segLen, 6), mat);
+    const mid = pos.clone().lerp(end, 0.5);
+    cyl.position.copy(mid);
+    cyl.lookAt(end);
+    cyl.rotateX(Math.PI / 2);
+    group.add(cyl);
+    pos = end;
+  }
+}
+
+/** One cornrow braid — single rope following the scalp from hairline to nape. */
+function addCornrowBraid(group, headY, headR, xOff, mat, rowIndex){
+  const pts = [];
+  const steps = 18;
+  for(let i = 0; i <= steps; i++){
+    const t = i / steps;
+    const arc = lerp(-1.02, 1.02, t);
+    const r = headR + 0.022;
+    const localY = Math.cos(arc) * r * 0.56;
+    const localZ = Math.sin(arc) * r;
+    const py = headY + localY;
+    const xMax = Math.sqrt(Math.max(0, r * r - localY * localY)) * 0.90;
+    const cx = clamp(xOff, -xMax, xMax);
+    const weave = Math.sin(i * 1.05 + rowIndex * 0.65) * 0.0035;
+    const nx = cx / headR;
+    const ny = localY / headR;
+    const nz = localZ / headR;
+    const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 0.001;
+    const lift = 0.020;
+    pts.push(new THREE.Vector3(
+      cx + weave + (nx / nLen) * lift,
+      py + (ny / nLen) * lift,
+      localZ + (nz / nLen) * lift
+    ));
+  }
+  addHairTube(group, pts, 0.010, mat, 30);
+}
+
 function buildHairMesh(buildH){
-  if(hairMesh){ playerGroup.remove(hairMesh); hairMesh=null; }
-  const headY = 1.96*buildH;  // centre of head sphere
+  if(hairMesh){
+    if(hairMesh.parent) hairMesh.parent.remove(hairMesh);
+    hairMesh = null;
+  }
+  const onHead = pHead && pHead.isGroup;
+  const headY = onHead ? 0 : 1.96 * buildH;
   const headR = 0.24;
 
   const hairConfigs = [
@@ -913,38 +983,28 @@ function buildHairMesh(buildH){
       }
       return g;
     },
-    ()=>{ // 2: dreads — rope locs hanging from scalp with natural sag
+    ()=>{ // 2: dreads — locs rooted on scalp, hanging outside the head
       const g = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color:0x2a1200, roughness:0.92 });
+      const mat = new THREE.MeshStandardMaterial({ color: 0x2a1200, roughness: 0.92 });
       const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(headR + 0.012, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.50),
+        new THREE.SphereGeometry(headR + 0.028, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.48),
         mat.clone()
       );
       cap.position.y = headY;
       g.add(cap);
 
       const locDefs = [
-        [0, 0.22, 0.50], [0.52, 0.30, 0.56], [1.05, 0.34, 0.58], [1.57, 0.32, 0.54],
-        [2.09, 0.28, 0.52], [2.62, 0.34, 0.57], [3.14, 0.30, 0.55], [3.67, 0.34, 0.53],
-        [4.19, 0.38, 0.59], [4.71, 0.36, 0.56], [5.24, 0.40, 0.58], [5.76, 0.34, 0.52],
-        [0.26, 0.48, 0.62], [0.78, 0.52, 0.64], [1.31, 0.50, 0.63], [1.83, 0.52, 0.65],
-        [2.36, 0.48, 0.61], [2.88, 0.52, 0.64], [3.40, 0.50, 0.62], [4.45, 0.52, 0.63],
-        [4.97, 0.48, 0.60], [5.50, 0.50, 0.62]
+        [0.00, 0.38, 0.48], [0.55, 0.42, 0.52], [1.10, 0.46, 0.54], [1.65, 0.44, 0.50],
+        [2.20, 0.40, 0.48], [2.75, 0.46, 0.53], [3.30, 0.42, 0.51], [3.85, 0.44, 0.49],
+        [4.40, 0.48, 0.55], [4.95, 0.46, 0.52], [5.50, 0.42, 0.50], [6.05, 0.46, 0.53],
+        [0.28, 0.58, 0.56], [0.83, 0.62, 0.58], [1.38, 0.60, 0.57], [1.93, 0.64, 0.59],
+        [2.48, 0.60, 0.55], [3.03, 0.62, 0.58], [3.58, 0.60, 0.56], [4.13, 0.64, 0.57],
+        [4.68, 0.60, 0.54], [5.23, 0.62, 0.56]
       ];
 
       locDefs.forEach(([azimuth, polar, len], idx)=>{
-        const o = headSurfaceOffset(headR + 0.014, azimuth, polar);
-        const ax = o.x, ay = o.y, az = o.z;
-        const sway = (idx % 3 - 1) * 0.018;
-        const pts = [
-          new THREE.Vector3(ax, headY + ay, az),
-          new THREE.Vector3(ax + sway, headY + ay - len * 0.28, az + 0.03),
-          new THREE.Vector3(ax - sway * 0.6, headY + ay - len * 0.58, az - 0.02),
-          new THREE.Vector3(ax + sway * 0.4, headY + ay - len * 0.82, az + 0.015),
-          new THREE.Vector3(ax, headY + ay - len, az + 0.01)
-        ];
-        addHairTube(g, pts, 0.020, mat.clone(), 10);
-        addHairTube(g, pts, 0.011, mat.clone(), 10);
+        const attach = scalpAttach(headY, headR, azimuth, polar, 0.042);
+        addDreadLoc(g, attach, len, mat.clone(), idx);
       });
       return g;
     },
@@ -956,37 +1016,21 @@ function buildHairMesh(buildH){
       m.position.y = headY;
       return m;
     },
-    ()=>{ // 4: cornrows — tight parallel braids from hairline to nape
+    ()=>{ // 4: cornrows — parallel scalp braids (one strand per row)
       const g = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color:0x2a1200, roughness:0.88 });
+      const mat = new THREE.MeshStandardMaterial({ color: 0x2a1200, roughness: 0.88 });
       const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(headR + 0.010, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.48),
+        new THREE.SphereGeometry(headR + 0.018, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.46),
         mat.clone()
       );
       cap.position.y = headY;
       g.add(cap);
 
-      const braidRows = [-0.17, -0.085, 0, 0.085, 0.17];
-      braidRows.forEach((xOff, row)=>{
-        const pts = [];
-        const steps = 14;
-        for(let i = 0; i <= steps; i++){
-          const t = i / steps;
-          const angle = lerp(-1.15, 1.15, t);
-          const r = headR + 0.014 + (row % 2) * 0.004;
-          const py = headY + Math.cos(angle) * r * 0.62;
-          const pz = Math.sin(angle) * r;
-          const dy = py - headY;
-          const xMax = Math.sqrt(Math.max(0, r * r - dy * dy - pz * pz));
-          pts.push(new THREE.Vector3(clamp(xOff, -xMax + 0.01, xMax - 0.01), py, pz));
-        }
-        addHairTube(g, pts, 0.013, mat.clone(), 20);
-        const ptsRaised = pts.map((p, i) => {
-          const lift = 0.008 + Math.sin(i * 0.55) * 0.003;
-          return new THREE.Vector3(p.x, p.y + lift, p.z + 0.006);
-        });
-        addHairTube(g, ptsRaised, 0.009, mat.clone(), 20);
-      });
+      const braidCount = 7;
+      for(let row = 0; row < braidCount; row++){
+        const xOff = lerp(-0.19, 0.19, row / (braidCount - 1));
+        addCornrowBraid(g, headY, headR, xOff, mat.clone(), row);
+      }
       return g;
     },
     ()=>{ // 5: mohawk — fin shape sitting dead centre
@@ -1011,7 +1055,10 @@ function buildHairMesh(buildH){
   ];
   if(custom.hair > 0 && hairConfigs[custom.hair]){
     hairMesh = hairConfigs[custom.hair]();
-    if(hairMesh) playerGroup.add(hairMesh);
+    if(hairMesh){
+      if(onHead) pHead.add(hairMesh);
+      else playerGroup.add(hairMesh);
+    }
   }
 }
 
