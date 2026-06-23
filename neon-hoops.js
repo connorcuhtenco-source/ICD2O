@@ -871,90 +871,6 @@ function addSmile(group, bH){
   group.add(smile);
 }
 
-/** Point on unit head sphere (azimuth around Y, polar from top). */
-function headSurfaceOffset(headR, azimuth, polar){
-  const sinP = Math.sin(polar);
-  return {
-    x: sinP * Math.cos(azimuth) * headR,
-    y: Math.cos(polar) * headR,
-    z: sinP * Math.sin(azimuth) * headR
-  };
-}
-
-/** Scalp attach point slightly outside the skull mesh with outward normal. */
-function scalpAttach(headY, headR, azimuth, polar, lift = 0.040){
-  const o = headSurfaceOffset(headR + lift, azimuth, polar);
-  const nLen = Math.sqrt(o.x * o.x + o.y * o.y + o.z * o.z) || 0.001;
-  return {
-    pos: new THREE.Vector3(o.x, headY + o.y, o.z),
-    normal: new THREE.Vector3(o.x / nLen, o.y / nLen, o.z / nLen)
-  };
-}
-
-function addHairTube(group, points, radius, mat, tubularSegs){
-  if(points.length < 2) return;
-  const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.35);
-  const segs = tubularSegs || Math.max(8, points.length * 2);
-  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, segs, radius, 5, false), mat);
-  group.add(tube);
-}
-
-/** One dread loc — chained tapered cylinders hanging down/outside the head. */
-function addDreadLoc(group, attach, locLen, mat, seed){
-  const segments = 8;
-  const segLen = locLen / segments;
-  const swayX = Math.sin(seed * 1.73) * 0.014;
-  const swayZ = Math.cos(seed * 2.11) * 0.010;
-  let pos = attach.pos.clone();
-
-  for(let i = 0; i < segments; i++){
-    const t = (i + 0.5) / segments;
-    const rTop = 0.023 * (1 - t * 0.42);
-    const rBot = 0.023 * (1 - (t + 1 / segments) * 0.42);
-    const dir = new THREE.Vector3(
-      swayX + attach.normal.x * 0.12,
-      -0.94 + attach.normal.y * 0.08,
-      0.05 + swayZ + attach.normal.z * 0.10
-    ).normalize();
-    const end = pos.clone().add(dir.multiplyScalar(segLen));
-    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, segLen, 6), mat);
-    const mid = pos.clone().lerp(end, 0.5);
-    cyl.position.copy(mid);
-    cyl.lookAt(end);
-    cyl.rotateX(Math.PI / 2);
-    group.add(cyl);
-    pos = end;
-  }
-}
-
-/** One cornrow braid — single rope following the scalp from hairline to nape. */
-function addCornrowBraid(group, headY, headR, xOff, mat, rowIndex){
-  const pts = [];
-  const steps = 18;
-  for(let i = 0; i <= steps; i++){
-    const t = i / steps;
-    const arc = lerp(-1.02, 1.02, t);
-    const r = headR + 0.022;
-    const localY = Math.cos(arc) * r * 0.56;
-    const localZ = Math.sin(arc) * r;
-    const py = headY + localY;
-    const xMax = Math.sqrt(Math.max(0, r * r - localY * localY)) * 0.90;
-    const cx = clamp(xOff, -xMax, xMax);
-    const weave = Math.sin(i * 1.05 + rowIndex * 0.65) * 0.0035;
-    const nx = cx / headR;
-    const ny = localY / headR;
-    const nz = localZ / headR;
-    const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 0.001;
-    const lift = 0.020;
-    pts.push(new THREE.Vector3(
-      cx + weave + (nx / nLen) * lift,
-      py + (ny / nLen) * lift,
-      localZ + (nz / nLen) * lift
-    ));
-  }
-  addHairTube(group, pts, 0.010, mat, 30);
-}
-
 function buildHairMesh(buildH){
   if(hairMesh){
     if(hairMesh.parent) hairMesh.parent.remove(hairMesh);
@@ -963,6 +879,8 @@ function buildHairMesh(buildH){
   const onHead = pHead && pHead.isGroup;
   const headY = onHead ? 0 : 1.96 * buildH;
   const headR = 0.24;
+
+  const hairStyle = ({ 0: 0, 1: 1, 2: 0, 3: 2, 4: 0, 5: 0 })[custom.hair] ?? 0;
 
   const hairConfigs = [
     null,  // 0: bald
@@ -983,78 +901,17 @@ function buildHairMesh(buildH){
       }
       return g;
     },
-    ()=>{ // 2: dreads — locs rooted on scalp, hanging outside the head
-      const g = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color: 0x2a1200, roughness: 0.92 });
-      const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(headR + 0.028, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.48),
-        mat.clone()
-      );
-      cap.position.y = headY;
-      g.add(cap);
-
-      const locDefs = [
-        [0.00, 0.38, 0.48], [0.55, 0.42, 0.52], [1.10, 0.46, 0.54], [1.65, 0.44, 0.50],
-        [2.20, 0.40, 0.48], [2.75, 0.46, 0.53], [3.30, 0.42, 0.51], [3.85, 0.44, 0.49],
-        [4.40, 0.48, 0.55], [4.95, 0.46, 0.52], [5.50, 0.42, 0.50], [6.05, 0.46, 0.53],
-        [0.28, 0.58, 0.56], [0.83, 0.62, 0.58], [1.38, 0.60, 0.57], [1.93, 0.64, 0.59],
-        [2.48, 0.60, 0.55], [3.03, 0.62, 0.58], [3.58, 0.60, 0.56], [4.13, 0.64, 0.57],
-        [4.68, 0.60, 0.54], [5.23, 0.62, 0.56]
-      ];
-
-      locDefs.forEach(([azimuth, polar, len], idx)=>{
-        const attach = scalpAttach(headY, headR, azimuth, polar, 0.042);
-        addDreadLoc(g, attach, len, mat.clone(), idx);
-      });
-      return g;
-    },
-    ()=>{ // 3: buzz cut — tight shell hugging the head
+    ()=>{ // 2: buzz cut — tight shell hugging the head
       const m = new THREE.Mesh(
         new THREE.SphereGeometry(headR + 0.022, 18, 14, 0, Math.PI*2, 0, Math.PI*0.56),
         new THREE.MeshStandardMaterial({ color:0x1a0800, roughness:.95 })
       );
       m.position.y = headY;
       return m;
-    },
-    ()=>{ // 4: cornrows — parallel scalp braids (one strand per row)
-      const g = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color: 0x2a1200, roughness: 0.88 });
-      const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(headR + 0.018, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.46),
-        mat.clone()
-      );
-      cap.position.y = headY;
-      g.add(cap);
-
-      const braidCount = 7;
-      for(let row = 0; row < braidCount; row++){
-        const xOff = lerp(-0.19, 0.19, row / (braidCount - 1));
-        addCornrowBraid(g, headY, headR, xOff, mat.clone(), row);
-      }
-      return g;
-    },
-    ()=>{ // 5: mohawk — fin shape sitting dead centre
-      const g = new THREE.Group();
-      // Base strip
-      const base = new THREE.Mesh(
-        new THREE.BoxGeometry(0.1, 0.06, 0.56),
-        new THREE.MeshStandardMaterial({ color:0x1a0800, roughness:.9 })
-      );
-      base.position.y = headY + headR - 0.01;
-      g.add(base);
-      // Spiky fin
-      const fin = new THREE.Mesh(
-        new THREE.CylinderGeometry(0, 0.06, 0.38, 6),
-        new THREE.MeshStandardMaterial({ color:C_PINK, emissive:C_PINK, emissiveIntensity:.5 })
-      );
-      fin.position.y = headY + headR + 0.18;
-      fin.scale.z = 2.2; // stretch into a fin shape
-      g.add(fin);
-      return g;
     }
   ];
-  if(custom.hair > 0 && hairConfigs[custom.hair]){
-    hairMesh = hairConfigs[custom.hair]();
+  if(hairStyle > 0 && hairConfigs[hairStyle]){
+    hairMesh = hairConfigs[hairStyle]();
     if(hairMesh){
       if(onHead) pHead.add(hairMesh);
       else playerGroup.add(hairMesh);
@@ -2550,6 +2407,9 @@ function closeCustomization(){
 }
 
 function applyCustomization(){
+  const hairMap = { 0: 0, 1: 1, 2: 0, 3: 2, 4: 0, 5: 0 };
+  custom.hair = hairMap[custom.hair] ?? 0;
+
   // Remove old player
   if(playerGroup) scene.remove(playerGroup);
   skinMeshes=[]; jerseyMeshes=[]; shoeMeshes=[];
