@@ -2396,6 +2396,10 @@ body.neon-hoops-page .neon-hoops-hub-btn {
     box-shadow: 0 0 8px rgba(0, 245, 255, 0.25);
 }
 
+body.neon-hoops-page #hud-left {
+    margin-left: 92px;
+}
+
 body.neon-hoops-page .neon-hoops-hub-btn:hover {
     background: rgba(0, 245, 255, 0.12);
     box-shadow: 0 0 16px rgba(0, 245, 255, 0.35);
