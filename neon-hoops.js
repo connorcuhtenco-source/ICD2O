@@ -41,6 +41,7 @@ let playerGroup;
 let pBody, pHead, pHair, pHat, pLegL, pLegR, pArmL, pArmR, pShoeL, pShoeR, pFaceEl;
 let pKneeL, pKneeR;       // knee sub-groups (shin + shoe pivot)
 let pElbowL, pElbowR;     // forearm sub-groups (pivot at elbow)
+let pHandL, pHandR;       // wrist anchors for ball/hand tracking
 let playerBallAnchorR, playerBallAnchorL;
 let ballMesh, ballLight;
 let hoopGroup;
@@ -72,18 +73,20 @@ let dunkActive  = false;
 let dunkPhase   = 0;       // 0-1 animation progress
 let dunkTimeout = null;
 
-// Dribble — phase-driven bounce physics and contextual stance
+// Dribble + locomotion — realistic gait and ball physics
 let dribbleHand   = 'right';
-let dribblePhase  = 0;          // 0 = hand/apex, 0.5 = floor impact, 1 = hand again
-let dribbleSpeed  = 2.35;       // bounces per second (dt-clamped, human-readable)
-const DRIBBLE_HEIGHT = 1.3;
+let dribblePhase  = 0;
+let locoPhase     = 0;          // stride cycle shared by run/dribble
+let ballSpinAngle = 0;
+const DRIBBLE_HEIGHT = 1.05;
 const BALL_STAND_Y = 1.2;
-let onBallCrouch  = 0;          // 0-1 on-ball stance blend
-let offBallCrouch = 0;          // 0-1 off-ball ready stance blend
-let stanceDropY   = 0;          // current root Y drop applied to playerGroup
-const ON_BALL_CROUCH_IDLE = 0.20;
-const ON_BALL_CROUCH_RUN  = 0.34;
-const OFF_BALL_CROUCH     = 0.11;
+let onBallCrouch  = 0;
+let offBallCrouch = 0;
+let stanceDropY   = 0;
+const ON_BALL_CROUCH_IDLE = 0.22;
+const ON_BALL_CROUCH_RUN  = 0.38;
+const OFF_BALL_CROUCH     = 0.12;
+const OFF_BALL_RUN_CROUCH = 0.18;
 let crossoverActive = false;
 let crossoverPhase  = 0;
 let crossoverFrom   = 'right';
@@ -531,6 +534,10 @@ function buildPlayer(){
     fore.position.y = -0.20*buildH; elbowGrp.add(fore); skinMeshes.push(fore);
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.078*buildScale,10,8), sMat());
     hand.position.y = -0.40*buildH; elbowGrp.add(hand); skinMeshes.push(hand);
+    const handAnchor = new THREE.Object3D();
+    handAnchor.position.set(0, -0.40*buildH, 0.04*buildScale);
+    elbowGrp.add(handAnchor);
+    if(isLeft) pHandL = handAnchor; else pHandR = handAnchor;
     g.add(elbowGrp);
     if(isLeft) pElbowL = elbowGrp; else pElbowR = elbowGrp;
     return g;
@@ -848,121 +855,223 @@ function buildBall(){
   snapBallToHand();
 }
 
-/** Map dribblePhase (floor at 0.5) to height 0→1 with apex hang and fast slam. */
+// ═══════════════════════════════════════════════════════════════
+// PLAYER LOCOMOTION — realistic dribble, sprint, and ready stances
+// ═══════════════════════════════════════════════════════════════
+
+function getMoveSpeed(){
+  return Math.hypot(playerVel.x, playerVel.z);
+}
+
+function rotateOffsetByFacing(lx, lz){
+  const c = Math.cos(playerFacing), s = Math.sin(playerFacing);
+  return { x: lx * c - lz * s, z: lx * s + lz * c };
+}
+
+function usesProceduralLocomotion(){
+  if(!playerOnGround || animState === 'jump') return false;
+  if(shotCharging || dunkActive || playerStealActive) return false;
+  if(ballState === 'held') return animState === 'idle' || animState === 'run';
+  if(ballState === 'dunking') return false;
+  return animState === 'idle' || animState === 'run';
+}
+
+/** Phase 0/1 = hand height, 0.5 = floor — biased gravity fall. */
 function dribbleHeightFromPhase(phase){
+  let h;
   if(phase < 0.5){
     const u = phase / 0.5;
-    return 1 - Math.pow(u, 2.35);
+    h = 1 - Math.pow(u, 2.55);
+  } else {
+    const u = (phase - 0.5) / 0.5;
+    h = Math.pow(Math.sin(u * Math.PI * 0.5), 0.52);
   }
-  const u = (phase - 0.5) / 0.5;
-  return Math.pow(Math.sin(u * Math.PI * 0.5), 0.58);
+  return { h, falling: phase < 0.5 };
 }
 
-/** True when player should use deep on-ball athletic crouch. */
-function isOnBallGrounded(){
-  return ballState === 'held' && playerOnGround && animState !== 'jump'
-      && !shotCharging && !dunkActive && !playerStealActive;
+function sampleStride(phase){
+  const ang = phase * Math.PI * 2;
+  const sin = Math.sin(ang);
+  const cos = Math.cos(ang);
+  return { sin, cos, strike: Math.max(0, cos), ang };
 }
 
-/** True when player should use lighter off-ball ready stance. */
-function isOffBallGrounded(){
-  return ballState !== 'held' && ballState !== 'dunking' && playerOnGround && animState !== 'jump';
+/** Single-leg run/dribble drive pose. */
+function applyLegStride(leg, knee, phase, intensity){
+  const s = sampleStride(phase);
+  const thigh = s.sin * 0.50 * intensity + 0.16 * intensity;
+  const kneeBend = -Math.abs(s.sin) * 0.64 * intensity - s.strike * 0.30 * intensity;
+  if(leg) leg.rotation.x = thigh;
+  if(knee) knee.rotation.x = kneeBend;
+  return s.strike;
 }
 
-/** Dribble arm piston + off-hand protective guard. */
-function applyDribbleArmPose(heightNorm, phase){
-  const isRight = dribbleHand === 'right';
-  const dribbleArm = isRight ? pArmR : pArmL;
-  const offArm     = isRight ? pArmL : pArmR;
-  const dribbleElb = isRight ? pElbowR : pElbowL;
-  const offElb     = isRight ? pElbowL : pElbowR;
+/** Dribble-hand reaches to floor; off-hand stays in protect position. */
+function applyOnBallDribbleArms(h, falling, speed){
+  const isR = dribbleHand === 'right';
+  const dA = isR ? pArmR : pArmL;
+  const dE = isR ? pElbowR : pElbowL;
+  const oA = isR ? pArmL : pArmR;
+  const oE = isR ? pElbowL : pElbowR;
 
-  const falling = phase < 0.5;
-  const fallSnatch = falling ? Math.pow(1 - heightNorm, 1.6) * 0.32 : 0;
-  const pistonX = lerp(-0.68, 0.42, heightNorm) + fallSnatch;
+  const reach = 1 - h;
+  const shoulder = lerp(-0.08, 0.78, reach) + (falling ? reach * 0.14 : 0);
+  const elbow = lerp(-0.28, -1.12, reach);
 
-  if(dribbleArm){
-    dribbleArm.rotation.x = pistonX;
-    dribbleArm.rotation.z = isRight ? -0.26 : 0.26;
+  if(dA){
+    dA.rotation.x = shoulder;
+    dA.rotation.z = isR ? -0.12 : 0.12;
+    dA.rotation.y = isR ? 0.10 : -0.10;
   }
-  if(dribbleElb) dribbleElb.rotation.x = lerp(-0.78, -0.10, heightNorm);
+  if(dE) dE.rotation.x = elbow;
 
-  if(offArm){
-    offArm.rotation.x = -0.52;
-    offArm.rotation.z = isRight ? 0.72 : -0.72;
+  const guard = -0.70 - Math.min(speed / PLAYER_SPEED, 1) * 0.14;
+  if(oA){
+    oA.rotation.x = guard;
+    oA.rotation.z = isR ? 0.66 : -0.66;
+    oA.rotation.y = 0;
   }
-  if(offElb) offElb.rotation.x = -1.18;
+  if(oE) oE.rotation.x = -1.35;
 }
 
-/** Thighs forward + knee counter-bend for weighted on-ball crouch. */
-function applyOnBallLegPose(blend, driving){
-  if(blend <= 0.001) return;
-  const thigh = lerp(0.24, 0.42, driving ? 1 : 0) * blend;
-  const knee  = lerp(-0.46, -0.58, driving ? 1 : 0) * blend;
-  if(pLegL) pLegL.rotation.x = thigh;
-  if(pLegR) pLegR.rotation.x = thigh;
-  if(pKneeL) pKneeL.rotation.x = knee;
-  if(pKneeR) pKneeR.rotation.x = knee;
-  if(pBody) pBody.rotation.x = lerp(pBody.rotation.x, -0.16 * blend, 0.35);
+/** Low athletic dribble stance with contralateral footwork. */
+function applyOnBallLocomotion(dt, speed, moving, skipArms){
+  const gaitRate = moving ? 2.35 + speed * 0.30 : 0.85;
+  locoPhase = (locoPhase + dt * gaitRate) % 1;
+
+  const lead = dribbleHand === 'right' ? 0 : 0.5;
+  const drive = moving ? 0.80 + Math.min(speed / PLAYER_SPEED, 1) * 0.42 : 0.50;
+  applyLegStride(pLegL, pKneeL, (locoPhase + lead) % 1, drive);
+  applyLegStride(pLegR, pKneeR, (locoPhase + lead + 0.5) % 1, drive);
+
+  const tDrop = moving
+    ? lerp(ON_BALL_CROUCH_IDLE, ON_BALL_CROUCH_RUN, Math.min(speed / PLAYER_SPEED, 1))
+    : ON_BALL_CROUCH_IDLE;
+  onBallCrouch = lerp(onBallCrouch, 1, clamp(dt * 10, 0, 1));
+  offBallCrouch = lerp(offBallCrouch, 0, clamp(dt * 10, 0, 1));
+  stanceDropY = lerp(stanceDropY, tDrop * onBallCrouch, clamp(dt * 12, 0, 1));
+
+  const leanFwd = 0.08 + (moving ? 0.16 + speed * 0.022 : 0.05);
+  let leanSide = 0;
+  if(speed > 0.25){
+    leanSide = Math.sin(Math.atan2(playerVel.x, playerVel.z) - playerFacing) * 0.07;
+  }
+  if(pBody){ pBody.rotation.x = leanFwd; pBody.rotation.z = leanSide * 0.45; }
+  if(shortsRef) shortsRef.rotation.x = leanFwd * 0.62;
+  if(pHead){
+    pHead.rotation.x = lerp(pHead.rotation.x, -leanFwd * 0.28 - 0.02, 0.22);
+    pHead.rotation.z = lerp(pHead.rotation.z, -leanSide * 0.4, 0.18);
+  }
+
+  playerGroup.position.set(playerPos.x, playerPos.y - stanceDropY, playerPos.z);
+  playerGroup.rotation.z = lerp(playerGroup.rotation.z || 0, leanSide, 0.14);
+
+  if(!skipArms){
+    const { h, falling } = dribbleHeightFromPhase(dribblePhase);
+    applyOnBallDribbleArms(h, falling, speed);
+  }
 }
 
-/** Symmetric hands-up guard when waiting off-ball. */
-function applyOffBallGuardPose(blend){
-  if(blend <= 0.001) return;
-  const armUp = -0.42 * blend;
-  const elbow = -0.98 * blend;
-  const flare = 0.58 * blend;
+/** Off-ball sprint with natural opposing arm/leg pump. */
+function applyOffBallRunLocomotion(dt, speed){
+  const gaitRate = 3.15 + speed * 0.42;
+  locoPhase = (locoPhase + dt * gaitRate) % 1;
+
+  const drive = 0.72 + Math.min(speed / PLAYER_SPEED, 1) * 0.55;
+  applyLegStride(pLegL, pKneeL, locoPhase, drive);
+  applyLegStride(pLegR, pKneeR, (locoPhase + 0.5) % 1, drive);
+
+  const ang = locoPhase * Math.PI * 2;
+  const pump = 0.55 + speed * 0.035;
+  const armL = Math.sin(ang + Math.PI) * pump;
+  const armR = Math.sin(ang) * pump;
+
   if(pArmL){
-    pArmL.rotation.x = armUp;
-    pArmL.rotation.z = flare;
+    pArmL.rotation.x = armL;
+    pArmL.rotation.z = 0.18 + Math.max(0, armL) * 0.08;
+    pArmL.rotation.y = 0;
   }
   if(pArmR){
-    pArmR.rotation.x = armUp;
-    pArmR.rotation.z = -flare;
+    pArmR.rotation.x = armR;
+    pArmR.rotation.z = -0.18 - Math.max(0, armR) * 0.08;
   }
-  if(pElbowL) pElbowL.rotation.x = elbow;
-  if(pElbowR) pElbowR.rotation.x = elbow;
-  if(pLegL) pLegL.rotation.x = 0.10 * blend;
-  if(pLegR) pLegR.rotation.x = 0.10 * blend;
-  if(pKneeL) pKneeL.rotation.x = -0.20 * blend;
-  if(pKneeR) pKneeR.rotation.x = -0.20 * blend;
+  if(pElbowL) pElbowL.rotation.x = armL > 0 ? -0.55 : -0.16;
+  if(pElbowR) pElbowR.rotation.x = armR > 0 ? -0.55 : -0.16;
+
+  const leanFwd = 0.14 + speed * 0.030;
+  let leanSide = 0;
+  if(speed > 0.25){
+    leanSide = Math.sin(Math.atan2(playerVel.x, playerVel.z) - playerFacing) * 0.05;
+  }
+  if(pBody){ pBody.rotation.x = leanFwd; pBody.rotation.z = leanSide * 0.35; }
+  if(shortsRef) shortsRef.rotation.x = leanFwd * 0.48;
+  if(pHead) pHead.rotation.x = lerp(pHead.rotation.x, -leanFwd * 0.22, 0.2);
+
+  offBallCrouch = lerp(offBallCrouch, 0.55 + Math.min(speed / PLAYER_SPEED, 1) * 0.45, clamp(dt * 8, 0, 1));
+  onBallCrouch = lerp(onBallCrouch, 0, clamp(dt * 10, 0, 1));
+  const drop = lerp(OFF_BALL_CROUCH, OFF_BALL_RUN_CROUCH + 0.08, Math.min(speed / PLAYER_SPEED, 1));
+  stanceDropY = lerp(stanceDropY, drop * offBallCrouch, clamp(dt * 11, 0, 1));
+  playerGroup.position.set(playerPos.x, playerPos.y - stanceDropY, playerPos.z);
+  playerGroup.rotation.z = lerp(playerGroup.rotation.z || 0, leanSide, 0.12);
 }
 
-/** Physically lower playerGroup root — bypassed entirely during jump/airborne. */
-function applyPlayerRootStance(dt){
+/** Off-ball catch/defensive ready — light knee flex, hands up. */
+function applyOffBallReadyStance(dt){
+  locoPhase = (locoPhase + dt * 0.5) % 1;
+  const breathe = Math.sin(locoPhase * Math.PI * 2) * 0.018;
+
+  if(pLegL) pLegL.rotation.x = 0.14 + breathe;
+  if(pLegR) pLegR.rotation.x = 0.14 - breathe;
+  if(pKneeL) pKneeL.rotation.x = -0.28;
+  if(pKneeR) pKneeR.rotation.x = -0.28;
+
+  const up = -0.58;
+  if(pArmL){ pArmL.rotation.x = up; pArmL.rotation.z = 0.62; pArmL.rotation.y = 0; }
+  if(pArmR){ pArmR.rotation.x = up; pArmR.rotation.z = -0.62; }
+  if(pElbowL) pElbowL.rotation.x = -1.08;
+  if(pElbowR) pElbowR.rotation.x = -1.08;
+
+  if(pBody){ pBody.rotation.x = 0.06; pBody.rotation.z = breathe * 0.4; }
+  if(shortsRef) shortsRef.rotation.x = 0.04;
+  if(pHead) pHead.rotation.x = lerp(pHead.rotation.x, -0.04, 0.15);
+
+  offBallCrouch = lerp(offBallCrouch, 1, clamp(dt * 7, 0, 1));
+  onBallCrouch = lerp(onBallCrouch, 0, clamp(dt * 10, 0, 1));
+  stanceDropY = lerp(stanceDropY, OFF_BALL_CROUCH * offBallCrouch, clamp(dt * 9, 0, 1));
+  playerGroup.position.set(playerPos.x, playerPos.y - stanceDropY, playerPos.z);
+  playerGroup.rotation.z = lerp(playerGroup.rotation.z || 0, 0, 0.1);
+}
+
+/** Authoritative grounded locomotion — replaces generic idle/run posing. */
+function applyPlayerLocomotion(dt){
   if(!playerGroup) return;
 
   if(animState === 'jump' || !playerOnGround){
     onBallCrouch = lerp(onBallCrouch, 0, clamp(dt * 14, 0, 1));
     offBallCrouch = lerp(offBallCrouch, 0, clamp(dt * 14, 0, 1));
     stanceDropY = lerp(stanceDropY, 0, clamp(dt * 14, 0, 1));
-    playerGroup.position.y = playerPos.y;
+    playerGroup.position.set(playerPos.x, playerPos.y, playerPos.z);
+    playerGroup.rotation.z = lerp(playerGroup.rotation.z || 0, 0, 0.18);
     return;
   }
 
-  let targetDrop = 0;
+  const speed = getMoveSpeed();
+  const moving = speed > 0.35;
 
-  if(isOnBallGrounded()){
-    onBallCrouch = lerp(onBallCrouch, 1, clamp(dt * 9, 0, 1));
-    offBallCrouch = lerp(offBallCrouch, 0, clamp(dt * 10, 0, 1));
-    const base = animState === 'run' ? ON_BALL_CROUCH_RUN : ON_BALL_CROUCH_IDLE;
-    targetDrop = base * onBallCrouch;
-    applyOnBallLegPose(onBallCrouch, animState === 'run');
-  } else if(isOffBallGrounded()){
-    onBallCrouch = lerp(onBallCrouch, 0, clamp(dt * 10, 0, 1));
-    offBallCrouch = lerp(offBallCrouch, 1, clamp(dt * 7, 0, 1));
-    targetDrop = OFF_BALL_CROUCH * offBallCrouch;
-    applyOffBallGuardPose(offBallCrouch);
+  if(ballState === 'held'){
+    applyOnBallLocomotion(dt, speed, moving, crossoverActive);
+  } else if(ballState !== 'dunking'){
+    if(moving) applyOffBallRunLocomotion(dt, speed);
+    else applyOffBallReadyStance(dt);
   } else {
-    onBallCrouch = lerp(onBallCrouch, 0, clamp(dt * 10, 0, 1));
-    offBallCrouch = lerp(offBallCrouch, 0, clamp(dt * 10, 0, 1));
+    stanceDropY = lerp(stanceDropY, 0, clamp(dt * 10, 0, 1));
+    playerGroup.position.set(playerPos.x, playerPos.y - stanceDropY, playerPos.z);
   }
-
-  stanceDropY = lerp(stanceDropY, targetDrop, clamp(dt * 11, 0, 1));
-  playerGroup.position.set(playerPos.x, playerPos.y - stanceDropY, playerPos.z);
 }
 
 function getHandAnchor(){
+  const wrist = dribbleHand === 'right' ? pHandR : pHandL;
+  if(wrist) return wrist;
   return dribbleHand === 'right' ? playerBallAnchorR : playerBallAnchorL;
 }
 
@@ -1580,7 +1689,7 @@ function updateBallPosition(dt){
   }
 
   if(crossoverActive){
-    crossoverPhase += dt * 3.5;
+    crossoverPhase += dt * 3.2;
     if(crossoverPhase >= 1){
       crossoverActive = false;
       crossoverPhase  = 0;
@@ -1595,51 +1704,62 @@ function updateBallPosition(dt){
     fromAnchor.getWorldPosition(fromWP);
     toAnchor.getWorldPosition(toWP);
     const t = crossoverPhase;
-    const midDip = Math.sin(t * Math.PI);
+    const dip = Math.sin(t * Math.PI);
     const floorY = FLOOR_Y + BALL_RADIUS;
-    ballPos.x = lerp(fromWP.x, toWP.x, t);
-    ballPos.z = lerp(fromWP.z, toWP.z, t);
+    const midX = lerp(fromWP.x, toWP.x, t);
+    const midZ = lerp(fromWP.z, toWP.z, t);
     const handY = lerp(fromWP.y, toWP.y, t);
-    ballPos.y = lerp(handY, floorY, midDip * 0.88);
+    ballPos.x = midX;
+    ballPos.z = midZ;
+    ballPos.y = lerp(handY, floorY, Math.pow(dip, 1.35));
     ballMesh.position.set(ballPos.x, ballPos.y, ballPos.z);
-    const squash = lerp(1.0, 0.72, midDip);
-    ballMesh.scale.set(lerp(1, 1.25, midDip), squash, lerp(1, 1.25, midDip));
-    if(pArmR) pArmR.rotation.x = lerp(0.4, -0.1, t);
-    if(pArmL) pArmL.rotation.x = lerp(-0.1, 0.4, t);
-    if(pBody) pBody.rotation.z = lerp(pBody.rotation.z, (crossoverFrom === 'right' ? 1 : -1) * 0.12 * Math.sin(t * Math.PI), 0.25);
+    if(dip > 0.55){
+      const s = (dip - 0.55) / 0.45;
+      ballMesh.scale.set(lerp(1, 1.26, s), lerp(1, 0.71, s), lerp(1, 1.26, s));
+    } else {
+      ballMesh.scale.set(1, 1, 1);
+    }
+    if(pArmR) pArmR.rotation.x = lerp(0.35, -0.05, t);
+    if(pArmL) pArmL.rotation.x = lerp(-0.05, 0.35, t);
+    if(pBody) pBody.rotation.z = (crossoverFrom === 'right' ? 1 : -1) * 0.14 * dip;
     return;
   }
 
-  const moving = Math.abs(playerVel.x) + Math.abs(playerVel.z) > 0.5;
-  const speedMult = moving ? 1.06 : 0.94;
-  dribblePhase = (dribblePhase + clamp(dt * dribbleSpeed * speedMult, 0, 0.06)) % 1;
+  const speed = getMoveSpeed();
+  const moving = speed > 0.35;
+  const bps = moving ? 1.95 + speed * 0.10 : 1.45;
+  dribblePhase = (dribblePhase + clamp(dt * bps, 0, 0.045)) % 1;
 
-  const heightNorm = dribbleHeightFromPhase(dribblePhase);
-  const handPos = new THREE.Vector3();
-  getHandAnchor().getWorldPosition(handPos);
+  const { h, falling } = dribbleHeightFromPhase(dribblePhase);
+  const side = dribbleHand === 'right' ? 1 : -1;
+  const localX = side * 0.56;
+  const localZ = 0.36 + (moving ? Math.min(speed * 0.038, 0.32) : 0.08);
+  const off = rotateOffsetByFacing(localX, localZ);
+
   const floorY = FLOOR_Y + BALL_RADIUS;
-  const apexY = floorY + DRIBBLE_HEIGHT;
-  const handApexY = Math.max(apexY, handPos.y, FLOOR_Y + BALL_STAND_Y * 0.55);
+  const bounceH = DRIBBLE_HEIGHT * (moving ? 0.90 + speed * 0.018 : 0.78);
 
-  ballPos.x = handPos.x;
-  ballPos.y = lerp(floorY, handApexY, heightNorm);
-  ballPos.z = handPos.z;
+  const fallLead = falling ? (1 - h) * 0.16 : 0;
+  const lead = rotateOffsetByFacing(0, fallLead);
+
+  ballPos.x = playerPos.x + off.x + lead.x;
+  ballPos.y = floorY + bounceH * h;
+  ballPos.z = playerPos.z + off.z + lead.z;
   ballMesh.position.set(ballPos.x, ballPos.y, ballPos.z);
 
+  ballSpinAngle += dt * (7.5 + speed * 0.45);
+  ballMesh.rotation.x = ballSpinAngle;
+  ballMesh.rotation.z = ballSpinAngle * 0.25;
+
   const impactDist = Math.abs(dribblePhase - 0.5);
-  if(impactDist < 0.06){
-    const impactT = 1 - impactDist / 0.06;
-    ballMesh.scale.set(
-      lerp(1, 1.25, impactT),
-      lerp(1, 0.72, impactT),
-      lerp(1, 1.25, impactT)
-    );
+  if(impactDist < 0.05){
+    const t = 1 - impactDist / 0.05;
+    ballMesh.scale.set(lerp(1, 1.25, t), lerp(1, 0.72, t), lerp(1, 1.25, t));
+  } else if(falling && h < 0.35){
+    const stretch = (0.35 - h) / 0.35 * 0.10;
+    ballMesh.scale.set(1 - stretch * 0.35, 1 + stretch, 1 - stretch * 0.35);
   } else {
     ballMesh.scale.set(1, 1, 1);
-  }
-
-  if(isOnBallGrounded()){
-    applyDribbleArmPose(heightNorm, dribblePhase);
   }
 }
 
@@ -1748,49 +1868,38 @@ function physicsStep(dt){
               armLX:0, armLZ:0.28, armRX:0, armRZ:-0.28,
               elbLX:0, elbRX:0,
               legLX:0, legRX:0, kneeLX:0, kneeRX:0 };
+  const procLoco = usesProceduralLocomotion();
   const T = animTimer;
 
-  if(animState === 'idle'){
+  if(animState === 'idle' && !procLoco){
     const breathe = Math.sin(T * 1.2) * 0.022;
     const sway = Math.sin(T * 0.75) * 0.035;
-    const crouch = onBallCrouch;
-    const ready = offBallCrouch;
-    tgt.torsoX  = breathe - 0.12 * crouch - 0.04 * ready;
+    tgt.torsoX  = breathe;
     tgt.torsoZ  = sway;
     tgt.headZ   = -sway * 0.45;
-    tgt.kneeLX  = -0.06 - 0.28 * crouch - 0.14 * ready;
-    tgt.kneeRX  = -0.06 - 0.28 * crouch - 0.14 * ready;
-    if(ballState !== 'held'){
-      tgt.armLX   = -0.38 - 0.08 * ready;
-      tgt.armLZ   =  0.50 + 0.06 * ready;
-      tgt.armRX   = -0.38 - 0.08 * ready;
-      tgt.armRZ   = -0.50 - 0.06 * ready;
-      tgt.elbLX   = -0.88 * ready - 0.18 * (1 - ready);
-      tgt.elbRX   = -0.88 * ready - 0.18 * (1 - ready);
-    }
+    tgt.armLZ   =  0.32 + Math.sin(T * 1.2) * 0.05;
+    tgt.armRZ   = -0.32 - Math.sin(T * 1.2) * 0.05;
+    tgt.elbLX   = -0.18;
+    tgt.elbRX   = -0.18;
+    tgt.kneeLX  = -0.06;
+    tgt.kneeRX  = -0.06;
   }
 
-  if(animState === 'run'){
+  if(animState === 'run' && !procLoco){
     const speed = Math.sqrt(playerVel.x * playerVel.x + playerVel.z * playerVel.z);
     const cycle = T * (5.5 + speed * 0.45);
     const legSwing = 0.62, kneeSwing = 0.52;
     const contactL = Math.max(0, Math.sin(cycle));
     const contactR = Math.max(0, Math.sin(cycle + Math.PI));
-    const crouch = onBallCrouch;
-    const ready = offBallCrouch;
-    tgt.legLX  =  Math.sin(cycle) * legSwing + 0.08 * crouch + 0.04 * ready;
-    tgt.legRX  =  Math.sin(cycle + Math.PI) * legSwing + 0.08 * crouch + 0.04 * ready;
-    tgt.kneeLX = -Math.abs(Math.sin(cycle)) * kneeSwing - contactL * 0.08 - 0.24 * crouch - 0.12 * ready;
-    tgt.kneeRX = -Math.abs(Math.sin(cycle + Math.PI)) * kneeSwing - contactR * 0.08 - 0.24 * crouch - 0.12 * ready;
-    if(ballState !== 'held'){
-      tgt.armLX = -0.40 - 0.06 * ready;
-      tgt.armLZ =  0.48 + 0.05 * ready;
-      tgt.armRX = -0.40 - 0.06 * ready;
-      tgt.armRZ = -0.48 - 0.05 * ready;
-      tgt.elbLX = -0.85 * ready - 0.20 * (1 - ready);
-      tgt.elbRX = -0.85 * ready - 0.20 * (1 - ready);
-    }
-    tgt.torsoX  = -0.14 - Math.max(contactL, contactR) * 0.05 - 0.12 * crouch - 0.04 * ready;
+    tgt.legLX  =  Math.sin(cycle) * legSwing;
+    tgt.legRX  =  Math.sin(cycle + Math.PI) * legSwing;
+    tgt.kneeLX = -Math.abs(Math.sin(cycle)) * kneeSwing - contactL * 0.08;
+    tgt.kneeRX = -Math.abs(Math.sin(cycle + Math.PI)) * kneeSwing - contactR * 0.08;
+    tgt.armLX = Math.sin(cycle + Math.PI) * 0.48;
+    tgt.armRX = Math.sin(cycle) * 0.48;
+    tgt.elbLX = -0.22 - contactL * 0.12;
+    tgt.elbRX = -0.22 - contactR * 0.12;
+    tgt.torsoX  = -0.14 - Math.max(contactL, contactR) * 0.05;
     tgt.torsoZ  = Math.sin(cycle) * 0.06;
     tgt.headX   = Math.sin(cycle * 2) * 0.04;
     tgt.headZ   = -tgt.torsoZ * 0.35;
@@ -1904,34 +2013,36 @@ function physicsStep(dt){
   jRot.legLZ = lerp(jRot.legLZ, tgt.kneeLX, kSpd);
   jRot.legRZ = lerp(jRot.legRZ, tgt.kneeRX, kSpd);
 
-  if(pBody){
-    pBody.rotation.x = jRot.torsoX;
-    pBody.rotation.z = jRot.torsoZ;
+  if(!procLoco){
+    if(pBody){
+      pBody.rotation.x = jRot.torsoX;
+      pBody.rotation.z = jRot.torsoZ;
+    }
+    if(pHead){
+      pHead.rotation.x = lerp(pHead.rotation.x, -jRot.torsoX * 0.35 - 0.04 + jRot.headX, clamp(10 * dt, 0, 1));
+      pHead.rotation.z = lerp(pHead.rotation.z, jRot.headZ, clamp(10 * dt, 0, 1));
+    }
+    if(pArmL){
+      pArmL.rotation.x = jRot.armLX;
+      pArmL.rotation.z = jRot.armLZ;
+    }
+    if(pArmR){
+      pArmR.rotation.x = jRot.armRX;
+      pArmR.rotation.z = jRot.armRZ;
+    }
+    if(pElbowL) pElbowL.rotation.x = jRot.elbLX;
+    if(pElbowR) pElbowR.rotation.x = jRot.elbRX;
+    if(pLegL){ pLegL.rotation.x = jRot.legLX; }
+    if(pLegR){ pLegR.rotation.x = jRot.legRX; }
+    if(pKneeL) pKneeL.rotation.x = jRot.legLZ;
+    if(pKneeR) pKneeR.rotation.x = jRot.legRZ;
   }
-  if(pHead){
-    pHead.rotation.x = lerp(pHead.rotation.x, -jRot.torsoX * 0.35 - 0.04 + jRot.headX, clamp(10 * dt, 0, 1));
-    pHead.rotation.z = lerp(pHead.rotation.z, jRot.headZ, clamp(10 * dt, 0, 1));
-  }
-  if(pArmL){
-    pArmL.rotation.x = jRot.armLX;
-    pArmL.rotation.z = jRot.armLZ;
-  }
-  if(pArmR){
-    pArmR.rotation.x = jRot.armRX;
-    pArmR.rotation.z = jRot.armRZ;
-  }
-  if(pElbowL) pElbowL.rotation.x = jRot.elbLX;
-  if(pElbowR) pElbowR.rotation.x = jRot.elbRX;
-  if(pLegL){ pLegL.rotation.x = jRot.legLX; }
-  if(pLegR){ pLegR.rotation.x = jRot.legRX; }
-  if(pKneeL) pKneeL.rotation.x = jRot.legLZ;
-  if(pKneeR) pKneeR.rotation.x = jRot.legRZ;
 
   stealCooldown = Math.max(0, stealCooldown - dt);
 
   updatePlayerSteal(dt);
   updateBallPosition(dt);
-  applyPlayerRootStance(dt);
+  applyPlayerLocomotion(dt);
   updateDunk(dt);
   updateAI(dt);
   updateShotMeter(dt);
@@ -2103,6 +2214,8 @@ function startGame(){
   stealAnimTimer=0;
   dribbleHand='right';
   dribblePhase=0;
+  locoPhase=0;
+  ballSpinAngle=0;
   onBallCrouch=0;
   offBallCrouch=0;
   stanceDropY=0;
