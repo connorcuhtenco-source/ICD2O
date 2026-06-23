@@ -178,7 +178,7 @@
             opacity: 0;
             background: #ffffff;
         }
-        #startScreen, #gameOverScreen {
+        #startScreen, #gameOverScreen, #victoryScreen {
             position: absolute;
             inset: 0;
             display: flex;
@@ -191,7 +191,17 @@
             text-align: center;
             padding: 24px;
         }
-        #gameOverScreen { display: none; }
+        #gameOverScreen, #victoryScreen { display: none; }
+        .victory-title {
+            color: #00ffaa;
+            text-shadow: 0 0 24px rgba(0, 255, 170, 0.5);
+        }
+        .end-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
         h1 {
             font-size: clamp(2rem, 6vw, 3.5rem);
             letter-spacing: 0.25em;
@@ -580,6 +590,14 @@
             <p class="hint" id="finalStats"></p>
             <button class="btn" id="retryBtn">Retry</button>
         </div>
+        <div id="victoryScreen">
+            <h1 class="victory-title">ARCHITECT FALLEN</h1>
+            <p class="hint" id="victoryStats"></p>
+            <div class="end-actions">
+                <button class="btn" id="playAgainBtn">Play Again</button>
+                <button class="btn" id="victoryMenuBtn">Back to Menu</button>
+            </div>
+        </div>
         <div id="pauseOverlay" class="hidden" aria-hidden="true">
             <div id="pausePanel">
                 <h2>SYSTEM PAUSED</h2>
@@ -619,6 +637,7 @@
         let styleMultiplier = 1.0;
         let styleRank = 'DULL';
         let wave = 1;
+        const FINAL_WAVE = 15;
         let player = {
             hp: 100,
             maxHp: 100,
@@ -6333,6 +6352,10 @@
                 scene.add(m);
                 healParticles.push({ mesh: m, life: 4 });
             }
+            if (wave === FINAL_WAVE) {
+                showVictoryScreen();
+                return;
+            }
             wave += 1;
             spawnWave();
         }
@@ -7177,8 +7200,20 @@
             stopCombatMusic();
             exitArchitectArena();
             document.exitPointerLock?.();
+            document.getElementById('victoryScreen').style.display = 'none';
             document.getElementById('finalStats').textContent = `Score ${score} · Wave ${wave} · Rank ${styleRank}`;
             document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+
+        function showVictoryScreen() {
+            gameRunning = false;
+            isPaused = false;
+            pauseOverlayEl.classList.add('hidden');
+            stopCombatMusic();
+            document.exitPointerLock?.();
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('victoryStats').textContent = `Score ${score} · Wave ${wave} · Rank ${styleRank}`;
+            document.getElementById('victoryScreen').style.display = 'flex';
         }
 
         // ===== PLAYER PHYSICS & COLLISION =====
@@ -7653,6 +7688,13 @@
         document.getElementById('retryBtn').addEventListener('click', () => {
             document.getElementById('gameOverScreen').style.display = 'none';
             beginGame();
+        });
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+            document.getElementById('victoryScreen').style.display = 'none';
+            beginGame();
+        });
+        document.getElementById('victoryMenuBtn').addEventListener('click', () => {
+            returnToHub();
         });
         document.getElementById('backHub').addEventListener('click', () => {
             returnToHub();
