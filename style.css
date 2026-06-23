@@ -1,4 +1,4 @@
-/* Arcade Arena — shared styles for hub, embedded games, shop, Neon Kill iframe page, Water Royale */
+/* Arcade Arena — shared styles for hub, embedded games, shop, Neon Kill, Water Royale, Neon Hoops */
 
 /* --- :root and theme variants --- */
 :root {
@@ -1377,6 +1377,11 @@ body.boot-sequence-active .landing-reveal {
     box-shadow: 0 0 24px rgba(27, 184, 255, 0.14);
 }
 
+.game-tile-hoops {
+    border-color: rgba(255, 107, 0, 0.45);
+    box-shadow: 0 0 24px rgba(255, 107, 0, 0.14);
+}
+
 .game-tile-header {
     display: flex;
     justify-content: space-between;
@@ -1477,6 +1482,11 @@ body.boot-sequence-active .landing-reveal {
 .game-preview-float.preview-eagle {
     border-color: rgba(255, 230, 109, 0.55);
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(255, 230, 109, 0.22);
+}
+
+.game-preview-float.preview-hoops {
+    border-color: rgba(255, 107, 0, 0.55);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(255, 107, 0, 0.22);
 }
 
 #gamePreviewCanvas {
@@ -2407,5 +2417,609 @@ body.water-royale-page .water-stat span {
     body.water-royale-page .water-class-card {
         min-height: 96px;
         padding: 12px;
+    }
+}
+
+/* --- Neon Hoops (standalone page) --- */
+html.neon-hoops-root,
+html.neon-hoops-root body.neon-hoops-page {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden;
+}
+
+body.neon-hoops-page {
+    display: block;
+    margin: 0;
+    background: #05020f;
+    font-family: 'Courier New', Courier, monospace;
+    color: #fff;
+    user-select: none;
+    animation: none;
+    --neon-cyan: #00f5ff;
+    --neon-purple: #bf00ff;
+    --neon-pink: #ff2d78;
+    --neon-orange: #ff6b00;
+    --neon-green: #00ff88;
+    --neon-yellow: #ffe600;
+    --dark-bg: #05020f;
+    --panel-bg: rgba(5, 2, 20, 0.82);
+}
+
+body.neon-hoops-page .neon-hoops-hub-btn {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 150;
+    background: rgba(5, 2, 20, 0.82);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 4px;
+    color: var(--neon-cyan);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 8px 14px;
+    text-shadow: 0 0 6px var(--neon-cyan);
+    box-shadow: 0 0 8px rgba(0, 245, 255, 0.25);
+}
+
+body.neon-hoops-page .neon-hoops-hub-btn:hover {
+    background: rgba(0, 245, 255, 0.12);
+    box-shadow: 0 0 16px rgba(0, 245, 255, 0.35);
+}
+
+body.neon-hoops-page #canvas-container {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+}
+
+body.neon-hoops-page #canvas-container canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+body.neon-hoops-page #hud {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 14px 20px 0;
+    pointer-events: none;
+}
+
+body.neon-hoops-page .hud-panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 4px;
+    padding: 8px 18px;
+    text-align: center;
+    box-shadow: 0 0 8px var(--neon-cyan), inset 0 0 12px rgba(0, 245, 255, 0.06);
+    min-width: 90px;
+}
+
+body.neon-hoops-page .hud-label {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 6px var(--neon-cyan);
+    margin-bottom: 2px;
+}
+
+body.neon-hoops-page .hud-value {
+    font-size: 36px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #fff;
+    text-shadow: 0 0 8px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+    line-height: 1;
+}
+
+body.neon-hoops-page .hud-center {
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 8px var(--neon-purple), inset 0 0 12px rgba(191, 0, 255, 0.06);
+    min-width: 160px;
+}
+
+body.neon-hoops-page .hud-title {
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 6px;
+    color: var(--neon-purple);
+    text-shadow: 0 0 8px var(--neon-purple), 0 0 20px var(--neon-purple);
+}
+
+body.neon-hoops-page .hud-sub {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--neon-pink);
+    text-shadow: 0 0 6px var(--neon-pink);
+    margin-top: 2px;
+}
+
+body.neon-hoops-page #timer-display.warning {
+    color: var(--neon-pink);
+    text-shadow: 0 0 8px var(--neon-pink), 0 0 20px var(--neon-pink);
+    animation: neon-hoops-pulse-warn 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes neon-hoops-pulse-warn {
+    from { opacity: 1; }
+    to { opacity: 0.4; }
+}
+
+body.neon-hoops-page #controls-hint {
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    background: var(--panel-bg);
+    border: 1px solid rgba(0, 245, 255, 0.3);
+    border-radius: 4px;
+    padding: 6px 16px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.55);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+body.neon-hoops-page .key {
+    display: inline-block;
+    background: rgba(0, 245, 255, 0.1);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 10px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 4px var(--neon-cyan);
+    box-shadow: 0 0 4px var(--neon-cyan);
+}
+
+body.neon-hoops-page #shot-meter-wrap {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+body.neon-hoops-page .shot-meter-label {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 6px var(--neon-cyan);
+    margin-bottom: 6px;
+}
+
+body.neon-hoops-page #shot-meter-bar {
+    position: relative;
+    width: 260px;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 0 10px var(--neon-cyan), inset 0 0 8px rgba(0, 245, 255, 0.08);
+}
+
+body.neon-hoops-page #shot-meter-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, #ff2d78, #ffe600 50%, #00ff88);
+}
+
+body.neon-hoops-page #shot-meter-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(0, 255, 136, 0.28);
+    border-left: 2px solid #00ff88;
+    border-right: 2px solid #00ff88;
+    box-shadow: inset 0 0 6px rgba(0, 255, 136, 0.4);
+}
+
+body.neon-hoops-page #shot-meter-needle {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 4px;
+    background: #fff;
+    box-shadow: 0 0 8px #fff, 0 0 16px rgba(255, 255, 255, 0.6);
+    border-radius: 2px;
+    transform: translateX(-50%);
+}
+
+body.neon-hoops-page .shot-meter-hint {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 5px;
+}
+
+body.neon-hoops-page #dribble-indicator {
+    position: fixed;
+    bottom: 40px;
+    right: 24px;
+    z-index: 10;
+    background: var(--panel-bg);
+    border: 1px solid var(--neon-orange);
+    border-radius: 4px;
+    padding: 5px 12px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--neon-orange);
+    text-shadow: 0 0 6px var(--neon-orange);
+    box-shadow: 0 0 6px var(--neon-orange);
+    pointer-events: none;
+}
+
+body.neon-hoops-page #ai-zone-prompt {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 15;
+    pointer-events: none;
+    text-align: center;
+}
+
+body.neon-hoops-page .zone-sign {
+    background: rgba(10, 0, 30, 0.9);
+    border: 2px solid var(--neon-purple);
+    border-radius: 6px;
+    padding: 14px 22px;
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: var(--neon-purple);
+    text-shadow: 0 0 8px var(--neon-purple);
+    box-shadow: 0 0 20px var(--neon-purple);
+    line-height: 2;
+}
+
+body.neon-hoops-page #feedback-msg {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+    font-size: 42px;
+    font-weight: bold;
+    letter-spacing: 6px;
+    color: var(--neon-green);
+    text-shadow: 0 0 10px var(--neon-green), 0 0 30px var(--neon-green), 0 0 60px var(--neon-green);
+    pointer-events: none;
+    opacity: 0;
+    text-align: center;
+}
+
+body.neon-hoops-page #feedback-msg.show {
+    animation: neon-hoops-feedback-pop 1.2s ease forwards;
+}
+
+@keyframes neon-hoops-feedback-pop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+    15% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+    30% { transform: translate(-50%, -50%) scale(1); }
+    70% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+}
+
+body.neon-hoops-page .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 2, 15, 0.88);
+    backdrop-filter: blur(4px);
+}
+
+body.neon-hoops-page .overlay-box {
+    background: rgba(10, 4, 30, 0.95);
+    border: 2px solid var(--neon-cyan);
+    border-radius: 8px;
+    padding: 40px 48px;
+    text-align: center;
+    box-shadow: 0 0 30px var(--neon-cyan), 0 0 80px rgba(0, 245, 255, 0.2), inset 0 0 40px rgba(0, 245, 255, 0.04);
+    max-width: 460px;
+    width: 90%;
+}
+
+body.neon-hoops-page .overlay-title {
+    font-size: 64px;
+    font-weight: 900;
+    letter-spacing: 8px;
+    line-height: 1;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px var(--neon-cyan), 0 0 30px var(--neon-cyan), 0 0 70px var(--neon-cyan);
+    margin-bottom: 8px;
+}
+
+body.neon-hoops-page .go-title {
+    color: var(--neon-pink);
+    text-shadow: 0 0 10px var(--neon-pink), 0 0 30px var(--neon-pink), 0 0 70px var(--neon-pink);
+}
+
+body.neon-hoops-page .overlay-sub {
+    font-size: 12px;
+    letter-spacing: 8px;
+    color: var(--neon-purple);
+    text-shadow: 0 0 8px var(--neon-purple);
+    margin-bottom: 20px;
+}
+
+body.neon-hoops-page .overlay-desc {
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.8;
+    margin-bottom: 24px;
+}
+
+body.neon-hoops-page .overlay-score {
+    font-size: 80px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 10px var(--neon-yellow), 0 0 30px var(--neon-yellow);
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+body.neon-hoops-page .overlay-rank {
+    font-size: 13px;
+    letter-spacing: 4px;
+    color: var(--neon-green);
+    text-shadow: 0 0 8px var(--neon-green);
+    margin-bottom: 28px;
+    min-height: 20px;
+}
+
+body.neon-hoops-page .neon-btn {
+    display: inline-block;
+    background: transparent;
+    border: 2px solid var(--neon-cyan);
+    color: var(--neon-cyan);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 6px;
+    padding: 14px 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 0 0 10px var(--neon-cyan), 0 0 30px rgba(0, 245, 255, 0.2), inset 0 0 10px rgba(0, 245, 255, 0.05);
+    text-shadow: 0 0 8px var(--neon-cyan);
+    transition: background 0.2s, box-shadow 0.2s;
+}
+
+body.neon-hoops-page .neon-btn:hover {
+    background: rgba(0, 245, 255, 0.1);
+    box-shadow: 0 0 20px var(--neon-cyan), 0 0 60px rgba(0, 245, 255, 0.35);
+}
+
+body.neon-hoops-page .neon-btn:active {
+    background: rgba(0, 245, 255, 0.2);
+    transform: scale(0.97);
+}
+
+body.neon-hoops-page .small-btn {
+    font-size: 12px;
+    letter-spacing: 3px;
+    padding: 8px 20px;
+}
+
+body.neon-hoops-page .tutorial-box {
+    max-width: 560px;
+    padding: 36px 44px;
+}
+
+body.neon-hoops-page .tut-step {
+    display: none;
+}
+
+body.neon-hoops-page .tut-step.active {
+    display: block;
+}
+
+body.neon-hoops-page .tut-icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+body.neon-hoops-page .tut-title {
+    font-size: 18px;
+    letter-spacing: 5px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 8px var(--neon-cyan);
+    margin-bottom: 14px;
+}
+
+body.neon-hoops-page .tut-desc {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.9;
+    margin-bottom: 12px;
+}
+
+body.neon-hoops-page .tut-tip {
+    font-size: 11px;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 6px var(--neon-yellow);
+    letter-spacing: 1px;
+    border: 1px solid rgba(255, 230, 0, 0.3);
+    border-radius: 4px;
+    padding: 8px 12px;
+}
+
+body.neon-hoops-page .tut-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+body.neon-hoops-page #tut-dots {
+    display: flex;
+    gap: 8px;
+}
+
+body.neon-hoops-page .tut-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(0, 245, 255, 0.25);
+    border: 1px solid var(--neon-cyan);
+    transition: background 0.2s;
+}
+
+body.neon-hoops-page .tut-dot.active {
+    background: var(--neon-cyan);
+    box-shadow: 0 0 6px var(--neon-cyan);
+}
+
+body.neon-hoops-page .custom-box {
+    max-width: 700px;
+    padding: 30px 36px;
+    overflow-y: auto;
+    max-height: 90vh;
+}
+
+body.neon-hoops-page .custom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+    text-align: left;
+}
+
+body.neon-hoops-page .full-width {
+    grid-column: 1 / -1;
+}
+
+body.neon-hoops-page .custom-section {
+    background: rgba(0, 245, 255, 0.04);
+    border: 1px solid rgba(0, 245, 255, 0.15);
+    border-radius: 6px;
+    padding: 12px 14px;
+}
+
+body.neon-hoops-page .custom-label {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 4px var(--neon-cyan);
+    margin-bottom: 10px;
+}
+
+body.neon-hoops-page .swatch-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+body.neon-hoops-page .swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border 0.15s, box-shadow 0.15s;
+}
+
+body.neon-hoops-page .swatch:hover {
+    box-shadow: 0 0 8px #fff;
+}
+
+body.neon-hoops-page .swatch.active {
+    border-color: #fff;
+    box-shadow: 0 0 10px #fff;
+}
+
+body.neon-hoops-page .option-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+body.neon-hoops-page .opt-btn {
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 2px;
+    padding: 5px 10px;
+    border: 1px solid rgba(0, 245, 255, 0.35);
+    border-radius: 3px;
+    color: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+}
+
+body.neon-hoops-page .opt-btn:hover {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+}
+
+body.neon-hoops-page .opt-btn.active {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    text-shadow: 0 0 6px var(--neon-cyan);
+    background: rgba(0, 245, 255, 0.1);
+    box-shadow: 0 0 6px var(--neon-cyan);
+}
+
+body.neon-hoops-page .custom-preview-note {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.35);
+    margin-bottom: 16px;
+}
+
+body.neon-hoops-page::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.07) 2px,
+        rgba(0, 0, 0, 0.07) 4px
+    );
+    pointer-events: none;
+}
+
+@media (max-width: 720px) {
+    body.neon-hoops-page .custom-grid {
+        grid-template-columns: 1fr;
+    }
+
+    body.neon-hoops-page #controls-hint {
+        font-size: 9px;
+        max-width: 96vw;
+        white-space: normal;
+        text-align: center;
+    }
+
+    body.neon-hoops-page .overlay-title {
+        font-size: 42px;
     }
 }

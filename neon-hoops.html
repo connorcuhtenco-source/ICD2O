@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<!-- Neon Hoops standalone page — retro-84 basketball loaded outside the hub canvas.
+     Three.js court, shot meter, AI defender zone, and player customization. -->
+<html lang="en" class="neon-hoops-root">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neon Hoops — Arcade Arena</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body class="neon-hoops-page">
+
+  <button id="backHub" class="neon-hoops-hub-btn" type="button">← Hub</button>
+
+  <div id="canvas-container"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-panel" id="hud-left">
+      <div class="hud-label">SCORE</div>
+      <div class="hud-value" id="score-display">00</div>
+    </div>
+    <div class="hud-panel hud-center">
+      <div class="hud-title">NEON HOOPS</div>
+      <div class="hud-sub">// RETRO-84 //</div>
+    </div>
+    <div class="hud-panel" id="hud-right">
+      <div class="hud-label">TIME</div>
+      <div class="hud-value" id="timer-display">60</div>
+    </div>
+  </div>
+
+  <!-- Controls hint -->
+  <div id="controls-hint">
+    <span class="key">W A S D</span> MOVE &nbsp;|&nbsp;
+    <span class="key">SPACE</span> JUMP / DUNK &nbsp;|&nbsp;
+    <span class="key">LMB</span> SHOOT &nbsp;|&nbsp;
+    <span class="key">RMB</span> STEAL &nbsp;|&nbsp;
+    <span class="key">C</span> CROSSOVER &nbsp;|&nbsp;
+    <span class="key">F</span> BLOCK &nbsp;|&nbsp;
+    <span class="key">ESC</span> CUSTOMIZE
+  </div>
+
+  <!-- Shot meter -->
+  <div id="shot-meter-wrap" class="hidden">
+    <div class="shot-meter-label">SHOT POWER</div>
+    <div id="shot-meter-bar">
+      <div id="shot-meter-fill"></div>
+      <div id="shot-meter-zone"></div>
+      <div id="shot-meter-needle"></div>
+    </div>
+    <div class="shot-meter-hint">Release <span class="key">LMB</span> in the GREEN zone!</div>
+  </div>
+
+  <!-- Dribble hand indicator -->
+  <div id="dribble-indicator">
+    <span id="dribble-label">◀ LEFT</span>
+  </div>
+
+  <!-- Feedback popup -->
+  <div id="feedback-msg"></div>
+
+  <!-- AI Zone Sign -->
+  <div id="ai-zone-prompt" class="hidden">
+    <div class="zone-sign">
+      🤖 AI DEFENDER ZONE<br/>
+      <span class="key">1</span> EASY &nbsp; <span class="key">2</span> MEDIUM &nbsp; <span class="key">3</span> HARD
+    </div>
+  </div>
+
+  <!-- Tutorial overlay -->
+  <div id="tutorial-screen" class="overlay hidden">
+    <div class="overlay-box tutorial-box">
+      <div class="overlay-title" style="font-size:36px;letter-spacing:6px;">TUTORIAL</div>
+      <div id="tut-steps">
+        <div class="tut-step active" data-step="0">
+          <div class="tut-icon">🏃</div>
+          <div class="tut-title">MOVEMENT</div>
+          <div class="tut-desc">Use <span class="key">W A S D</span> to move your player around the court.<br/>Your player always dribbles automatically — watch the ball bounce!</div>
+          <div class="tut-tip">💡 Press <span class="key">C</span> to switch dribbling hands at any time.</div>
+        </div>
+        <div class="tut-step" data-step="1">
+          <div class="tut-icon">🎯</div>
+          <div class="tut-title">SHOOTING</div>
+          <div class="tut-desc">Hold <span class="key">LMB</span> (left mouse button) to charge your shot. A meter will appear — release when the needle lands in the <span style="color:#00ff88;">GREEN</span> zone! The green zone is randomised every shot, so stay sharp.</div>
+          <div class="tut-tip">💡 The green zone is wider when you're close to the hoop.</div>
+        </div>
+        <div class="tut-step" data-step="2">
+          <div class="tut-icon">🏀</div>
+          <div class="tut-title">DUNKING</div>
+          <div class="tut-desc">Get close to the hoop (within 3 units) and press <span class="key">SPACE</span> to jump, then press <span class="key">SPACE</span> again mid-air for a <span style="color:#ff6b00;">DUNK!</span></div>
+          <div class="tut-tip">💡 Dunks score 2 points and never miss!</div>
+        </div>
+        <div class="tut-step" data-step="3">
+          <div class="tut-icon">🤖</div>
+          <div class="tut-title">AI DEFENDER</div>
+          <div class="tut-desc">Walk into the glowing <span style="color:#bf00ff;">purple zone</span> near the far end of the court to spawn an AI defender. Choose Easy, Medium, or Hard!</div>
+          <div class="tut-tip">💡 If the AI steals the ball, press <span class="key">F</span> near them to block their shot!</div>
+        </div>
+        <div class="tut-step" data-step="4">
+          <div class="tut-icon">👕</div>
+          <div class="tut-title">CUSTOMIZATION</div>
+          <div class="tut-desc">Press <span class="key">ESC</span> at any time during the game to open the customization menu. Change your skin, hair, outfit, hat, shoes, and face!</div>
+          <div class="tut-tip">💡 Your choices are saved automatically.</div>
+        </div>
+      </div>
+      <div class="tut-nav">
+        <button class="neon-btn small-btn" id="tut-prev">◀ PREV</button>
+        <div id="tut-dots">
+          <span class="tut-dot active"></span>
+          <span class="tut-dot"></span>
+          <span class="tut-dot"></span>
+          <span class="tut-dot"></span>
+          <span class="tut-dot"></span>
+        </div>
+        <button class="neon-btn small-btn" id="tut-next">NEXT ▶</button>
+      </div>
+      <button class="neon-btn" id="tut-close" style="margin-top:14px;">START GAME</button>
+    </div>
+  </div>
+
+  <!-- Start screen -->
+  <div id="start-screen" class="overlay">
+    <div class="overlay-box">
+      <div class="overlay-title">NEON<br/>HOOPS</div>
+      <div class="overlay-sub">// RETRO-84 //</div>
+      <div class="overlay-desc">Score as many baskets as you can before time runs out!</div>
+      <div style="display:flex;gap:14px;justify-content:center;margin-top:20px;">
+        <button id="start-btn" class="neon-btn">PLAY</button>
+        <button id="tutorial-btn" class="neon-btn" style="border-color:#bf00ff;color:#bf00ff;text-shadow:0 0 8px #bf00ff;box-shadow:0 0 10px #bf00ff;">TUTORIAL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customization overlay -->
+  <div id="custom-screen" class="overlay hidden">
+    <div class="overlay-box custom-box">
+      <div class="overlay-title" style="font-size:32px;letter-spacing:5px;margin-bottom:6px;">CUSTOMIZE</div>
+      <div class="overlay-sub">YOUR PLAYER</div>
+
+      <div class="custom-grid">
+        <div class="custom-section">
+          <div class="custom-label">SKIN</div>
+          <div class="swatch-row" id="skin-swatches">
+            <div class="swatch active" data-cat="skin" data-val="0" style="background:#f5cba7;" title="Light"></div>
+            <div class="swatch" data-cat="skin" data-val="1" style="background:#e8a87c;" title="Tan"></div>
+            <div class="swatch" data-cat="skin" data-val="2" style="background:#c68642;" title="Brown"></div>
+            <div class="swatch" data-cat="skin" data-val="3" style="background:#8d5524;" title="Dark"></div>
+            <div class="swatch" data-cat="skin" data-val="4" style="background:#ffe4e1;" title="Pale"></div>
+          </div>
+        </div>
+
+        <div class="custom-section">
+          <div class="custom-label">HAIR</div>
+          <div class="option-row" id="hair-options">
+            <div class="opt-btn active" data-cat="hair" data-val="0">BALD</div>
+            <div class="opt-btn" data-cat="hair" data-val="1">AFRO</div>
+            <div class="opt-btn" data-cat="hair" data-val="2">DREADS</div>
+            <div class="opt-btn" data-cat="hair" data-val="3">BUZZ</div>
+            <div class="opt-btn" data-cat="hair" data-val="4">BRAIDS</div>
+            <div class="opt-btn" data-cat="hair" data-val="5">MOHAWK</div>
+          </div>
+        </div>
+
+        <div class="custom-section">
+          <div class="custom-label">FACE</div>
+          <div class="option-row" id="face-options">
+            <div class="opt-btn active" data-cat="face" data-val="0">😐 NEUTRAL</div>
+            <div class="opt-btn" data-cat="face" data-val="1">😤 INTENSE</div>
+            <div class="opt-btn" data-cat="face" data-val="2">😎 COOL</div>
+            <div class="opt-btn" data-cat="face" data-val="3">😁 HAPPY</div>
+            <div class="opt-btn" data-cat="face" data-val="4">🤨 MEAN MUG</div>
+          </div>
+        </div>
+
+        <div class="custom-section">
+          <div class="custom-label">JERSEY</div>
+          <div class="swatch-row" id="jersey-swatches">
+            <div class="swatch active" data-cat="jersey" data-val="0" style="background:#bf00ff;" title="Purple"></div>
+            <div class="swatch" data-cat="jersey" data-val="1" style="background:#ff2d78;" title="Pink"></div>
+            <div class="swatch" data-cat="jersey" data-val="2" style="background:#00f5ff;" title="Cyan"></div>
+            <div class="swatch" data-cat="jersey" data-val="3" style="background:#ffe600;" title="Yellow"></div>
+            <div class="swatch" data-cat="jersey" data-val="4" style="background:#00ff88;" title="Green"></div>
+            <div class="swatch" data-cat="jersey" data-val="5" style="background:#ff6b00;" title="Orange"></div>
+          </div>
+        </div>
+
+        <div class="custom-section">
+          <div class="custom-label">HAT</div>
+          <div class="option-row" id="hat-options">
+            <div class="opt-btn active" data-cat="hat" data-val="0">NONE</div>
+            <div class="opt-btn" data-cat="hat" data-val="1">🎩 TOP HAT</div>
+            <div class="opt-btn" data-cat="hat" data-val="2">🧢 SNAPBACK</div>
+            <div class="opt-btn" data-cat="hat" data-val="3">👑 CROWN</div>
+            <div class="opt-btn" data-cat="hat" data-val="4">🤠 COWBOY</div>
+            <div class="opt-btn" data-cat="hat" data-val="5">🎓 GRAD CAP</div>
+          </div>
+        </div>
+
+        <div class="custom-section">
+          <div class="custom-label">SHOES</div>
+          <div class="swatch-row" id="shoe-swatches">
+            <div class="swatch active" data-cat="shoes" data-val="0" style="background:#ff2d78;" title="Pink"></div>
+            <div class="swatch" data-cat="shoes" data-val="1" style="background:#00f5ff;" title="Cyan"></div>
+            <div class="swatch" data-cat="shoes" data-val="2" style="background:#ffe600;" title="Yellow"></div>
+            <div class="swatch" data-cat="shoes" data-val="3" style="background:#ffffff;" title="White"></div>
+            <div class="swatch" data-cat="shoes" data-val="4" style="background:#ff6b00;" title="Orange"></div>
+          </div>
+        </div>
+
+        <div class="custom-section full-width">
+          <div class="custom-label">BODY BUILD</div>
+          <div class="option-row" id="build-options">
+            <div class="opt-btn" data-cat="build" data-val="0">SLIM</div>
+            <div class="opt-btn active" data-cat="build" data-val="1">AVERAGE</div>
+            <div class="opt-btn" data-cat="build" data-val="2">STOCKY</div>
+            <div class="opt-btn" data-cat="build" data-val="3">TALL</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="custom-preview-note">Changes apply live in the game world!</div>
+      <button class="neon-btn" id="custom-close">CLOSE</button>
+    </div>
+  </div>
+
+  <!-- Game over -->
+  <div id="gameover-screen" class="overlay hidden">
+    <div class="overlay-box">
+      <div class="overlay-title go-title">GAME<br/>OVER</div>
+      <div class="overlay-sub">FINAL SCORE</div>
+      <div class="overlay-score" id="final-score">00</div>
+      <div class="overlay-rank" id="rank-display"></div>
+      <button id="restart-btn" class="neon-btn">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <script src="neon-hoops.js"></script>
+  <script>
+    document.getElementById('backHub').addEventListener('click', () => {
+      window.location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>

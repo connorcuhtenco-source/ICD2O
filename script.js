@@ -4,7 +4,7 @@
  * This file drives the landing menu, game picker, settings drawer, and achievement
  * system. Two mini-games run inline on the shared canvas: Fast Eagle (Flappy-style)
  * and Tag Zone (top-down survival/tag). Other titles (Water Royale, Neon Kill,
- * Space Runner) are launched via navigation or delegated modules.
+ * Space Runner, Neon Hoops) are launched via navigation or delegated modules.
  */
 // --- DOM references, shared game state, and per-game constants ---
 const canvas = document.getElementById('gameCanvas');
@@ -24,6 +24,7 @@ const closeAchievementsBtn = document.getElementById('closeAchievementsBtn');
 
 const tagZoneBtn = document.getElementById('tagZoneBtn');
 const neonKillBtn = document.getElementById('neonKillBtn');
+const neonHoopsBtn = document.getElementById('neonHoopsBtn');
 const waterRoyaleBtn = document.getElementById('waterRoyaleBtn');
 const platformerBtn = document.getElementById('platformerBtn');
 const playBtn = document.getElementById('playBtn');
@@ -558,7 +559,8 @@ const GAME_PREVIEW_DRAWERS = {
     kill: drawNeonKillPreview,
     space: drawSpaceRunnerPreview,
     water: drawWaterRoyalePreview,
-    eagle: drawFastEaglePreview
+    eagle: drawFastEaglePreview,
+    hoops: drawNeonHoopsPreview
 };
 
 /** Resolve preview key from a `.game-tile-*` class on the hovered tile. */
@@ -568,6 +570,7 @@ function getGamePreviewKey(tile) {
     if (tile.classList.contains('game-tile-space')) return 'space';
     if (tile.classList.contains('game-tile-water')) return 'water';
     if (tile.classList.contains('game-tile-eagle')) return 'eagle';
+    if (tile.classList.contains('game-tile-hoops')) return 'hoops';
     return null;
 }
 
@@ -750,6 +753,44 @@ function drawFastEaglePreview(ctx, w, h, t) {
     ctx.fill();
 }
 
+/** Neon Hoops: court, bouncing ball arc, neon hoop glow. */
+function drawNeonHoopsPreview(ctx, w, h, t) {
+    ctx.fillStyle = '#1a0a2e';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#2a1848';
+    ctx.fillRect(0, h * 0.55, w, h * 0.45);
+    ctx.strokeStyle = 'rgba(0, 245, 255, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(w * 0.12, h * 0.2, w * 0.76, h * 0.62);
+
+    const hoopX = w * 0.5;
+    const hoopY = h * 0.32;
+    ctx.strokeStyle = '#ff6b00';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(hoopX, hoopY, 14, 0, Math.PI);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(191, 0, 255, 0.6)';
+    ctx.beginPath();
+    ctx.arc(hoopX, hoopY, 16, 0, Math.PI);
+    ctx.stroke();
+
+    const bx = w * 0.35 + Math.sin(t * 2.5) * (w * 0.22);
+    const by = h * 0.72 - Math.abs(Math.sin(t * 5)) * (h * 0.28);
+    ctx.fillStyle = '#ff6b00';
+    ctx.beginPath();
+    ctx.arc(bx, by, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffe600';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(bx, by, 6, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#00f5ff';
+    ctx.fillRect(w * 0.46, h * 0.58, 8, 14);
+}
+
 /** RAF loop: redraw the active preview each frame while hovering a tile. */
 function tickGamePreview(timestamp) {
     if (!gamePreviewActive || !gamePreviewCtx) return;
@@ -782,7 +823,7 @@ function showGamePreview(tile, clientX, clientY) {
 
     gamePreviewActive = { key, title: tile.querySelector('h3')?.textContent || '' };
     gamePreviewStart = 0;
-    gamePreviewFloat.classList.remove('hidden', 'preview-tag', 'preview-kill', 'preview-space', 'preview-water', 'preview-eagle');
+    gamePreviewFloat.classList.remove('hidden', 'preview-tag', 'preview-kill', 'preview-space', 'preview-water', 'preview-eagle', 'preview-hoops');
     gamePreviewFloat.classList.add('visible', `preview-${key}`);
     gamePreviewFloat.setAttribute('aria-hidden', 'false');
     if (gamePreviewLabel) gamePreviewLabel.textContent = gamePreviewActive.title;
@@ -801,7 +842,7 @@ function hideGamePreview() {
         gamePreviewFrameId = null;
     }
     if (!gamePreviewFloat) return;
-    gamePreviewFloat.classList.remove('visible', 'preview-tag', 'preview-kill', 'preview-space', 'preview-water', 'preview-eagle');
+    gamePreviewFloat.classList.remove('visible', 'preview-tag', 'preview-kill', 'preview-space', 'preview-water', 'preview-eagle', 'preview-hoops');
     gamePreviewFloat.classList.add('hidden');
     gamePreviewFloat.setAttribute('aria-hidden', 'true');
 }
@@ -2513,6 +2554,11 @@ function startNeonKill() {
     window.location.href = 'neon-kill.html';
 }
 
+function startNeonHoops() {
+    ArcadeMusic.stop();
+    window.location.href = 'neon-hoops.html';
+}
+
 function startSpaceRunner() {
     stopGame();
     currentGame = 'spaceRunner';
@@ -2562,6 +2608,8 @@ document.addEventListener('keyup', e => {
 tagZoneBtn.addEventListener('click', startTagZone);
 
 neonKillBtn?.addEventListener('click', startNeonKill);
+
+neonHoopsBtn?.addEventListener('click', startNeonHoops);
 
 waterRoyaleBtn?.addEventListener('click', startWaterRoyale);
 
