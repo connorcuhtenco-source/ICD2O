@@ -881,7 +881,7 @@ function addBrow(group, bH, yOff){
 function addSmile(group, bH){
   const mat = new THREE.MeshBasicMaterial({ color:0xffffff });
   const smile = new THREE.Mesh(new THREE.TorusGeometry(0.07,0.015,6,12,Math.PI), mat);
-  smile.position.set(0, 1.82*bH, 0.27);
+  smile.position.set(0, 1.88*bH, 0.24);
   smile.rotation.z = Math.PI;
   group.add(smile);
 }
@@ -889,7 +889,7 @@ function addSmile(group, bH){
 function buildHairMesh(buildH){
   if(hairMesh){ playerGroup.remove(hairMesh); hairMesh=null; }
   const headY = 1.96*buildH;  // centre of head sphere
-  const headR = 0.295;
+  const headR = 0.24;
 
   const hairConfigs = [
     null,  // 0: bald
