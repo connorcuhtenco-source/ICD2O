@@ -903,13 +903,25 @@ function buildStarfield(){
   scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color:C_CYAN, size:.15, transparent:true, opacity:.5 })));
 }
 
+function isCustomizeOpen(){
+  return customScreenEl && !customScreenEl.classList.contains('hidden');
+}
+
 // ─── Input ──────────────────────────────────────────────────
 function initInput(){
   window.addEventListener('keydown', e=>{
+    if(e.code === 'Escape'){
+      e.preventDefault();
+      if(isCustomizeOpen()){ closeCustomization(); return; }
+      if(tutScreenEl && !tutScreenEl.classList.contains('hidden')){ closeTutorial(); return; }
+      if(gameActive) openCustomization();
+      return;
+    }
+
     if(keys[e.code]) return;
     keys[e.code] = true;
 
-    if(!gameActive) return;
+    if(!gameActive || isCustomizeOpen()) return;
 
     if(e.code==='KeyC'){ switchDribbleHand(); }
 
@@ -931,14 +943,13 @@ function initInput(){
       if(e.code==='Digit2'){ aiDifficulty='medium'; aiActive=true; buildAI(); }
       if(e.code==='Digit3'){ aiDifficulty='hard'; aiActive=true; buildAI(); }
     }
-
-    if(e.code==='Escape'){ openCustomization(); }
   });
 
   window.addEventListener('keyup', e=>{ keys[e.code] = false; });
 
   // ── LMB = shoot
   window.addEventListener('mousedown', e=>{
+    if(isCustomizeOpen()) return;
     if(e.target !== renderer.domElement) return;
     if(!gameActive) return;
     if(e.button === 0 && ballState==='held' && !shotCharging) startShotCharge();
@@ -1398,7 +1409,7 @@ function updateCamera(dt){
 
 // ─── Physics Step ────────────────────────────────────────────
 function physicsStep(dt){
-  if(!gameActive) return;
+  if(!gameActive || isCustomizeOpen()) return;
 
   let mx=0, mz=0;
   if(keys['KeyW']||keys['ArrowUp'])    mz=-1;
@@ -1676,6 +1687,10 @@ function updateTimer(dt){
 
 // ─── Customization ──────────────────────────────────────────
 function openCustomization(){
+  if(shotCharging){
+    shotCharging = false;
+    shotWrapEl.classList.add('hidden');
+  }
   customScreenEl.classList.remove('hidden');
 }
 
@@ -1705,10 +1720,13 @@ function initCustomizationUI(){
   document.querySelectorAll('.swatch, .opt-btn').forEach(el=>{
     el.addEventListener('click', ()=>{
       const cat = el.dataset.cat;
-      const val = parseInt(el.dataset.val);
+      const val = parseInt(el.dataset.val, 10);
+      if(!cat || Number.isNaN(val)) return;
       custom[cat] = val;
-      // Update active class within same group
-      el.closest('[id]').querySelectorAll('[data-cat="'+cat+'"]').forEach(s=> s.classList.remove('active'));
+      const group = el.closest('[id]');
+      if(group){
+        group.querySelectorAll('[data-cat="'+cat+'"]').forEach(s=> s.classList.remove('active'));
+      }
       el.classList.add('active');
       applyCustomization();
     });
@@ -1736,9 +1754,9 @@ function initTutorialUI(){
   prevBtn.addEventListener('click', ()=> goTo(tutStep-1));
   nextBtn.addEventListener('click', ()=>{
     if(tutStep < steps.length-1) goTo(tutStep+1);
-    else closeTutorial();
+    else finishTutorial();
   });
-  closeBtn.addEventListener('click', closeTutorial);
+  closeBtn.addEventListener('click', finishTutorial);
   goTo(0);
 }
 
@@ -1750,6 +1768,12 @@ function openTutorial(){
 function closeTutorial(){
   tutScreenEl.classList.add('hidden');
   startScreenEl.classList.remove('hidden');
+}
+
+function finishTutorial(){
+  tutScreenEl.classList.add('hidden');
+  startScreenEl.classList.add('hidden');
+  startGame();
 }
 
 // ─── Game State ─────────────────────────────────────────────
@@ -1794,8 +1818,20 @@ function endGame(){
 }
 
 // ─── Game Loop ───────────────────────────────────────────────
+let gameLoopStarted = false;
+
+function ensureGameLoop(){
+  if(gameLoopStarted) return;
+  gameLoopStarted = true;
+  requestAnimationFrame(gameLoop);
+}
+
 function gameLoop(ts){
   requestAnimationFrame(gameLoop);
+  if(!gameActive){
+    renderer.render(scene,camera);
+    return;
+  }
   if(!lastTimestamp) lastTimestamp=ts;
   let dt = Math.min((ts-lastTimestamp)/1000, 0.05);
   lastTimestamp=ts;
@@ -1822,11 +1858,10 @@ function init(){
   camera.lookAt(0,HOOP_Y,HOOP_Z);
   renderer.render(scene,camera);
 
-  startBtn.addEventListener('click', ()=>{
-    startGame();
-    requestAnimationFrame(gameLoop);
-  });
-  restartBtn.addEventListener('click', ()=>{ startGame(); requestAnimationFrame(gameLoop); });
+  ensureGameLoop();
+
+  startBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', startGame);
   document.getElementById('tutorial-btn').addEventListener('click', openTutorial);
 }
 

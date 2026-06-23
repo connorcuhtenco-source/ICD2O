@@ -861,6 +861,7 @@ function setupGameTilePreviews() {
             moveGamePreview(e.clientX, e.clientY);
         });
         tile.addEventListener('mouseleave', hideGamePreview);
+        tile.querySelector('.play-game-btn')?.addEventListener('click', hideGamePreview);
     });
 }
 
@@ -2605,7 +2606,7 @@ document.addEventListener('keyup', e => {
     keys[e.code] = false;
 });
 
-tagZoneBtn.addEventListener('click', startTagZone);
+tagZoneBtn?.addEventListener('click', startTagZone);
 
 neonKillBtn?.addEventListener('click', startNeonKill);
 
@@ -2613,11 +2614,11 @@ neonHoopsBtn?.addEventListener('click', startNeonHoops);
 
 waterRoyaleBtn?.addEventListener('click', startWaterRoyale);
 
-platformerBtn.addEventListener('click', startSpaceRunner);
+platformerBtn?.addEventListener('click', startSpaceRunner);
 
-playBtn.addEventListener('click', startFastEagle);
+playBtn?.addEventListener('click', startFastEagle);
 
-restartBtn.addEventListener('click', () => {
+restartBtn?.addEventListener('click', () => {
     if (currentGame === 'fastEagle') restartFastEagle();
     if (currentGame === 'tagZone') restartTagZone();
 });
