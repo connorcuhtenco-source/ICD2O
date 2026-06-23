@@ -22,6 +22,7 @@ const ArcadeMeta = (() => {
         { id: 'kill-overclock-core', category: 'upgrade', name: 'Overclock Core', price: 150, desc: '+25% move and projectile speed in Neon Kill.', icon: '⚡' },
         { id: 'kill-siphon-nanites', category: 'upgrade', name: 'Siphon Nanites', price: 175, desc: 'Double health restored from defeat particles in Neon Kill.', icon: '💚' },
         { id: 'kill-slam-module', category: 'upgrade', name: 'Slam Module', price: 200, desc: 'Mid-air Space slams down with a shockwave in Neon Kill.', icon: '💥' },
+        { id: 'kill-cyber-yamato', category: 'upgrade', name: 'Cyber Yamato', price: 250, desc: 'Vergil-inspired katana melee weapon in Neon Kill. Judgement Cut combos and dimension tear ultimate.', icon: '⚔' },
         { id: 'trail-cyan', category: 'trail', name: 'Neon Cyan Trail', price: 0, desc: 'Classic cyan and pink neon mouse trail.', preview: 'preview-trail-cyan' },
         { id: 'trail-pink', category: 'trail', name: 'Hot Pink Trail', price: 75, desc: 'Magenta streaks with gold sparks.', preview: 'preview-trail-pink' },
         { id: 'trail-gold', category: 'trail', name: 'Gold Rush Trail', price: 100, desc: 'Golden arcade streaks behind your cursor.', preview: 'preview-trail-gold' },
@@ -64,7 +65,8 @@ const ArcadeMeta = (() => {
                 spaceShield: false,
                 killOverclock: false,
                 killSiphon: false,
-                killSlam: false
+                killSlam: false,
+                killYamato: false
             },
             daily: { date: '', quests: [] },
             playTimeAccumulator: 0,
@@ -95,6 +97,7 @@ const ArcadeMeta = (() => {
         if (isOwned('kill-overclock-core')) state.equipped.killOverclock = true;
         if (isOwned('kill-siphon-nanites')) state.equipped.killSiphon = true;
         if (isOwned('kill-slam-module')) state.equipped.killSlam = true;
+        if (isOwned('kill-cyber-yamato')) state.equipped.killYamato = true;
     }
 
     function save() {
@@ -181,6 +184,7 @@ const ArcadeMeta = (() => {
         if (id === 'kill-overclock-core') return state.equipped.killOverclock;
         if (id === 'kill-siphon-nanites') return state.equipped.killSiphon;
         if (id === 'kill-slam-module') return state.equipped.killSlam;
+        if (id === 'kill-cyber-yamato') return state.equipped.killYamato;
         return false;
     }
 
@@ -345,6 +349,7 @@ const ArcadeMeta = (() => {
             else if (id === 'kill-overclock-core') state.equipped.killOverclock = true;
             else if (id === 'kill-siphon-nanites') state.equipped.killSiphon = true;
             else if (id === 'kill-slam-module') state.equipped.killSlam = true;
+            else if (id === 'kill-cyber-yamato') state.equipped.killYamato = true;
         }
         save();
         renderShop();
@@ -367,6 +372,7 @@ const ArcadeMeta = (() => {
         else if (id === 'kill-overclock-core') state.equipped.killOverclock = true;
         else if (id === 'kill-siphon-nanites') state.equipped.killSiphon = true;
         else if (id === 'kill-slam-module') state.equipped.killSlam = true;
+        else if (id === 'kill-cyber-yamato') state.equipped.killYamato = true;
 
         save();
         renderShop();
@@ -381,6 +387,7 @@ const ArcadeMeta = (() => {
         if (id === 'kill-overclock-core') state.equipped.killOverclock = false;
         if (id === 'kill-siphon-nanites') state.equipped.killSiphon = false;
         if (id === 'kill-slam-module') state.equipped.killSlam = false;
+        if (id === 'kill-cyber-yamato') state.equipped.killYamato = false;
         save();
         renderInventory();
         renderShop();
@@ -576,6 +583,7 @@ const ArcadeMeta = (() => {
         if (id === 'kill-overclock-core') return state.equipped.killOverclock;
         if (id === 'kill-siphon-nanites') return state.equipped.killSiphon;
         if (id === 'kill-slam-module') return state.equipped.killSlam;
+        if (id === 'kill-cyber-yamato') return state.equipped.killYamato;
         return false;
     }
 

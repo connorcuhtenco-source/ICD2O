@@ -469,6 +469,16 @@
             padding: 5px 12px;
         }
         #weaponLabel.shotgun { color: #ff8833; text-shadow: 0 0 8px rgba(255, 120, 0, 0.55); border-color: rgba(255, 120, 0, 0.35); }
+        #weaponLabel.katana { color: #cc88ff; text-shadow: 0 0 8px rgba(204, 136, 255, 0.55); border-color: rgba(204, 136, 255, 0.35); }
+        #katanaVoidVeil {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9;
+            opacity: 0;
+            background: rgba(0, 0, 0, 0.88);
+            transition: opacity 0.12s linear;
+        }
         #pauseOverlay {
             position: fixed;
             inset: 0;
@@ -526,6 +536,7 @@
     <div id="gameRoot">
         <button id="backHub" class="btn">← Hub</button>
         <div id="parryFlash"></div>
+        <div id="katanaVoidVeil" aria-hidden="true"></div>
         <div id="damageFlash" aria-hidden="true"></div>
         <div id="defeatFlash" aria-hidden="true"></div>
         <div id="crosshair" aria-hidden="true">
@@ -585,7 +596,7 @@
         </div>
         <div id="startScreen">
             <h1>NEON KILL</h1>
-            <p class="hint">Click to lock pointer. WASD move · Space jump/slam · Shift slide · Tap LMB shoot · Hold LMB charge special · RMB/E parry · 1/2/Q swap weapons · G ultimate.<br>Revolver: pierce beam · Shotgun: buckshot spread + focus slug · Deal damage to fill the ultimate meter.</p>
+            <p class="hint">Click to lock pointer. WASD move · Space jump/slam · Shift slide · Tap LMB shoot/slash · Hold LMB charge special · RMB/E parry · 1/2/3/Q swap weapons · G ultimate.<br>Revolver: pierce beam · Shotgun: buckshot spread · Cyber Yamato (shop): judgement slash combos & dimension tear.</p>
             <button class="btn" id="startBtn">Enter Arena</button>
         </div>
         <div id="gameOverScreen">
@@ -655,12 +666,14 @@
         let hasOverclockCore = false;
         let hasSiphonNanites = false;
         let hasSlamModule = false;
+        let hasCyberYamato = false;
 
         // --- Hub session upgrades (loaded from sessionStorage) ---
         window.NeonKillSetup = {
             enableOverclockCore: () => { hasOverclockCore = true; },
             enableSiphonNanites: () => { hasSiphonNanites = true; },
-            enableSlamModule: () => { hasSlamModule = true; }
+            enableSlamModule: () => { hasSlamModule = true; },
+            enableCyberYamato: () => { hasCyberYamato = true; }
         };
 
         try {
@@ -668,6 +681,7 @@
             if (saved.overclock) window.NeonKillSetup.enableOverclockCore();
             if (saved.siphon) window.NeonKillSetup.enableSiphonNanites();
             if (saved.slam) window.NeonKillSetup.enableSlamModule();
+            if (saved.yamato) window.NeonKillSetup.enableCyberYamato();
         } catch (_) {}
 
         const ARENA = 40;
@@ -779,6 +793,20 @@
         let ultimateResetTimer = 0;
         let aoeBlasts = [];
         let rockets = [];
+        let katanaComboIndex = 0;
+        let katanaSlashTimer = 0;
+        let katanaSlashActive = false;
+        let katanaSlashFrom = null;
+        let katanaSlashTo = null;
+        let katanaSlashDealt = false;
+        let katanaSlashDmgIndex = 0;
+        let katanaJudgementCut = null;
+        let katanaSliceMarks = [];
+        let katanaDashTrails = [];
+        let katanaStormLines = [];
+        let katanaDimensionTear = null;
+        let katanaChargeHum = null;
+        let katanaUltLightState = null;
 
         const PLAYER_SHOT_DAMAGE = 25;
         const PARRY_SHOT_DAMAGE = PLAYER_SHOT_DAMAGE * 3;
@@ -828,6 +856,19 @@
 
         const REVOLVER_BASE = { x: 0.35, y: -0.35, z: -0.7 };
         const SHOTGUN_BASE = { x: 0.38, y: -0.38, z: -0.62 };
+        const KATANA_BASE = { x: 0.42, y: -0.42, z: -0.58 };
+        const KATANA_REST_ROT = { x: -0.08, y: 0.18, z: 0.12 };
+        const KATANA_COMBO_DMG = [48, 54, 72];
+        const KATANA_MELEE_RANGE = 5.4;
+        const KATANA_MELEE_RADIUS = 2.5;
+        const KATANA_JUDGEMENT_RADIUS = 9;
+        const KATANA_JUDGEMENT_DMG = 42;
+        const KATANA_JUDGEMENT_HITS = 6;
+        const KATANA_SLASH_ARCS = [
+            { from: { x: 0.38, y: -0.3, z: -0.5, rx: 0.2, ry: -0.35, rz: 1.1 }, to: { x: 0.44, y: -0.44, z: -0.62, rx: -0.75, ry: 0.45, rz: -0.35 } },
+            { from: { x: 0.44, y: -0.44, z: -0.62, rx: -0.75, ry: 0.45, rz: -0.35 }, to: { x: 0.36, y: -0.36, z: -0.55, rx: 0.55, ry: -0.2, rz: 0.95 } },
+            { from: { x: 0.36, y: -0.36, z: -0.55, rx: 0.55, ry: -0.2, rz: 0.95 }, to: { x: 0.42, y: -0.42, z: -0.58, rx: KATANA_REST_ROT.x, ry: KATANA_REST_ROT.y, rz: KATANA_REST_ROT.z } }
+        ];
         const ironDark = new THREE.MeshBasicMaterial({ color: 0x282830, transparent: false, opacity: 1.0, ...viewFlags });
         const ironMid = new THREE.MeshBasicMaterial({ color: 0x3a3a44, transparent: false, opacity: 1.0, ...viewFlags });
         const ironEdge = new THREE.LineBasicMaterial({ color: 0x88aacc, transparent: false, opacity: 1.0, ...viewFlags });
@@ -893,11 +934,13 @@
             ctx.fillStyle = '#0a1018';
             ctx.fillRect(0, 0, w, h);
 
-            let color = currentWeapon === 'shotgun' ? '#ff7722' : '#00ffff';
+            let color = currentWeapon === 'shotgun' ? '#ff7722' : (currentWeapon === 'katana' ? '#cc88ff' : '#00ffff');
             if (isCharging && chargeLevel > 0) {
                 if (chargeLevel >= 100) color = '#ff2200';
                 else if (currentWeapon === 'shotgun') {
                     color = Math.sin(performance.now() * 0.025) > 0 ? '#ffaa44' : '#ff5500';
+                } else if (currentWeapon === 'katana') {
+                    color = Math.sin(performance.now() * 0.03) > 0 ? '#ffffff' : '#cc88ff';
                 } else {
                     color = Math.sin(performance.now() * 0.025) > 0 ? '#ff8800' : '#ff4400';
                 }
@@ -1004,6 +1047,70 @@
         cyberShotgun.visible = false;
         camera.add(cyberShotgun);
 
+        const katanaBladeFill = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: false, opacity: 1.0, ...viewFlags });
+        const katanaBladeEdge = new THREE.LineBasicMaterial({ color: 0xcc88ff, transparent: false, opacity: 1.0, ...viewFlags });
+        const katanaDarkFill = new THREE.MeshBasicMaterial({ color: 0x120818, transparent: false, opacity: 1.0, ...viewFlags });
+        const katanaWhiteEdge = new THREE.LineBasicMaterial({ color: 0xeeffff, transparent: false, opacity: 1.0, ...viewFlags });
+        const katanaChargeEdge = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, ...viewFlags });
+
+        function addKatanaPart(geo, fillMat, edgeMat, edgeColor) {
+            const mesh = new THREE.Mesh(geo, fillMat);
+            const edge = new THREE.LineSegments(
+                new THREE.EdgesGeometry(geo),
+                edgeMat || new THREE.LineBasicMaterial({ color: edgeColor || 0xcc88ff, ...viewFlags })
+            );
+            const g = new THREE.Group();
+            g.add(mesh, edge);
+            return g;
+        }
+
+        function createCyberKatana() {
+            const katana = new THREE.Group();
+            const bladeGeo = new THREE.BoxGeometry(0.016, 0.016, 0.94);
+            const blade = new THREE.Mesh(bladeGeo, katanaBladeFill);
+            const bladeWire = new THREE.LineSegments(new THREE.EdgesGeometry(bladeGeo), katanaBladeEdge);
+            const bladeGroup = new THREE.Group();
+            blade.position.set(0, 0, -0.47);
+            bladeWire.position.copy(blade.position);
+            bladeGroup.add(blade, bladeWire);
+
+            const tsubaGeo = new THREE.CylinderGeometry(0.105, 0.105, 0.022, 6);
+            const tsuba = addKatanaPart(tsubaGeo, katanaDarkFill, katanaWhiteEdge);
+            tsuba.rotation.x = Math.PI / 2;
+
+            const hilt = new THREE.Group();
+            for (let i = 0; i < 5; i += 1) {
+                const segGeo = new THREE.CylinderGeometry(0.026, 0.026, 0.048, 6);
+                const seg = addKatanaPart(segGeo, katanaDarkFill, katanaWhiteEdge);
+                seg.rotation.x = Math.PI / 2;
+                seg.position.z = 0.05 + i * 0.052;
+                hilt.add(seg);
+            }
+
+            const chargeSphereGeo = new THREE.IcosahedronGeometry(0.055, 1);
+            const chargeSphere = new THREE.LineSegments(new THREE.EdgesGeometry(chargeSphereGeo), katanaChargeEdge);
+            chargeSphere.name = 'chargeSphere';
+            chargeSphere.position.set(0, 0, -0.94);
+            chargeSphere.visible = false;
+
+            katana.add(bladeGroup, tsuba, hilt, chargeSphere);
+            return katana;
+        }
+
+        const cyberKatana = createCyberKatana();
+        const katanaTipPoint = new THREE.Object3D();
+        katanaTipPoint.position.set(0, 0, -0.94);
+        cyberKatana.add(katanaTipPoint);
+        const katanaBatteryHUD = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.045), batteryMat);
+        katanaBatteryHUD.position.set(-0.05, 0.07, 0.1);
+        katanaBatteryHUD.rotation.set(-0.55, 0.15, 0);
+        cyberKatana.add(katanaBatteryHUD);
+        cyberKatana.position.set(KATANA_BASE.x, KATANA_BASE.y, KATANA_BASE.z);
+        cyberKatana.rotation.set(KATANA_REST_ROT.x, KATANA_REST_ROT.y, KATANA_REST_ROT.z);
+        stampViewmodel(cyberKatana);
+        cyberKatana.visible = false;
+        camera.add(cyberKatana);
+
         const revolverRailGlow = new THREE.Mesh(
             new THREE.BoxGeometry(0.18, 0.18, 0.52),
             weaponGlowMat
@@ -1080,6 +1187,7 @@
         scene.add(camera);
 
         const parryFlashEl = document.getElementById('parryFlash');
+        const katanaVoidVeilEl = document.getElementById('katanaVoidVeil');
         const damageFlashEl = document.getElementById('damageFlash');
         const defeatFlashEl = document.getElementById('defeatFlash');
         const bossHudEl = document.getElementById('bossHud');
@@ -2210,6 +2318,162 @@
             noise.stop(t + 0.42);
         }
 
+        function playKatanaSwingSound() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.42, t);
+            master.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+            connectAudioOut(master);
+            const nLen = Math.floor(ctx.sampleRate * 0.1);
+            const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+            const nd = nBuf.getChannelData(0);
+            for (let i = 0; i < nLen; i += 1) nd[i] = (Math.random() * 2 - 1) * (1 - i / nLen);
+            const noise = ctx.createBufferSource();
+            noise.buffer = nBuf;
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(1200, t);
+            filter.frequency.exponentialRampToValueAtTime(400, t + 0.08);
+            const nGain = ctx.createGain();
+            nGain.gain.setValueAtTime(0.38, t);
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(master);
+            noise.start(t);
+            noise.stop(t + 0.11);
+            const saw = ctx.createOscillator();
+            saw.type = 'sawtooth';
+            saw.frequency.setValueAtTime(520, t);
+            saw.frequency.exponentialRampToValueAtTime(120, t + 0.09);
+            const sawGain = ctx.createGain();
+            sawGain.gain.setValueAtTime(0.12, t);
+            sawGain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+            saw.connect(sawGain);
+            sawGain.connect(master);
+            saw.start(t);
+            saw.stop(t + 0.11);
+        }
+
+        function playJudgementCutSound() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.65, t);
+            master.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+            connectAudioOut(master);
+            for (let i = 0; i < 4; i += 1) {
+                const osc = ctx.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(1800 - i * 220, t + i * 0.04);
+                osc.frequency.exponentialRampToValueAtTime(400, t + i * 0.04 + 0.08);
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.22, t + i * 0.04);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.04 + 0.1);
+                osc.connect(gain);
+                gain.connect(master);
+                osc.start(t + i * 0.04);
+                osc.stop(t + i * 0.04 + 0.12);
+            }
+        }
+
+        function playSheathClickSound() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.35, t);
+            connectAudioOut(master);
+            [0, 0.06].forEach((off, i) => {
+                const osc = ctx.createOscillator();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(i === 0 ? 880 : 1320, t + off);
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.18, t + off);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + off + 0.05);
+                osc.connect(gain);
+                gain.connect(master);
+                osc.start(t + off);
+                osc.stop(t + off + 0.06);
+            });
+        }
+
+        function playKatanaChargeHum(intensity) {
+            const ctx = initAudio();
+            if (!katanaChargeHum) {
+                const osc = ctx.createOscillator();
+                osc.type = 'sawtooth';
+                const gain = ctx.createGain();
+                gain.gain.value = 0.001;
+                osc.connect(gain);
+                connectAudioOut(gain);
+                osc.start();
+                katanaChargeHum = { osc, gain };
+            }
+            const t = ctx.currentTime;
+            const amp = 0.04 + intensity * 0.14;
+            katanaChargeHum.gain.gain.setTargetAtTime(amp, t, 0.04);
+            katanaChargeHum.osc.frequency.setTargetAtTime(180 + intensity * 420, t, 0.05);
+        }
+
+        function stopKatanaChargeHum() {
+            if (!katanaChargeHum) return;
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            katanaChargeHum.gain.gain.setTargetAtTime(0.001, t, 0.05);
+        }
+
+        function playKatanaParryRingSound() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1680, t);
+            osc.frequency.exponentialRampToValueAtTime(920, t + 0.18);
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.55, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+            osc.connect(gain);
+            connectAudioOut(gain);
+            osc.start(t);
+            osc.stop(t + 0.3);
+        }
+
+        function playDimensionTearBoom() {
+            const ctx = initAudio();
+            const t = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.001, t);
+            master.gain.linearRampToValueAtTime(1, t + 0.05);
+            master.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+            connectAudioOut(master);
+            const sub = ctx.createOscillator();
+            sub.type = 'sine';
+            sub.frequency.setValueAtTime(48, t);
+            sub.frequency.exponentialRampToValueAtTime(8, t + 1.8);
+            const subGain = ctx.createGain();
+            subGain.gain.setValueAtTime(0.9, t);
+            sub.connect(subGain);
+            subGain.connect(master);
+            sub.start(t);
+            sub.stop(t + 1.85);
+            const nLen = Math.floor(ctx.sampleRate * 1.6);
+            const nBuf = ctx.createBuffer(1, nLen, ctx.sampleRate);
+            const nd = nBuf.getChannelData(0);
+            for (let i = 0; i < nLen; i += 1) nd[i] = (Math.random() * 2 - 1) * (1 - i / nLen);
+            const noise = ctx.createBufferSource();
+            noise.buffer = nBuf;
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(600, t);
+            const nGain = ctx.createGain();
+            nGain.gain.setValueAtTime(0.5, t);
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(master);
+            noise.start(t);
+            noise.stop(t + 1.65);
+        }
+
         // ===== RENDERER, LIGHTING & ARENA GEOMETRY =====
         // WebGL renderer, arena lights/fog, obsidian floor, cathedral overhead, pillars, jump pads.
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -2401,8 +2665,15 @@
             return new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
         }
 
+        function getKatanaTipWorld() {
+            const pos = new THREE.Vector3();
+            katanaTipPoint.getWorldPosition(pos);
+            return pos;
+        }
+
         function getMuzzleWorldPosition() {
             const pos = new THREE.Vector3();
+            if (currentWeapon === 'katana') return getKatanaTipWorld();
             if (ultimateActive && currentWeapon === 'shotgun' && shotgunRocketTube.visible) {
                 rocketMuzzlePoint.getWorldPosition(pos);
                 return pos;
@@ -2427,19 +2698,39 @@
             updateUltimateHUD();
         }
 
+        function getAvailableWeapons() {
+            const list = ['revolver', 'shotgun'];
+            if (hasCyberYamato) list.push('katana');
+            return list;
+        }
+
+        function cycleWeapon() {
+            const list = getAvailableWeapons();
+            const idx = list.indexOf(currentWeapon);
+            switchWeapon(list[(idx + 1) % list.length]);
+        }
+
         function setWeaponVisibility() {
-            cyberRevolver.visible = currentWeapon === 'revolver';
+            cyberRevolver.visible = currentWeapon === 'revolver' && !ultimateActive;
             cyberShotgun.visible = currentWeapon === 'shotgun' && !ultimateActive;
+            cyberKatana.visible = currentWeapon === 'katana' && !ultimateActive;
             shotgunRocketTube.visible = currentWeapon === 'shotgun' && ultimateActive;
             revolverRailGlow.visible = currentWeapon === 'revolver' && ultimateActive;
-            weaponLabelEl.textContent = currentWeapon === 'revolver'
-                ? 'CYBER REVOLVER · [1/2/Q]'
-                : 'CYBER SHOTGUN · [1/2/Q]';
+            const swapHint = hasCyberYamato ? '1/2/3/Q' : '1/2/Q';
+            if (currentWeapon === 'revolver') {
+                weaponLabelEl.textContent = `CYBER REVOLVER · [${swapHint}]`;
+            } else if (currentWeapon === 'shotgun') {
+                weaponLabelEl.textContent = `CYBER SHOTGUN · [${swapHint}]`;
+            } else {
+                weaponLabelEl.textContent = `CYBER YAMATO · [${swapHint}]`;
+            }
             weaponLabelEl.classList.toggle('shotgun', currentWeapon === 'shotgun');
+            weaponLabelEl.classList.toggle('katana', currentWeapon === 'katana');
         }
 
         function switchWeapon(weapon) {
             if (ultimateActive || isDialogueActive || weapon === currentWeapon) return;
+            if (weapon === 'katana' && !hasCyberYamato) return;
             currentWeapon = weapon;
             weaponSwitchTimer = 0.25;
             isCharging = false;
@@ -2447,6 +2738,8 @@
             chargeCommitted = false;
             chargeWasFull = false;
             leftHoldTime = 0;
+            katanaSlashActive = false;
+            stopKatanaChargeHum();
             drawBatteryHUD();
             setWeaponVisibility();
         }
@@ -6608,6 +6901,14 @@
             revolverRailGlow.material.opacity = 1;
             revolverRailGlow.material.transparent = false;
             revolverRailGlow.material.color.setHex(0x00ffff);
+            katanaVoidVeilEl.style.opacity = '0';
+            if (katanaUltLightState && arenaAmbientLight) {
+                arenaAmbientLight.intensity = katanaUltLightState.ambient;
+                if (arenaKeyLight) arenaKeyLight.intensity = katanaUltLightState.key;
+                if (arenaFillLight) arenaFillLight.intensity = katanaUltLightState.fill;
+                katanaUltLightState = null;
+            }
+            katanaDimensionTear = null;
             setWeaponVisibility();
         }
 
@@ -6684,7 +6985,8 @@
             if (isDialogueActive || ultimateActive || ultimateCharge < 100) return;
             ultimateCharge = 0;
             updateUltimateHUD();
-            if (currentWeapon === 'revolver') fireRevolverUltimate();
+            if (currentWeapon === 'katana') fireKatanaUltimate();
+            else if (currentWeapon === 'revolver') fireRevolverUltimate();
             else fireShotgunUltimate();
         }
 
@@ -6828,8 +7130,401 @@
             }
         }
 
+        // ===== CYBER YAMATO — melee combos, judgement cut, parry dash, dimension tear =====
+        function spawnKatanaSliceMark(worldPos) {
+            const g = new THREE.Group();
+            const mat = new THREE.LineBasicMaterial({ color: 0xcc88ff, transparent: true, opacity: 0.95 });
+            const makeLine = (x1, y1, z1, x2, y2, z2) => {
+                const geo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(x1, y1, z1),
+                    new THREE.Vector3(x2, y2, z2)
+                ]);
+                return new THREE.Line(geo, mat);
+            };
+            g.add(
+                makeLine(-0.6, 0, -0.6, 0.6, 0, 0.6),
+                makeLine(-0.6, 0, 0.6, 0.6, 0, -0.6)
+            );
+            g.position.copy(worldPos);
+            g.position.y = Math.max(FLOOR_Y + 0.8, worldPos.y);
+            g.lookAt(playerPos.x, g.position.y, playerPos.z);
+            scene.add(g);
+            katanaSliceMarks.push({ group: g, life: 0.15, maxLife: 0.15 });
+        }
+
+        function katanaMeleeScan(origin, dir, range, radius) {
+            const hits = { enemies: [], bossHit: false, bossPos: null };
+            const hitSet = new Set();
+            for (const enemy of enemies) {
+                if (distPointToRay(enemy.mesh.position, origin, dir) < radius &&
+                    enemy.mesh.position.distanceTo(origin) < range) {
+                    hitSet.add(enemy);
+                }
+            }
+            hits.enemies = [...hitSet];
+            if (activeBoss) {
+                if (activeBoss.type === 'architect') {
+                    if (architectWeakpointHitByRay(origin, dir, 0.4)) {
+                        hits.bossHit = true;
+                        hits.bossPos = getArchitectCoreWorld();
+                    }
+                } else {
+                    const voidP1 = activeBoss.type === 'void' && activeBoss.voidPhase === 1;
+                    const voidCoreExposed = activeBoss.type === 'void' && activeBoss.voidPhase === 2 && activeBoss.coreExposed;
+                    const hitPoint = voidCoreExposed ? getVoidBossCoreWorld() : activeBoss.mesh.position;
+                    const hitRadius = voidP1 ? 2.4 : (activeBoss.type === 'void' ? (voidCoreExposed ? 2.6 : 7) : 5);
+                    if (distPointToRay(hitPoint, origin, dir) < hitRadius) {
+                        hits.bossHit = true;
+                        hits.bossPos = hitPoint.clone();
+                    }
+                }
+            }
+            return hits;
+        }
+
+        function applyKatanaMeleeHits(dmg, aerial) {
+            const origin = getKatanaTipWorld();
+            const dir = getAimDirection();
+            const hits = katanaMeleeScan(origin, dir, KATANA_MELEE_RANGE, KATANA_MELEE_RADIUS);
+            let connected = false;
+            hits.enemies.forEach(enemy => {
+                damageEnemy(enemy, dmg, aerial);
+                spawnKatanaSliceMark(enemy.mesh.position);
+                connected = true;
+            });
+            if (hits.bossHit) {
+                damageBoss(BOSS_PRIMARY_DMG, 'primary');
+                spawnKatanaSliceMark(hits.bossPos || activeBoss.mesh.position);
+                connected = true;
+            }
+            if (connected) {
+                screenShake = Math.max(screenShake, 0.35);
+                showHitmarker();
+            }
+            return connected;
+        }
+
+        function beginKatanaSlash() {
+            if (katanaSlashActive || shootCooldown > 0) return;
+            katanaSlashDmgIndex = katanaComboIndex % KATANA_SLASH_ARCS.length;
+            const arc = KATANA_SLASH_ARCS[katanaSlashDmgIndex];
+            katanaSlashFrom = { ...arc.from };
+            katanaSlashTo = { ...arc.to };
+            katanaSlashTimer = 0;
+            katanaSlashActive = true;
+            katanaSlashDealt = false;
+            shootCooldown = 0.22;
+            playKatanaSwingSound();
+            katanaComboIndex = (katanaComboIndex + 1) % KATANA_SLASH_ARCS.length;
+        }
+
+        function updateKatanaSlash(dt) {
+            if (!katanaSlashActive || !katanaSlashFrom || !katanaSlashTo) return;
+            katanaSlashTimer += dt;
+            const t = Math.min(1, katanaSlashTimer / 0.11);
+            const eased = 1 - Math.pow(1 - t, 3);
+            cyberKatana.position.set(
+                THREE.MathUtils.lerp(katanaSlashFrom.x, katanaSlashTo.x, eased),
+                THREE.MathUtils.lerp(katanaSlashFrom.y, katanaSlashTo.y, eased),
+                THREE.MathUtils.lerp(katanaSlashFrom.z, katanaSlashTo.z, eased)
+            );
+            cyberKatana.rotation.set(
+                THREE.MathUtils.lerp(katanaSlashFrom.rx, katanaSlashTo.rx, eased),
+                THREE.MathUtils.lerp(katanaSlashFrom.ry, katanaSlashTo.ry, eased),
+                THREE.MathUtils.lerp(katanaSlashFrom.rz, katanaSlashTo.rz, eased)
+            );
+            if (!katanaSlashDealt && t >= 0.55) {
+                katanaSlashDealt = true;
+                applyKatanaMeleeHits(KATANA_COMBO_DMG[katanaSlashDmgIndex], !onGround);
+            }
+            if (t >= 1) {
+                katanaSlashActive = false;
+                katanaSlashFrom = null;
+                katanaSlashTo = null;
+            }
+        }
+
+        function spawnKatanaStormLine(center, radius) {
+            const geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(
+                    center.x + (Math.random() - 0.5) * radius,
+                    center.y + (Math.random() - 0.5) * radius * 0.6,
+                    center.z + (Math.random() - 0.5) * radius
+                ),
+                new THREE.Vector3(
+                    center.x + (Math.random() - 0.5) * radius,
+                    center.y + (Math.random() - 0.5) * radius * 0.6,
+                    center.z + (Math.random() - 0.5) * radius
+                )
+            ]);
+            const mat = new THREE.LineBasicMaterial({
+                color: Math.random() > 0.5 ? 0x00ffff : 0xcc88ff,
+                transparent: true,
+                opacity: 0.9
+            });
+            const line = new THREE.Line(geo, mat);
+            scene.add(line);
+            katanaStormLines.push({ mesh: line, life: 0.12 + Math.random() * 0.08 });
+        }
+
+        function startKatanaJudgementCut() {
+            const origin = getKatanaTipWorld();
+            const dir = getAimDirection();
+            const center = origin.clone().add(dir.multiplyScalar(4.5));
+            playJudgementCutSound();
+            screenShake = 0.85;
+            styleMultiplier = Math.min(8, styleMultiplier + 0.55);
+            katanaJudgementCut = {
+                timer: 0,
+                duration: 0.4,
+                center,
+                hitsDealt: 0,
+                maxHits: KATANA_JUDGEMENT_HITS,
+                sphere: null
+            };
+            const sphereGeo = new THREE.SphereGeometry(KATANA_JUDGEMENT_RADIUS, 14, 10);
+            const sphere = new THREE.LineSegments(
+                new THREE.EdgesGeometry(sphereGeo),
+                new THREE.LineBasicMaterial({ color: 0xcc88ff, transparent: true, opacity: 0.75 })
+            );
+            sphere.position.copy(center);
+            scene.add(sphere);
+            katanaJudgementCut.sphere = sphere;
+        }
+
+        function updateKatanaJudgementCut(dt) {
+            if (!katanaJudgementCut) return;
+            const j = katanaJudgementCut;
+            j.timer += dt;
+            if (j.sphere) {
+                j.sphere.material.opacity = 0.75 * (1 - j.timer / j.duration);
+                j.sphere.scale.setScalar(1 + j.timer * 0.4);
+            }
+            while (j.hitsDealt < j.maxHits && j.timer >= (j.hitsDealt + 1) * (j.duration / j.maxHits)) {
+                spawnKatanaStormLine(j.center, KATANA_JUDGEMENT_RADIUS);
+                enemies.forEach(enemy => {
+                    if (enemy.mesh.position.distanceTo(j.center) < KATANA_JUDGEMENT_RADIUS) {
+                        damageEnemy(enemy, KATANA_JUDGEMENT_DMG, !onGround);
+                    }
+                });
+                if (activeBoss) {
+                    const bp = activeBoss.type === 'architect' ? getArchitectCoreWorld() : activeBoss.mesh.position;
+                    if (bp.distanceTo(j.center) < KATANA_JUDGEMENT_RADIUS + 4) {
+                        if (activeBoss.type === 'architect') {
+                            if (architectWeakpointHitByRay(j.center, new THREE.Vector3(0, 1, 0), 2)) {
+                                damageBoss(BOSS_PIERCE_DMG, 'pierce');
+                            }
+                        } else {
+                            damageBoss(BOSS_PIERCE_DMG, 'pierce');
+                        }
+                    }
+                }
+                j.hitsDealt += 1;
+            }
+            if (j.timer >= j.duration) {
+                if (j.sphere) scene.remove(j.sphere);
+                katanaJudgementCut = null;
+            }
+        }
+
+        function spawnKatanaDashTrail(from, to) {
+            const geo = new THREE.BufferGeometry().setFromPoints([from.clone(), to.clone()]);
+            const mesh = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.9 }));
+            scene.add(mesh);
+            katanaDashTrails.push({ mesh, life: 0.35 });
+        }
+
+        function executeKatanaDashCounter(impactPos) {
+            if (currentWeapon !== 'katana') return;
+            const dir = getAimDirection();
+            const from = playerPos.clone();
+            const dash = Math.min(7, 4.5 + styleMultiplier * 0.35);
+            playerPos.add(dir.clone().multiplyScalar(dash));
+            clampArena();
+            spawnKatanaDashTrail(from, playerPos.clone());
+            playKatanaParryRingSound();
+            flashTimer = PARRY_FLASH_DECAY;
+            parryFlashEl.classList.add('solid');
+            parryFlashEl.style.opacity = '1';
+            let bestEnemy = null;
+            let bestDist = Infinity;
+            enemies.forEach(enemy => {
+                const d = enemy.mesh.position.distanceTo(playerPos);
+                if (d < bestDist && d < 4) {
+                    bestDist = d;
+                    bestEnemy = enemy;
+                }
+            });
+            if (bestEnemy) damageEnemy(bestEnemy, BOSS_PARRY_DMG, !onGround);
+            else if (activeBoss) {
+                const bp = activeBoss.type === 'architect' ? getArchitectCoreWorld() : activeBoss.mesh.position;
+                if (bp.distanceTo(playerPos) < 8) damageBoss(BOSS_PARRY_DMG, 'parry');
+            }
+            screenShake = Math.max(screenShake, 1.1);
+            styleMultiplier = Math.min(8, styleMultiplier + 0.65);
+        }
+
+        function spawnDimensionShard(pos) {
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.12, 0.12, 0.12),
+                new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0x00ffff : 0xcc88ff, transparent: true, opacity: 0.9 })
+            );
+            mesh.position.copy(pos);
+            scene.add(mesh);
+            parryBursts.push({
+                mesh,
+                vel: new THREE.Vector3((Math.random() - 0.5) * 2, 2 + Math.random() * 3, (Math.random() - 0.5) * 2),
+                life: 1.2 + Math.random() * 0.5
+            });
+        }
+
+        function fireKatanaUltimate() {
+            ultimateActive = true;
+            ultimateCharge = 0;
+            updateUltimateHUD();
+            setWeaponVisibility();
+            katanaDimensionTear = { phase: 'sheath', timer: 0.65 };
+            katanaVoidVeilEl.style.opacity = '0';
+            if (arenaAmbientLight && !katanaUltLightState) {
+                katanaUltLightState = {
+                    ambient: arenaAmbientLight.intensity,
+                    key: arenaKeyLight?.intensity ?? 0.8,
+                    fill: arenaFillLight?.intensity ?? 0.4
+                };
+                arenaAmbientLight.intensity = 0.04;
+                if (arenaKeyLight) arenaKeyLight.intensity = 0.05;
+                if (arenaFillLight) arenaFillLight.intensity = 0.02;
+            }
+            cyberKatana.position.set(-0.55, -0.28, -0.48);
+            cyberKatana.rotation.set(-0.05, -0.35, 0.05);
+        }
+
+        function updateKatanaDimensionTear(dt) {
+            if (!katanaDimensionTear) return;
+            const tear = katanaDimensionTear;
+            tear.timer -= dt;
+            if (tear.phase === 'sheath') {
+                katanaVoidVeilEl.style.opacity = String(Math.min(0.88, 0.88 * (1 - tear.timer / 0.65)));
+                if (tear.timer <= 0) {
+                    playSheathClickSound();
+                    tear.phase = 'lines';
+                    tear.timer = 0.25;
+                    for (let i = 0; i < 28; i += 1) {
+                        const geo = new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(-ARENA, FLOOR_Y + 1 + Math.random() * 8, (Math.random() - 0.5) * ARENA),
+                            new THREE.Vector3(ARENA, FLOOR_Y + 1 + Math.random() * 8, (Math.random() - 0.5) * ARENA)
+                        ]);
+                        const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+                        scene.add(line);
+                        katanaStormLines.push({ mesh: line, life: 0.35 });
+                    }
+                }
+                return;
+            }
+            if (tear.phase === 'lines' && tear.timer <= 0) {
+                tear.phase = 'blast';
+                tear.timer = 0.5;
+                playDimensionTearBoom();
+                screenShake = 3.5;
+                const blast = new THREE.Mesh(
+                    new THREE.SphereGeometry(1, 16, 12),
+                    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, wireframe: true })
+                );
+                blast.position.copy(playerPos);
+                scene.add(blast);
+                aoeBlasts.push({ mesh: blast, life: 0.55, maxRadius: ARENA * 1.6, damageDone: false });
+                enemies.forEach(enemy => {
+                    damageEnemy(enemy, 280, !onGround);
+                    spawnDimensionShard(enemy.mesh.position);
+                });
+                if (activeBoss) {
+                    damageBoss(BOSS_ULTIMATE_DMG, 'ultimate');
+                }
+            }
+            if (tear.phase === 'blast' && tear.timer <= 0) {
+                katanaDimensionTear = null;
+                katanaVoidVeilEl.style.opacity = '0';
+                if (katanaUltLightState && arenaAmbientLight) {
+                    arenaAmbientLight.intensity = katanaUltLightState.ambient;
+                    if (arenaKeyLight) arenaKeyLight.intensity = katanaUltLightState.key;
+                    if (arenaFillLight) arenaFillLight.intensity = katanaUltLightState.fill;
+                    katanaUltLightState = null;
+                }
+                ultimateResetTimer = 0.45;
+            }
+        }
+
+        function updateKatanaEffects(dt) {
+            updateKatanaSlash(dt);
+            updateKatanaJudgementCut(dt);
+            updateKatanaDimensionTear(dt);
+            katanaSliceMarks = katanaSliceMarks.filter(m => {
+                m.life -= dt;
+                const s = 1 + (1 - m.life / m.maxLife) * 1.4;
+                m.group.scale.setScalar(s);
+                m.group.children.forEach(c => { if (c.material) c.material.opacity = m.life / m.maxLife; });
+                if (m.life <= 0) {
+                    scene.remove(m.group);
+                    return false;
+                }
+                return true;
+            });
+            katanaStormLines = katanaStormLines.filter(l => {
+                l.life -= dt;
+                if (l.mesh.material) l.mesh.material.opacity = Math.max(0, l.life / 0.12);
+                if (l.life <= 0) {
+                    scene.remove(l.mesh);
+                    return false;
+                }
+                return true;
+            });
+            katanaDashTrails = katanaDashTrails.filter(t => {
+                t.life -= dt;
+                if (t.mesh.material) t.mesh.material.opacity = Math.max(0, t.life / 0.35);
+                if (t.life <= 0) {
+                    scene.remove(t.mesh);
+                    return false;
+                }
+                return true;
+            });
+            const chargeSphere = cyberKatana.getObjectByName('chargeSphere');
+            if (chargeSphere) {
+                const charging = currentWeapon === 'katana' && isCharging;
+                chargeSphere.visible = charging;
+                if (charging) {
+                    const pulse = 0.85 + Math.sin(performance.now() * 0.04) * 0.15;
+                    const hot = chargeLevel / 100;
+                    chargeSphere.scale.setScalar(pulse * (0.7 + hot * 0.5));
+                    chargeSphere.material.color.setHex(hot >= 1 ? 0xffffff : (hot > 0.6 ? 0xcc88ff : 0x44aaff));
+                    chargeSphere.material.opacity = 0.5 + hot * 0.5;
+                    playKatanaChargeHum(hot);
+                } else {
+                    stopKatanaChargeHum();
+                }
+            }
+        }
+
+        function releaseKatanaMouse() {
+            if (chargeCommitted || leftHoldTime >= TAP_HOLD_THRESHOLD) {
+                if (chargeLevel >= 100) startKatanaJudgementCut();
+            } else {
+                beginKatanaSlash();
+            }
+            chargeLevel = 0;
+            isCharging = false;
+            chargeCommitted = false;
+            chargeWasFull = false;
+            leftHoldTime = 0;
+            stopKatanaChargeHum();
+            drawBatteryHUD();
+        }
+
         function releaseLeftMouse() {
             if (isDialogueActive || ultimateActive) return;
+            if (currentWeapon === 'katana') {
+                releaseKatanaMouse();
+                return;
+            }
             if (chargeCommitted || leftHoldTime >= TAP_HOLD_THRESHOLD) {
                 if (chargeLevel >= 100) {
                     if (currentWeapon === 'shotgun') fireShotgunFocusBeam();
@@ -6850,7 +7545,7 @@
 
         function updateLeftMouse(dt) {
             if (isDialogueActive || ultimateActive || isPaused) return;
-            if (!mouseDown.left || !gameRunning || player.isParrying) return;
+            if (!mouseDown.left || !gameRunning || player.isParrying || katanaSlashActive) return;
             leftHoldTime += dt;
             if (leftHoldTime >= TAP_HOLD_THRESHOLD) {
                 chargeCommitted = true;
@@ -6883,6 +7578,10 @@
             player.isParrying = true;
             parryTimer = PARRY_WINDOW;
             parryAnimTimer = 0;
+            if (currentWeapon === 'katana') {
+                armGroup.visible = false;
+                return;
+            }
             armGroup.visible = true;
             armGroup.position.copy(parryRestPos);
             armGroup.rotation.set(0, 0, 0);
@@ -6890,6 +7589,11 @@
 
         function getParryHitCenter() {
             const center = new THREE.Vector3();
+            if (currentWeapon === 'katana') {
+                center.copy(playerPos);
+                const forward = getAimDirection();
+                return center.add(forward.multiplyScalar(1.2));
+            }
             armGroup.getWorldPosition(center);
             const forward = getAimDirection();
             return center.add(forward.multiplyScalar(0.35));
@@ -6900,7 +7604,8 @@
             flashTimer = PARRY_FLASH_DECAY;
             parryFlashEl.classList.add('solid');
             parryFlashEl.style.opacity = '1';
-            playParryImpactSound();
+            if (currentWeapon === 'katana') playKatanaParryRingSound();
+            else playParryImpactSound();
             styleMultiplier = Math.min(8, styleMultiplier + 0.5);
             for (let i = 0; i < 16; i++) {
                 const angle = (Math.PI * 2 / 16) * i + Math.random() * 0.4;
@@ -6978,8 +7683,11 @@
                 cyberRevolver.rotation.set(-0.1, 0.04, 0.02);
                 cyberShotgun.position.set(SHOTGUN_BASE.x, SHOTGUN_BASE.y + switchOffset, SHOTGUN_BASE.z);
                 cyberShotgun.rotation.set(-0.12, 0.03, -0.02);
+                cyberKatana.position.set(KATANA_BASE.x, KATANA_BASE.y + switchOffset, KATANA_BASE.z);
+                cyberKatana.rotation.set(KATANA_REST_ROT.x, KATANA_REST_ROT.y, KATANA_REST_ROT.z);
                 batteryHUD.scale.set(1, 1, 1);
                 shotgunBatteryHUD.scale.set(1, 1, 1);
+                katanaBatteryHUD.scale.set(1, 1, 1);
                 if (player.isParrying) {
                     player.isParrying = false;
                     parryAnimTimer = 0;
@@ -6987,6 +7695,38 @@
                 armGroup.visible = false;
                 armGroup.position.copy(parryRestPos);
                 armGroup.rotation.set(0, 0, 0);
+                return;
+            }
+
+            if (currentWeapon === 'katana') {
+                if (!katanaSlashActive && !ultimateActive) {
+                    cyberKatana.position.set(KATANA_BASE.x, KATANA_BASE.y + switchOffset, KATANA_BASE.z);
+                    if (player.isParrying) {
+                        const ms = parryAnimTimer * 1000;
+                        const block = ms >= 20 && ms <= 120;
+                        cyberKatana.rotation.set(
+                            block ? -0.05 : KATANA_REST_ROT.x,
+                            block ? 0 : KATANA_REST_ROT.y,
+                            block ? Math.PI / 2 : KATANA_REST_ROT.z
+                        );
+                        cyberKatana.position.set(
+                            block ? 0.05 : KATANA_BASE.x,
+                            block ? -0.2 : KATANA_BASE.y + switchOffset,
+                            block ? -0.42 : KATANA_BASE.z
+                        );
+                    } else {
+                        cyberKatana.rotation.set(KATANA_REST_ROT.x, KATANA_REST_ROT.y, KATANA_REST_ROT.z);
+                    }
+                }
+                const chargePulseTarget = katanaBatteryHUD;
+                if (isCharging) {
+                    const pulse = 1 + Math.sin(performance.now() * 0.018) * 0.02 * (chargeLevel / 100);
+                    chargePulseTarget.scale.set(pulse, pulse, 1);
+                } else {
+                    chargePulseTarget.scale.set(1, 1, 1);
+                }
+                setWeaponVisibility();
+                if (!player.isParrying) armGroup.visible = false;
                 return;
             }
 
@@ -7188,6 +7928,19 @@
             ultimateCharge = 0;
             ultimateActive = false;
             ultimateResetTimer = 0;
+            katanaComboIndex = 0;
+            katanaSlashActive = false;
+            katanaJudgementCut = null;
+            katanaDimensionTear = null;
+            katanaUltLightState = null;
+            katanaSliceMarks.forEach(m => scene.remove(m.group));
+            katanaSliceMarks = [];
+            katanaStormLines.forEach(l => scene.remove(l.mesh));
+            katanaStormLines = [];
+            katanaDashTrails.forEach(t => scene.remove(t.mesh));
+            katanaDashTrails = [];
+            stopKatanaChargeHum();
+            katanaVoidVeilEl.style.opacity = '0';
             currentWeapon = 'revolver';
             weaponSwitchTimer = 0;
             rockets.forEach(r => scene.remove(r.mesh));
@@ -7451,6 +8204,7 @@
                                 p.returnToCore = true;
                                 p.fromBoss = true;
                                 triggerParrySuccess(impact);
+                                if (currentWeapon === 'katana') executeKatanaDashCounter(impact);
                                 return true;
                             }
                             if (p.voidBarrage && activeBoss && activeBoss.type === 'void' && activeBoss.voidPhase === 2 && activeBoss.coreExposed) {
@@ -7464,6 +8218,7 @@
                             p.damage = PARRY_SHOT_DAMAGE;
                             if (p.fromBoss) p.bossParry = true;
                             triggerParrySuccess(impact);
+                            if (currentWeapon === 'katana') executeKatanaDashCounter(impact);
                             return true;
                         }
                     }
@@ -7572,7 +8327,7 @@
             last = now;
             const cinematicFreeze = bossIntroActive || bossCinematicActive || bossAwaitingEngage ||
                 voidTransformActive || architectIntroActive || architectTransformActive ||
-                (bossDefeatActive && bossDefeatPhase === 'dyingwords');
+                (bossDefeatActive && bossDefeatPhase === 'dyingwords') || !!katanaDimensionTear;
             const dt = (freezeTimer > 0 || cinematicFreeze || isPaused) ? 0 : rawDt;
             if (freezeTimer > 0 && !isPaused) freezeTimer = Math.max(0, freezeTimer - rawDt);
             advanceMusicScheduler();
@@ -7597,6 +8352,7 @@
                 updateHealParticles(dt);
                 updateBeamEffects(rawDt);
                 updateParryBursts(rawDt);
+                updateKatanaEffects(rawDt);
                 updateFlash(rawDt);
                 updateDamageFlash(rawDt);
                 updateStyle(dt);
@@ -7644,7 +8400,8 @@
             if (e.code === 'KeyG') fireUltimate();
             if (e.code === 'Digit1') switchWeapon('revolver');
             if (e.code === 'Digit2') switchWeapon('shotgun');
-            if (e.code === 'KeyQ') switchWeapon(currentWeapon === 'revolver' ? 'shotgun' : 'revolver');
+            if (e.code === 'Digit3' && hasCyberYamato) switchWeapon('katana');
+            if (e.code === 'KeyQ') cycleWeapon();
         });
         document.addEventListener('keyup', e => {
             keys[e.code] = false;

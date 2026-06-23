@@ -2226,7 +2226,8 @@ function startNeonKill() {
     sessionStorage.setItem('neonKillUpgrades', JSON.stringify({
         overclock: ArcadeMeta.hasEquippedUpgrade('kill-overclock-core'),
         siphon: ArcadeMeta.hasEquippedUpgrade('kill-siphon-nanites'),
-        slam: ArcadeMeta.hasEquippedUpgrade('kill-slam-module')
+        slam: ArcadeMeta.hasEquippedUpgrade('kill-slam-module'),
+        yamato: ArcadeMeta.hasEquippedUpgrade('kill-cyber-yamato')
     }));
     window.location.href = 'neon-kill.html';
 }
