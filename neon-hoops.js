@@ -72,10 +72,17 @@ let dunkActive  = false;
 let dunkPhase   = 0;       // 0-1 animation progress
 let dunkTimeout = null;
 
-// Dribble
+// Dribble — tactile bounce physics and athlete stance
 let dribbleHand   = 'right';   // 'right' | 'left'
-let dribblePhase  = 0;         // 0-1 bounce cycle
-let dribbleSpeed  = 6;
+let dribbleTimer  = 0;          // continuous bounce phase clock
+let dribbleCrouch = 0;         // 0-1 athletic stance blend
+let ballSquashY   = 1;         // elastic vertical squash (recovers each frame)
+let ballSquashXZ  = 1;
+let prevDribbleCycle = 0;      // prior frame's 0-1 bounce cycle for impact detect
+const DRIBBLE_SPEED = 14;      // frequency of bounces
+const DRIBBLE_HEIGHT = 1.3;    // maximum height of the bounce off the floor
+const BALL_STAND_Y = 1.2;      // baseline resting hand height for the ball
+const DRIBBLE_CROUCH_DROP = 0.22; // how far the player group sinks while dribbling
 let crossoverActive = false;
 let crossoverPhase  = 0;
 let crossoverFrom   = 'right';
@@ -835,8 +842,70 @@ function buildBall(){
   ballMesh.castShadow = true;
   ballLight = new THREE.PointLight(C_ORANGE, 1.2, 4);
   ballMesh.add(ballLight);
+  ballMesh.scale.set(1, 1, 1);
+  ballSquashY = 1;
+  ballSquashXZ = 1;
   scene.add(ballMesh);
   snapBallToHand();
+}
+
+/** Height fraction 0 (floor) → 1 (apex) with slow hang then fast slam. */
+function getDribbleBounceNorm(cycle){
+  if(cycle < 0.38){
+    const u = cycle / 0.38;
+    return Math.pow(Math.sin(u * Math.PI * 0.5), 0.62);
+  }
+  const u = (cycle - 0.38) / 0.62;
+  return Math.pow(1 - u, 2.75);
+}
+
+/** Dribble arm piston + off-hand protective guard. */
+function applyDribbleArmPose(heightNorm, cycle){
+  const isRight = dribbleHand === 'right';
+  const dribbleArm = isRight ? pArmR : pArmL;
+  const offArm     = isRight ? pArmL : pArmR;
+  const dribbleElb = isRight ? pElbowR : pElbowL;
+  const offElb     = isRight ? pElbowL : pElbowR;
+
+  const fallSnatch = cycle > 0.38 ? Math.pow(1 - heightNorm, 1.5) * 0.28 : 0;
+  const pistonX = lerp(-0.62, 0.38, heightNorm) + fallSnatch;
+
+  if(dribbleArm){
+    dribbleArm.rotation.x = pistonX;
+    dribbleArm.rotation.z = isRight ? -0.24 : 0.24;
+  }
+  if(dribbleElb) dribbleElb.rotation.x = lerp(-0.72, -0.12, heightNorm);
+
+  if(offArm){
+    offArm.rotation.x = -0.48;
+    offArm.rotation.z = isRight ? 0.68 : -0.68;
+  }
+  if(offElb) offElb.rotation.x = -1.12;
+}
+
+/** Compress ball on floor impact; slight stretch during fast descent. */
+function applyDribbleBallSquish(heightNorm, cycle, dt){
+  const floorY = FLOOR_Y + BALL_RADIUS;
+  const nearFloor = heightNorm < 0.1;
+  const justImpacted = cycle < prevDribbleCycle && prevDribbleCycle > 0.82;
+
+  let targetSquashY = 1;
+  let targetSquashXZ = 1;
+
+  if(nearFloor || justImpacted){
+    const impact = clamp(1 - heightNorm / 0.1, 0, 1);
+    targetSquashY = lerp(0.48, 1, impact);
+    targetSquashXZ = lerp(1.42, 1, impact);
+  } else if(cycle > 0.38){
+    const stretch = Math.pow(1 - heightNorm, 2) * 0.14;
+    targetSquashY = 1 + stretch;
+    targetSquashXZ = 1 - stretch * 0.45;
+  }
+
+  const snap = clamp(dt * 28, 0, 1);
+  ballSquashY = lerp(ballSquashY, targetSquashY, snap);
+  ballSquashXZ = lerp(ballSquashXZ, targetSquashXZ, snap);
+  ballMesh.scale.set(ballSquashXZ, ballSquashY, ballSquashXZ);
 }
 
 function getHandAnchor(){
@@ -1449,69 +1518,85 @@ function checkBasket(){
 
 // ─── Dribble Animation ──────────────────────────────────────
 function updateDribble(dt){
-  if(ballState !== 'held') return;
+  if(ballState !== 'held'){
+    dribbleCrouch = lerp(dribbleCrouch, 0, clamp(dt * 10, 0, 1));
+    if(playerGroup) playerGroup.position.y = playerPos.y;
+    if(ballMesh) ballMesh.scale.set(1, 1, 1);
+    ballSquashY = 1;
+    ballSquashXZ = 1;
+    return;
+  }
+
+  const wantCrouch = playerOnGround && !crossoverActive && !shotCharging && !playerStealActive && !dunkActive;
+  dribbleCrouch = lerp(dribbleCrouch, wantCrouch ? 1 : 0, clamp(dt * 9, 0, 1));
+  if(playerGroup){
+    playerGroup.position.y = playerPos.y - DRIBBLE_CROUCH_DROP * dribbleCrouch;
+  }
 
   // Handle crossover animation
   if(crossoverActive){
-    crossoverPhase += dt * 3.5;  // ~0.28s full cross
+    crossoverPhase += dt * 3.5;
     if(crossoverPhase >= 1){
       crossoverActive = false;
       crossoverPhase  = 0;
       dribbleHand     = crossoverTo;
-      dribbleLblEl.textContent = dribbleHand==='right' ? '▶ RIGHT' : '◀ LEFT';
+      dribbleLblEl.textContent = dribbleHand === 'right' ? '▶ RIGHT' : '◀ LEFT';
+      dribbleTimer = 0;
     }
-    // Ball arcs smoothly from one hand to the other through the floor
     const fromAnchor = crossoverFrom === 'right' ? playerBallAnchorR : playerBallAnchorL;
     const toAnchor   = crossoverFrom === 'right' ? playerBallAnchorL : playerBallAnchorR;
-    const fromWP = new THREE.Vector3(), toWP = new THREE.Vector3();
+    const fromWP = new THREE.Vector3();
+    const toWP = new THREE.Vector3();
     fromAnchor.getWorldPosition(fromWP);
     toAnchor.getWorldPosition(toWP);
-    // Arc dips down to floor level mid-cross
     const t = crossoverPhase;
-    const midDip = Math.sin(t * Math.PI);  // 0→1→0
+    const midDip = Math.sin(t * Math.PI);
+    const floorY = FLOOR_Y + BALL_RADIUS;
     ballPos.x = lerp(fromWP.x, toWP.x, t);
-    ballPos.y = lerp(fromWP.y * (1-midDip) + (FLOOR_Y + BALL_RADIUS) * midDip,
-                     fromWP.y * (1-midDip) + (FLOOR_Y + BALL_RADIUS) * midDip, t);
-    // Simpler: hand-height lerp with floor dip
+    ballPos.z = lerp(fromWP.z, toWP.z, t);
     const handY = lerp(fromWP.y, toWP.y, t);
-    ballPos.y   = lerp(handY, FLOOR_Y + BALL_RADIUS, midDip * 0.85);
-    ballPos.z   = lerp(fromWP.z, toWP.z, t);
+    ballPos.y = lerp(handY, floorY, midDip * 0.88);
     ballMesh.position.set(ballPos.x, ballPos.y, ballPos.z);
-    // Squash at bottom of cross
-    const squash = lerp(1.0, 0.6, midDip);
-    ballMesh.scale.set(1/squash, squash, 1/squash);
-    // Both arms swing during crossover
+
+    const squash = lerp(1.0, 0.5, midDip);
+    ballMesh.scale.set(1 / squash, squash, 1 / squash);
+
     if(pArmR) pArmR.rotation.x = lerp(0.4, -0.1, t);
     if(pArmL) pArmL.rotation.x = lerp(-0.1, 0.4, t);
     if(pBody) pBody.rotation.z = lerp(pBody.rotation.z, (crossoverFrom === 'right' ? 1 : -1) * 0.12 * Math.sin(t * Math.PI), 0.25);
+    prevDribbleCycle = 0;
     return;
   }
 
-  const moving = Math.abs(playerVel.x)+Math.abs(playerVel.z) > 0.5;
-  dribbleSpeed  = moving ? 5.5 : 3.8;   // slower, more realistic
-  dribblePhase  = (dribblePhase + dt*dribbleSpeed) % 1;
+  const moving = Math.abs(playerVel.x) + Math.abs(playerVel.z) > 0.5;
+  const speedMult = moving ? 1.12 : 0.82;
+  dribbleTimer += dt * DRIBBLE_SPEED * speedMult;
+  const cycle = dribbleTimer % 1;
+  const heightNorm = getDribbleBounceNorm(cycle);
 
-  // Ball bounces between hand and floor
   const handPos = new THREE.Vector3();
   getHandAnchor().getWorldPosition(handPos);
-
-  const bounceT = Math.abs(Math.sin(dribblePhase*Math.PI));
-  const floorY  = FLOOR_Y + BALL_RADIUS;
-  const ballY   = lerp(floorY, handPos.y, bounceT);
+  const floorY = FLOOR_Y + BALL_RADIUS;
+  const apexY = floorY + DRIBBLE_HEIGHT;
+  const handApexY = Math.max(apexY, handPos.y, FLOOR_Y + BALL_STAND_Y * 0.55);
 
   ballPos.x = handPos.x;
-  ballPos.y = ballY;
+  ballPos.y = lerp(floorY, handApexY, heightNorm);
   ballPos.z = handPos.z;
   ballMesh.position.set(ballPos.x, ballPos.y, ballPos.z);
 
-  // Squash ball at bottom of bounce
-  const squash = lerp(0.65, 1.0, bounceT);
-  ballMesh.scale.set(1/squash, squash, 1/squash);
+  applyDribbleBallSquish(heightNorm, cycle, dt);
+  applyDribbleArmPose(heightNorm, cycle);
 
-  // Arm swings with dribble — rotate forward/back naturally
-  const swingAmt = Math.sin(dribblePhase*Math.PI)*0.45;
-  if(dribbleHand==='right' && pArmR) pArmR.rotation.x = swingAmt;
-  else if(dribbleHand==='left' && pArmL) pArmL.rotation.x = swingAmt;
+  if(pLegL) pLegL.rotation.x = lerp(pLegL.rotation.x, 0.08 * dribbleCrouch, 0.35);
+  if(pLegR) pLegR.rotation.x = lerp(pLegR.rotation.x, 0.08 * dribbleCrouch, 0.35);
+  if(pKneeL) pKneeL.rotation.x = lerp(pKneeL.rotation.x, -0.34 * dribbleCrouch, 0.35);
+  if(pKneeR) pKneeR.rotation.x = lerp(pKneeR.rotation.x, -0.34 * dribbleCrouch, 0.35);
+  if(pBody){
+    pBody.rotation.x = lerp(pBody.rotation.x, -0.14 * dribbleCrouch, 0.3);
+  }
+
+  prevDribbleCycle = cycle;
 }
 
 // ─── Score / Feedback ────────────────────────────────────────
@@ -1545,7 +1630,7 @@ function updateCamera(dt){
   // Look at the player (slightly above feet), drifting a bit toward hoop
   camera.lookAt(
     lerp(playerPos.x, HOOP_X, 0.15),
-    playerPos.y + 1.2,
+    playerPos.y + 1.2 - dribbleCrouch * 0.18,
     lerp(playerPos.z, HOOP_Z, 0.25)
   );
 }
@@ -1624,15 +1709,18 @@ function physicsStep(dt){
   if(animState === 'idle'){
     const breathe = Math.sin(T * 1.2) * 0.022;
     const sway = Math.sin(T * 0.75) * 0.035;
-    tgt.torsoX  = breathe;
+    const crouch = dribbleCrouch;
+    tgt.torsoX  = breathe - 0.12 * crouch;
     tgt.torsoZ  = sway;
     tgt.headZ   = -sway * 0.45;
-    tgt.armLZ   =  0.32 + Math.sin(T * 1.2) * 0.05;
-    tgt.armRZ   = -0.32 - Math.sin(T * 1.2) * 0.05;
-    tgt.elbLX   = -0.18;
-    tgt.elbRX   = -0.18;
-    tgt.kneeLX  = -0.06;
-    tgt.kneeRX  = -0.06;
+    tgt.kneeLX  = -0.06 - 0.26 * crouch;
+    tgt.kneeRX  = -0.06 - 0.26 * crouch;
+    if(ballState !== 'held'){
+      tgt.armLZ   =  0.32 + Math.sin(T * 1.2) * 0.05;
+      tgt.armRZ   = -0.32 - Math.sin(T * 1.2) * 0.05;
+      tgt.elbLX   = -0.18;
+      tgt.elbRX   = -0.18;
+    }
   }
 
   if(animState === 'run'){
@@ -1641,15 +1729,18 @@ function physicsStep(dt){
     const legSwing = 0.62, kneeSwing = 0.52;
     const contactL = Math.max(0, Math.sin(cycle));
     const contactR = Math.max(0, Math.sin(cycle + Math.PI));
-    tgt.legLX  =  Math.sin(cycle) * legSwing;
-    tgt.legRX  =  Math.sin(cycle + Math.PI) * legSwing;
-    tgt.kneeLX = -Math.abs(Math.sin(cycle)) * kneeSwing - contactL * 0.08;
-    tgt.kneeRX = -Math.abs(Math.sin(cycle + Math.PI)) * kneeSwing - contactR * 0.08;
-    if(dribbleHand !== 'left')  tgt.armLX = Math.sin(cycle + Math.PI) * 0.48;
-    if(dribbleHand !== 'right') tgt.armRX = Math.sin(cycle) * 0.48;
-    tgt.elbLX = -0.22 - contactL * 0.12;
-    tgt.elbRX = -0.22 - contactR * 0.12;
-    tgt.torsoX  = -0.14 - Math.max(contactL, contactR) * 0.05;
+    const crouch = dribbleCrouch;
+    tgt.legLX  =  Math.sin(cycle) * legSwing + 0.06 * crouch;
+    tgt.legRX  =  Math.sin(cycle + Math.PI) * legSwing + 0.06 * crouch;
+    tgt.kneeLX = -Math.abs(Math.sin(cycle)) * kneeSwing - contactL * 0.08 - 0.22 * crouch;
+    tgt.kneeRX = -Math.abs(Math.sin(cycle + Math.PI)) * kneeSwing - contactR * 0.08 - 0.22 * crouch;
+    if(ballState !== 'held'){
+      if(dribbleHand !== 'left')  tgt.armLX = Math.sin(cycle + Math.PI) * 0.48;
+      if(dribbleHand !== 'right') tgt.armRX = Math.sin(cycle) * 0.48;
+      tgt.elbLX = -0.22 - contactL * 0.12;
+      tgt.elbRX = -0.22 - contactR * 0.12;
+    }
+    tgt.torsoX  = -0.14 - Math.max(contactL, contactR) * 0.05 - 0.1 * crouch;
     tgt.torsoZ  = Math.sin(cycle) * 0.06;
     tgt.headX   = Math.sin(cycle * 2) * 0.04;
     tgt.headZ   = -tgt.torsoZ * 0.35;
@@ -1960,6 +2051,11 @@ function startGame(){
   playerStealPhase=0;
   stealAnimTimer=0;
   dribbleHand='right';
+  dribbleTimer=0;
+  dribbleCrouch=0;
+  prevDribbleCycle=0;
+  ballSquashY=1;
+  ballSquashXZ=1;
   dribbleLblEl.textContent='▶ RIGHT';
   removeAI();
   scoreEl.textContent='00';
