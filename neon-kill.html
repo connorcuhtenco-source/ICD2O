@@ -717,7 +717,7 @@
         let architectWallDebris = [];      // intro wall tear debris
         let architectLightState = null;    // saved arena lights so we can restore after the fight
         let architectIntroActive = false;
-        let architectIntroPhase = 'idle';  // tear → reveal → dialogue → hold → done
+        let architectIntroPhase = 'idle';  // tear → reveal → dialogue → engage → done
         let architectIntroTimer = 0;
         let architectTransformActive = false; // locks input during phase-2 cinematic
         let architectStarrySky = null;
@@ -2796,6 +2796,12 @@
             canShoot = true;
             activeBoss.combatReady = true;
             syncDialogueLock();
+            if (activeBoss.type === 'architect') {
+                finishArchitectIntroHandoff();
+                showBossHud();
+                boostBossCombatMusic();
+                return;
+            }
             hideBossDialogue();
             if (apexCinematic?.grid) {
                 scene.remove(apexCinematic.grid);
@@ -4143,7 +4149,7 @@
         // Minos-inspired colossus in a crimson/purple court arena (gate, neon pillars, stars).
         // Attack kit: slam shockwaves, parryable punch fist, chasing black hole, parasite adds.
         // Weakpoint: twin white eyes for the entire fight; phase-2 plasma transform + mask tear.
-        // Intro: wall tear cinematic → dialogue → combat. Runtime state declared up top (~670).
+        // Intro: wall tear cinematic → dialogue → press space to engage → combat. Runtime state declared up top (~670).
         // =============================================================================
 
         function enterArchitectArena() {
@@ -5432,8 +5438,20 @@
             }
         }
 
+        function beginArchitectEngagePrompt() {
+            architectIntroPhase = 'engage';
+            architectIntroTimer = 0;
+            bossDialogueHeaderEl.textContent = activeBoss?.label || 'THE CORPSE OF THE ARCHITECT';
+            bossDialogueTextEl.textContent = activeBoss?.dialogue || '';
+            bossDialogueFooterEl.textContent = '[ PRESS SPACEBAR TO ENGAGE ]';
+            bossDialogueEl.classList.add('visible', 'done', 'await-engage');
+            bossAwaitingEngage = true;
+            lockPlayerForBossCinematic();
+            syncDialogueLock();
+        }
+
         function finishArchitectIntroHandoff() {
-            // Intro complete: restore HUD/weapons and start the combat attack loop.
+            bossAwaitingEngage = false;
             architectIntroActive = false;
             architectIntroPhase = 'done';
             hideBossDialogue();
@@ -5498,10 +5516,7 @@
                     startCinematicDialogue(
                         'CRADLED IN CODE... YET YOU CHOSE TO ASYNC FROM THE ARCHITECTURE.\nDIE.',
                         true,
-                        () => {
-                            architectIntroPhase = 'hold';
-                            architectIntroTimer = 0;
-                        }
+                        beginArchitectEngagePrompt
                     );
                 }
                 return;
@@ -5512,10 +5527,7 @@
                 return;
             }
 
-            if (architectIntroPhase === 'hold') {
-                architectIntroTimer += rawDt;
-                if (architectIntroTimer >= 2.5) finishArchitectIntroHandoff();
-            }
+            if (architectIntroPhase === 'engage') return;
         }
 
         function applyArchitectIntroShake() {
@@ -5577,6 +5589,7 @@
             architectIntroActive = true;
             architectIntroPhase = 'tear';
             architectIntroTimer = 0;
+            lockPlayerForBossCinematic();
             setArchitectIntroHud(true);
             syncDialogueLock();
             beginBossEncounterTracking();
