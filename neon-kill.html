@@ -2410,7 +2410,7 @@
                 katanaChargeHum = { osc, gain };
             }
             const t = ctx.currentTime;
-            const amp = 0.04 + intensity * 0.14;
+            const amp = 0.012 + intensity * 0.045;
             katanaChargeHum.gain.gain.setTargetAtTime(amp, t, 0.04);
             katanaChargeHum.osc.frequency.setTargetAtTime(180 + intensity * 420, t, 0.05);
         }
