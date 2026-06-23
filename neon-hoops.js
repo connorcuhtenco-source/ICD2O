@@ -501,7 +501,7 @@ function buildHumanoidRig(opts){
   });
 
   const pelvis = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.28 * s, 0.24 * s, 0.16 * h, 16),
+    new THREE.CylinderGeometry(0.25 * s, 0.21 * s, 0.12 * h, 16),
     shortMat()
   );
   pelvis.position.y = spec.waistY;
@@ -514,54 +514,39 @@ function buildHumanoidRig(opts){
   group.add(torso);
 
   const chest = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.36 * s, 0.30 * s, 0.52 * h, 18),
+    new THREE.CylinderGeometry(0.31 * s, 0.23 * s, 0.70 * h, 18),
     jMat()
   );
+  chest.position.y = -0.02 * h;
   chest.castShadow = true;
   torso.add(chest);
   pushJersey(chest);
 
-  const abs = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.30 * s, 0.26 * s, 0.28 * h, 16),
-    jMat()
-  );
-  abs.position.y = -0.36 * h;
-  abs.castShadow = true;
-  torso.add(abs);
-  pushJersey(abs);
-
-  const vNeck = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.18 * s, 0.34 * s, 0.14 * h, 3),
+  // Subtle collar trim — flat on chest, not a protruding wedge
+  const collar = new THREE.Mesh(
+    new THREE.TorusGeometry(0.11 * s, 0.012, 6, 16, Math.PI),
     jTrimMat()
   );
-  vNeck.position.set(0, 0.22 * h, 0.12 * s);
-  vNeck.rotation.x = -0.45;
-  torso.add(vNeck);
-
-  [-1, 1].forEach(side => {
-    const panel = new THREE.Mesh(
-      new THREE.BoxGeometry(0.05 * s, 0.42 * h, 0.30 * s),
-      jTrimMat()
-    );
-    panel.position.set(side * 0.30 * s, -0.04 * h, 0.02 * s);
-    torso.add(panel);
-  });
+  collar.position.set(0, 0.28 * h, 0.27 * s);
+  collar.rotation.x = -0.55;
+  collar.rotation.z = Math.PI;
+  torso.add(collar);
 
   if(isAI){
     const chestBadge = new THREE.Mesh(
-      new THREE.RingGeometry(0.06 * s, 0.10 * s, 6),
+      new THREE.RingGeometry(0.05 * s, 0.08 * s, 6),
       jTrimMat()
     );
-    chestBadge.position.set(0, 0.08 * h, 0.31 * s);
+    chestBadge.position.set(0, 0.08 * h, 0.29 * s);
     chestBadge.rotation.x = -0.2;
     torso.add(chestBadge);
   } else {
-    const chestStripe = new THREE.Mesh(
-      new THREE.BoxGeometry(0.34 * s, 0.08 * h, 0.04 * s),
+    const chestPip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05 * s, 0.10 * h, 0.012 * s),
       jTrimMat()
     );
-    chestStripe.position.set(0, 0.06 * h, 0.30 * s);
-    torso.add(chestStripe);
+    chestPip.position.set(0, 0.06 * h, 0.295 * s);
+    torso.add(chestPip);
   }
 
   const shortsGrp = new THREE.Group();
@@ -622,7 +607,7 @@ function buildHumanoidRig(opts){
       new THREE.SphereGeometry(0.11 * s, 12, 10),
       jMat()
     );
-    shoulder.scale.set(1.15, 0.85, 1.0);
+    shoulder.scale.set(1.05, 0.80, 1.0);
     shoulder.position.set(side * 0.36 * s, spec.shoulderY, 0);
     shoulder.castShadow = true;
     group.add(shoulder);
@@ -886,6 +871,24 @@ function addSmile(group, bH){
   group.add(smile);
 }
 
+/** Point on unit head sphere (azimuth around Y, polar from top). */
+function headSurfaceOffset(headR, azimuth, polar){
+  const sinP = Math.sin(polar);
+  return {
+    x: sinP * Math.cos(azimuth) * headR,
+    y: Math.cos(polar) * headR,
+    z: sinP * Math.sin(azimuth) * headR
+  };
+}
+
+function addHairTube(group, points, radius, mat, tubularSegs){
+  if(points.length < 2) return;
+  const curve = new THREE.CatmullRomCurve3(points);
+  const segs = tubularSegs || Math.max(8, points.length * 2);
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, segs, radius, 5, false), mat);
+  group.add(tube);
+}
+
 function buildHairMesh(buildH){
   if(hairMesh){ playerGroup.remove(hairMesh); hairMesh=null; }
   const headY = 1.96*buildH;  // centre of head sphere
@@ -910,47 +913,38 @@ function buildHairMesh(buildH){
       }
       return g;
     },
-    ()=>{ // 2: dreads — locs hanging from scalp cap
+    ()=>{ // 2: dreads — rope locs hanging from scalp with natural sag
       const g = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color:0x2a1200, roughness:.9 });
-      // Scalp cap — open-bottom hemisphere sitting on head
+      const mat = new THREE.MeshStandardMaterial({ color:0x2a1200, roughness:0.92 });
       const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(headR + 0.018, 16, 12, 0, Math.PI*2, 0, Math.PI*0.52),
+        new THREE.SphereGeometry(headR + 0.012, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.50),
         mat.clone()
       );
       cap.position.y = headY;
       g.add(cap);
-      // Locs: distribute around top hemisphere, hang down
+
       const locDefs = [
-        // [angleAroundHead, polarAngle(0=top, 1=equator), locLength]
-        [0,         0.15, 0.42],
-        [Math.PI*0.25, 0.35, 0.50],
-        [Math.PI*0.5,  0.40, 0.55],
-        [Math.PI*0.75, 0.35, 0.48],
-        [Math.PI,      0.30, 0.44],
-        [Math.PI*1.25, 0.35, 0.52],
-        [Math.PI*1.5,  0.40, 0.49],
-        [Math.PI*1.75, 0.35, 0.46],
-        [Math.PI*0.12, 0.50, 0.58],
-        [Math.PI*0.62, 0.50, 0.56],
-        [Math.PI*1.12, 0.50, 0.54],
-        [Math.PI*1.62, 0.50, 0.57],
+        [0, 0.22, 0.50], [0.52, 0.30, 0.56], [1.05, 0.34, 0.58], [1.57, 0.32, 0.54],
+        [2.09, 0.28, 0.52], [2.62, 0.34, 0.57], [3.14, 0.30, 0.55], [3.67, 0.34, 0.53],
+        [4.19, 0.38, 0.59], [4.71, 0.36, 0.56], [5.24, 0.40, 0.58], [5.76, 0.34, 0.52],
+        [0.26, 0.48, 0.62], [0.78, 0.52, 0.64], [1.31, 0.50, 0.63], [1.83, 0.52, 0.65],
+        [2.36, 0.48, 0.61], [2.88, 0.52, 0.64], [3.40, 0.50, 0.62], [4.45, 0.52, 0.63],
+        [4.97, 0.48, 0.60], [5.50, 0.50, 0.62]
       ];
-      locDefs.forEach(([azimuth, polar, len])=>{
-        // Point on head surface at that angle
-        const sx = Math.sin(polar*Math.PI) * Math.cos(azimuth) * (headR + 0.022);
-        const sy = Math.cos(polar*Math.PI) * (headR + 0.022);
-        const sz = Math.sin(polar*Math.PI) * Math.sin(azimuth) * (headR + 0.022);
-        const loc = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.030, 0.014, len, 6),
-          mat.clone()
-        );
-        // Place loc so its top is at the scalp attach point
-        loc.position.set(sx, headY + sy - len*0.5, sz);
-        // Point the loc outward/downward from the head centre
-        loc.lookAt(sx*3, headY + sy - len*1.5, sz*3);
-        loc.rotateX(Math.PI/2);
-        g.add(loc);
+
+      locDefs.forEach(([azimuth, polar, len], idx)=>{
+        const o = headSurfaceOffset(headR + 0.014, azimuth, polar);
+        const ax = o.x, ay = o.y, az = o.z;
+        const sway = (idx % 3 - 1) * 0.018;
+        const pts = [
+          new THREE.Vector3(ax, headY + ay, az),
+          new THREE.Vector3(ax + sway, headY + ay - len * 0.28, az + 0.03),
+          new THREE.Vector3(ax - sway * 0.6, headY + ay - len * 0.58, az - 0.02),
+          new THREE.Vector3(ax + sway * 0.4, headY + ay - len * 0.82, az + 0.015),
+          new THREE.Vector3(ax, headY + ay - len, az + 0.01)
+        ];
+        addHairTube(g, pts, 0.020, mat.clone(), 10);
+        addHairTube(g, pts, 0.011, mat.clone(), 10);
       });
       return g;
     },
@@ -962,42 +956,36 @@ function buildHairMesh(buildH){
       m.position.y = headY;
       return m;
     },
-    ()=>{ // 4: cornrows/braids — ridges draped over the head surface front-to-back
+    ()=>{ // 4: cornrows — tight parallel braids from hairline to nape
       const g = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color:0x2a1200, roughness:.85 });
-      // Scalp base
+      const mat = new THREE.MeshStandardMaterial({ color:0x2a1200, roughness:0.88 });
       const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(headR + 0.016, 16, 12, 0, Math.PI*2, 0, Math.PI*0.54),
+        new THREE.SphereGeometry(headR + 0.010, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.48),
         mat.clone()
       );
       cap.position.y = headY;
       g.add(cap);
-      // 5 braids: each is a chain of small spheres draped front-to-back over the head
-      const braidXOffsets = [-0.20, -0.10, 0, 0.10, 0.20];
-      braidXOffsets.forEach(bx=>{
-        // Sample 10 points along the arc from front to back of the head
-        const steps = 10;
-        for(let s=0;s<steps;s++){
-          // polar angle goes from ~30° (front) to ~160° (back)
-          const polar = 0.30 + (s/(steps-1)) * 0.90; // 0→1 mapped to front→back
-          const azimuth = Math.PI * 0.5; // facing front (z+)
-          // compute head surface point, but use bx as the x offset
-          const pAngle = polar * Math.PI;
-          const r = headR + 0.030;
-          // Use a simplified arc: x=bx fixed, y and z follow circle
-          const arcAngle = lerp(-0.85, 0.85, s/(steps-1)); // -PI/2 to PI/2 arc
-          const py = headY + Math.cos(arcAngle) * r;
-          const pz = Math.sin(arcAngle) * r;
-          // clamp x so bead stays on head surface
-          const xMax = Math.sqrt(Math.max(0, r*r - (py-headY)*(py-headY) - pz*pz));
-          const cx = clamp(bx, -xMax, xMax);
-          const bead = new THREE.Mesh(
-            new THREE.SphereGeometry(0.028, 6, 6),
-            mat.clone()
-          );
-          bead.position.set(cx, py, pz);
-          g.add(bead);
+
+      const braidRows = [-0.17, -0.085, 0, 0.085, 0.17];
+      braidRows.forEach((xOff, row)=>{
+        const pts = [];
+        const steps = 14;
+        for(let i = 0; i <= steps; i++){
+          const t = i / steps;
+          const angle = lerp(-1.15, 1.15, t);
+          const r = headR + 0.014 + (row % 2) * 0.004;
+          const py = headY + Math.cos(angle) * r * 0.62;
+          const pz = Math.sin(angle) * r;
+          const dy = py - headY;
+          const xMax = Math.sqrt(Math.max(0, r * r - dy * dy - pz * pz));
+          pts.push(new THREE.Vector3(clamp(xOff, -xMax + 0.01, xMax - 0.01), py, pz));
         }
+        addHairTube(g, pts, 0.013, mat.clone(), 20);
+        const ptsRaised = pts.map((p, i) => {
+          const lift = 0.008 + Math.sin(i * 0.55) * 0.003;
+          return new THREE.Vector3(p.x, p.y + lift, p.z + 0.006);
+        });
+        addHairTube(g, ptsRaised, 0.009, mat.clone(), 20);
       });
       return g;
     },
@@ -1042,11 +1030,42 @@ function buildHatMesh(buildH){
     },
     ()=>{ // 2: snapback
       const g = new THREE.Group();
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.31,0.29,0.24,12), new THREE.MeshStandardMaterial({ color:JERSEY_COLORS[custom.jersey], emissive:JERSEY_COLORS[custom.jersey], emissiveIntensity:.2 }));
-      cap.position.y = y+0.1;
-      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.52,0.05,0.25), new THREE.MeshStandardMaterial({ color:0x111111 }));
-      brim.position.set(0, y, 0.22);
-      g.add(cap); g.add(brim); return g;
+      const headTop = y;
+      const jerseyCol = JERSEY_COLORS[custom.jersey];
+      const capMat = new THREE.MeshStandardMaterial({
+        color: jerseyCol, emissive: jerseyCol, emissiveIntensity: 0.12, roughness: 0.62
+      });
+      const brimMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.88 });
+
+      const crown = new THREE.Mesh(
+        new THREE.SphereGeometry(0.255, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.40),
+        capMat
+      );
+      crown.position.y = headTop + 0.01;
+      crown.scale.set(1.02, 0.68, 1.0);
+      g.add(crown);
+
+      const panelSeam = new THREE.Mesh(
+        new THREE.BoxGeometry(0.02, 0.12, 0.24),
+        brimMat
+      );
+      panelSeam.position.set(0, headTop + 0.06, 0.24);
+      g.add(panelSeam);
+
+      const bill = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.022, 0.20), brimMat);
+      bill.position.set(0, headTop - 0.01, 0.19);
+      bill.rotation.x = -0.32;
+      g.add(bill);
+
+      const button = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.012, 8), brimMat);
+      button.position.y = headTop + 0.12;
+      g.add(button);
+
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.018, 0.035), brimMat);
+      strap.position.set(0, headTop - 0.03, -0.19);
+      g.add(strap);
+
+      return g;
     },
     ()=>{ // 3: crown
       const g = new THREE.Group();
