@@ -82,11 +82,17 @@ const DRIBBLE_HEIGHT = 1.05;
 const BALL_STAND_Y = 1.2;
 let onBallCrouch  = 0;
 let offBallCrouch = 0;
-let stanceDropY   = 0;
+let stanceCrouch  = 0;   // knee-bend intensity only — never lowers root Y
 const ON_BALL_CROUCH_IDLE = 0.22;
 const ON_BALL_CROUCH_RUN  = 0.38;
 const OFF_BALL_CROUCH     = 0.12;
 const OFF_BALL_RUN_CROUCH = 0.18;
+
+// Shared humanoid rigs (player + AI use the same locomotion system)
+let playerRig = null;
+let aiRig     = null;
+let aiFacing  = 0;
+let aiDribblePhase = 0;
 let crossoverActive = false;
 let crossoverPhase  = 0;
 let crossoverFrom   = 'right';
@@ -388,6 +394,190 @@ function buildNet(parent, cx, cy, cz, r, depth){
 }
 
 // ─── Player (smoother silhouette with CylinderGeometry limbs) ─
+function darken(hexColor, amount){
+  const r = ((hexColor >> 16) & 0xff);
+  const g = ((hexColor >> 8)  & 0xff);
+  const b = ( hexColor        & 0xff);
+  return (Math.floor(r*amount)<<16) | (Math.floor(g*amount)<<8) | Math.floor(b*amount);
+}
+
+/** Shared athletic humanoid rig — used by player and AI defenders. */
+function buildHumanoidRig(opts){
+  const {
+    skinCol, jerseyCol, shoeCol, accentCol,
+    buildScale = 1.0, buildH = 1.0,
+    skinMeshes = null, jerseyMeshes = null, shoeMeshes = null,
+    isAI = false
+  } = opts;
+
+  const group = new THREE.Group();
+  const rig = {
+    group, buildH,
+    body: null, head: null, shorts: null,
+    legL: null, legR: null, kneeL: null, kneeR: null,
+    armL: null, armR: null, elbowL: null, elbowR: null,
+    handL: null, handR: null,
+    ballAnchorL: null, ballAnchorR: null,
+    locoPhase: 0, onBallCrouch: 0, offBallCrouch: 0, stanceCrouch: 0,
+    dribbleHand: 'right'
+  };
+
+  const pushSkin = m => { if(skinMeshes) skinMeshes.push(m); };
+  const pushJersey = m => { if(jerseyMeshes) jerseyMeshes.push(m); };
+  const pushShoe = (...m) => { if(shoeMeshes) shoeMeshes.push(...m); };
+
+  const jMat  = () => new THREE.MeshStandardMaterial({
+    color: jerseyCol, emissive: jerseyCol, emissiveIntensity: isAI ? 0.35 : 0.22, roughness: 0.55, metalness: 0.05
+  });
+  const sMat  = () => new THREE.MeshStandardMaterial({ color: skinCol, roughness: 0.65, metalness: 0 });
+  const shMat = () => new THREE.MeshStandardMaterial({
+    color: shoeCol, emissive: shoeCol, emissiveIntensity: isAI ? 0.25 : 0.35, roughness: 0.45, metalness: 0.1
+  });
+  const dkMat = () => new THREE.MeshStandardMaterial({ color: darken(jerseyCol, 0.38), roughness: 0.7 });
+
+  const pelvis = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.32 * buildScale, 0.28 * buildScale, 0.22 * buildH, 16),
+    dkMat()
+  );
+  pelvis.position.y = 0.88 * buildH;
+  pelvis.castShadow = true;
+  group.add(pelvis);
+
+  const torsoGeo = new THREE.CylinderGeometry(0.40 * buildScale, 0.28 * buildScale, 1.0 * buildH, 16);
+  rig.body = new THREE.Mesh(torsoGeo, jMat());
+  rig.body.position.y = 1.38 * buildH;
+  rig.body.castShadow = true;
+  group.add(rig.body);
+  pushJersey(rig.body);
+
+  const stripeCol = isAI ? accentCol : C_CYAN;
+  const stripe = new THREE.Mesh(
+    new THREE.BoxGeometry(0.44 * buildScale, 0.13, 0.42 * buildScale),
+    new THREE.MeshBasicMaterial({ color: stripeCol })
+  );
+  stripe.position.set(0, 1.38 * buildH, 0.01);
+  group.add(stripe);
+
+  const shortsGeo = new THREE.CylinderGeometry(0.36 * buildScale, 0.33 * buildScale, 0.44 * buildH, 16);
+  rig.shorts = new THREE.Mesh(shortsGeo, dkMat());
+  rig.shorts.position.y = 0.68 * buildH;
+  group.add(rig.shorts);
+  pushJersey(rig.shorts);
+
+  rig.head = new THREE.Mesh(new THREE.SphereGeometry(0.295, 20, 16), sMat());
+  rig.head.position.y = 2.0 * buildH;
+  rig.head.castShadow = true;
+  group.add(rig.head);
+  pushSkin(rig.head);
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.13, 0.2, 12), sMat());
+  neck.position.y = 1.78 * buildH;
+  group.add(neck);
+  pushSkin(neck);
+
+  if(isAI){
+    const eyeMat = new THREE.MeshBasicMaterial({ color: accentCol });
+    [-0.09, 0.09].forEach(x => {
+      const e = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), eyeMat.clone());
+      e.position.set(x, 1.90 * buildH, 0.27);
+      group.add(e);
+    });
+    const glow = new THREE.PointLight(accentCol, 0.8, 4);
+    glow.position.y = 1.2 * buildH;
+    group.add(glow);
+  }
+
+  function makeShoe(){
+    const g = new THREE.Group();
+    const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * buildScale, 0.13 * buildScale, 0.1, 14), shMat());
+    sole.position.y = 0.05; g.add(sole);
+    const toe = new THREE.Mesh(new THREE.SphereGeometry(0.13 * buildScale, 14, 10), shMat());
+    toe.scale.set(1, 0.6, 1.4); toe.position.set(0, 0.06, 0.1 * buildScale); g.add(toe);
+    const heel = new THREE.Mesh(new THREE.SphereGeometry(0.115 * buildScale, 10, 8), shMat());
+    heel.scale.set(1, 0.65, 1.0); heel.position.set(0, 0.05, -0.08 * buildScale); g.add(heel);
+    pushShoe(sole, toe, heel);
+    return g;
+  }
+
+  const thighGeo = new THREE.CylinderGeometry(0.145 * buildScale, 0.125 * buildScale, 0.42 * buildH, 12);
+  const shinGeo  = new THREE.CylinderGeometry(0.115 * buildScale, 0.095 * buildScale, 0.38 * buildH, 12);
+  const kneeSphGeo = new THREE.SphereGeometry(0.11 * buildScale, 10, 8);
+
+  function makeLeg(isLeft){
+    const leg = new THREE.Group();
+    const thigh = new THREE.Mesh(thighGeo.clone(), dkMat());
+    thigh.position.y = -0.21 * buildH; leg.add(thigh);
+    const knee = new THREE.Group();
+    knee.position.y = -0.43 * buildH;
+    knee.add(new THREE.Mesh(kneeSphGeo.clone(), sMat()));
+    const shin = new THREE.Mesh(shinGeo.clone(), dkMat());
+    shin.position.y = -0.20 * buildH; knee.add(shin);
+    const shoe = makeShoe();
+    shoe.position.set(0, -0.40 * buildH, 0.02); knee.add(shoe);
+    leg.add(knee);
+    leg.position.set(isLeft ? -0.19 * buildScale : 0.19 * buildScale, 0.78 * buildH, 0);
+    group.add(leg);
+    return { leg, knee, shoe };
+  }
+
+  const leftLeg = makeLeg(true);
+  rig.legL = leftLeg.leg; rig.kneeL = leftLeg.knee;
+  const rightLeg = makeLeg(false);
+  rig.legR = rightLeg.leg; rig.kneeR = rightLeg.knee;
+
+  function makeArm(isLeft){
+    const g = new THREE.Group();
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.115 * buildScale, 12, 10), jMat());
+    cap.position.y = 0; g.add(cap); pushJersey(cap);
+    const upper = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.105 * buildScale, 0.095 * buildScale, 0.42 * buildH, 12), jMat());
+    upper.position.y = -0.22 * buildH; g.add(upper); pushJersey(upper);
+    const elbowGrp = new THREE.Group();
+    elbowGrp.position.y = -0.44 * buildH;
+    const elbowSph = new THREE.Mesh(new THREE.SphereGeometry(0.095 * buildScale, 10, 8), sMat());
+    elbowGrp.add(elbowSph); pushSkin(elbowSph);
+    const fore = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.090 * buildScale, 0.075 * buildScale, 0.38 * buildH, 12), sMat());
+    fore.position.y = -0.20 * buildH; elbowGrp.add(fore); pushSkin(fore);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.078 * buildScale, 10, 8), sMat());
+    hand.position.y = -0.40 * buildH; elbowGrp.add(hand); pushSkin(hand);
+    const handAnchor = new THREE.Object3D();
+    handAnchor.position.set(0, -0.40 * buildH, 0.04 * buildScale);
+    elbowGrp.add(handAnchor);
+    g.add(elbowGrp);
+    g.position.set(isLeft ? -0.50 * buildScale : 0.50 * buildScale, 1.60 * buildH, 0);
+    group.add(g);
+    return { arm: g, elbow: elbowGrp, hand: handAnchor };
+  }
+
+  const armL = makeArm(true);
+  rig.armL = armL.arm; rig.elbowL = armL.elbow; rig.handL = armL.hand;
+  const armR = makeArm(false);
+  rig.armR = armR.arm; rig.elbowR = armR.elbow; rig.handR = armR.hand;
+
+  rig.ballAnchorR = new THREE.Object3D();
+  rig.ballAnchorR.position.set(0.78 * buildScale, 0.82 * buildH, 0.28);
+  group.add(rig.ballAnchorR);
+  rig.ballAnchorL = new THREE.Object3D();
+  rig.ballAnchorL.position.set(-0.78 * buildScale, 0.82 * buildH, 0.28);
+  group.add(rig.ballAnchorL);
+
+  return rig;
+}
+
+function bindPlayerRigFromGlobals(){
+  playerRig = {
+    group: playerGroup,
+    body: pBody, head: pHead, shorts: shortsRef,
+    legL: pLegL, legR: pLegR, kneeL: pKneeL, kneeR: pKneeR,
+    armL: pArmL, armR: pArmR, elbowL: pElbowL, elbowR: pElbowR,
+    handL: pHandL, handR: pHandR,
+    ballAnchorL: playerBallAnchorL, ballAnchorR: playerBallAnchorR,
+    locoPhase, onBallCrouch, offBallCrouch, stanceCrouch,
+    dribbleHand, buildH: [1.0, 1.0, 1.0, 1.2][custom.build]
+  };
+}
+
 function buildPlayer(){
   playerGroup = new THREE.Group();
 
@@ -562,6 +752,7 @@ function buildPlayer(){
 
   playerGroup.position.set(playerPos.x, playerPos.y, playerPos.z);
   scene.add(playerGroup);
+  bindPlayerRigFromGlobals();
 }
 
 function buildFace(buildH){
@@ -833,13 +1024,6 @@ function buildHatMesh(buildH){
   }
 }
 
-function darken(hexColor, amount){
-  const r = ((hexColor >> 16) & 0xff);
-  const g = ((hexColor >> 8)  & 0xff);
-  const b = ( hexColor        & 0xff);
-  return (Math.floor(r*amount)<<16) | (Math.floor(g*amount)<<8) | Math.floor(b*amount);
-}
-
 // ─── Ball ───────────────────────────────────────────────────
 function buildBall(){
   const geo = new THREE.SphereGeometry(BALL_RADIUS, 20, 20);
@@ -861,6 +1045,17 @@ function buildBall(){
 
 function getMoveSpeed(){
   return Math.hypot(playerVel.x, playerVel.z);
+}
+
+/** Movement direction relative to character facing (forward = +1, back = -1). */
+function getMoveLeanRelative(facing, vx, vz, speed){
+  if(speed < 0.25) return { moveFwd: 0, moveSide: 0 };
+  const fwdX = Math.sin(facing);
+  const fwdZ = Math.cos(facing);
+  return {
+    moveFwd:  (vx * fwdX + vz * fwdZ) / speed,
+    moveSide: (vx * fwdZ - vz * fwdX) / speed
+  };
 }
 
 function rotateOffsetByFacing(lx, lz){
@@ -896,23 +1091,38 @@ function sampleStride(phase){
   return { sin, cos, strike: Math.max(0, cos), ang };
 }
 
-/** Single-leg run/dribble drive pose. */
-function applyLegStride(leg, knee, phase, intensity){
+/** Single-leg run/dribble drive pose — crouch adds knee flex without sinking root. */
+function applyLegStride(leg, knee, phase, intensity, crouch = 0){
   const s = sampleStride(phase);
-  const thigh = s.sin * 0.50 * intensity + 0.16 * intensity;
-  const kneeBend = -Math.abs(s.sin) * 0.64 * intensity - s.strike * 0.30 * intensity;
+  const thigh = s.sin * 0.50 * intensity + 0.16 * intensity + crouch * 0.30;
+  const kneeBend = -Math.abs(s.sin) * 0.64 * intensity - s.strike * 0.30 * intensity - crouch * 0.58;
   if(leg) leg.rotation.x = thigh;
   if(knee) knee.rotation.x = kneeBend;
   return s.strike;
 }
 
+function syncRigPosition(rig, pos){
+  if(rig && rig.group) rig.group.position.set(pos.x, pos.y, pos.z);
+}
+
+function applyBodyLean(rig, leanFwd, leanSide, headBlend = 0.22){
+  if(rig.body){ rig.body.rotation.x = leanFwd; rig.body.rotation.z = leanSide * 0.45; }
+  if(rig.shorts) rig.shorts.rotation.x = leanFwd * 0.62;
+  if(rig.head){
+    const headPitch = clamp(-leanFwd * headBlend - 0.02, -0.28, 0.22);
+    rig.head.rotation.x = lerp(rig.head.rotation.x, headPitch, 0.22);
+    rig.head.rotation.z = lerp(rig.head.rotation.z, -leanSide * 0.35, 0.18);
+  }
+  if(rig.group) rig.group.rotation.z = lerp(rig.group.rotation.z || 0, leanSide, 0.14);
+}
+
 /** Dribble-hand reaches to floor; off-hand stays in protect position. */
-function applyOnBallDribbleArms(h, falling, speed){
-  const isR = dribbleHand === 'right';
-  const dA = isR ? pArmR : pArmL;
-  const dE = isR ? pElbowR : pElbowL;
-  const oA = isR ? pArmL : pArmR;
-  const oE = isR ? pElbowL : pElbowR;
+function applyOnBallDribbleArms(rig, hand, h, falling, speed){
+  const isR = hand === 'right';
+  const dA = isR ? rig.armR : rig.armL;
+  const dE = isR ? rig.elbowR : rig.elbowL;
+  const oA = isR ? rig.armL : rig.armR;
+  const oE = isR ? rig.elbowL : rig.elbowR;
 
   const reach = 1 - h;
   const shoulder = lerp(-0.08, 0.78, reach) + (falling ? reach * 0.14 : 0);
@@ -935,138 +1145,193 @@ function applyOnBallDribbleArms(h, falling, speed){
 }
 
 /** Low athletic dribble stance with contralateral footwork. */
-function applyOnBallLocomotion(dt, speed, moving, skipArms){
+function applyOnBallLocomotion(rig, ctx){
+  const { dt, speed, moving, facing, vel, skipArms, dribblePhase: dPhase } = ctx;
+  const hand = rig.dribbleHand || 'right';
+
   const gaitRate = moving ? 2.35 + speed * 0.30 : 0.85;
-  locoPhase = (locoPhase + dt * gaitRate) % 1;
+  rig.locoPhase = (rig.locoPhase + dt * gaitRate) % 1;
 
-  const lead = dribbleHand === 'right' ? 0 : 0.5;
+  const lead = hand === 'right' ? 0 : 0.5;
   const drive = moving ? 0.80 + Math.min(speed / PLAYER_SPEED, 1) * 0.42 : 0.50;
-  applyLegStride(pLegL, pKneeL, (locoPhase + lead) % 1, drive);
-  applyLegStride(pLegR, pKneeR, (locoPhase + lead + 0.5) % 1, drive);
-
-  const tDrop = moving
+  const tCrouch = moving
     ? lerp(ON_BALL_CROUCH_IDLE, ON_BALL_CROUCH_RUN, Math.min(speed / PLAYER_SPEED, 1))
     : ON_BALL_CROUCH_IDLE;
-  onBallCrouch = lerp(onBallCrouch, 1, clamp(dt * 10, 0, 1));
-  offBallCrouch = lerp(offBallCrouch, 0, clamp(dt * 10, 0, 1));
-  stanceDropY = lerp(stanceDropY, tDrop * onBallCrouch, clamp(dt * 12, 0, 1));
+  rig.onBallCrouch = lerp(rig.onBallCrouch, 1, clamp(dt * 10, 0, 1));
+  rig.offBallCrouch = lerp(rig.offBallCrouch, 0, clamp(dt * 10, 0, 1));
+  rig.stanceCrouch = lerp(rig.stanceCrouch, tCrouch * rig.onBallCrouch, clamp(dt * 12, 0, 1));
 
-  const leanFwd = 0.08 + (moving ? 0.16 + speed * 0.022 : 0.05);
-  let leanSide = 0;
-  if(speed > 0.25){
-    leanSide = Math.sin(Math.atan2(playerVel.x, playerVel.z) - playerFacing) * 0.07;
-  }
-  if(pBody){ pBody.rotation.x = leanFwd; pBody.rotation.z = leanSide * 0.45; }
-  if(shortsRef) shortsRef.rotation.x = leanFwd * 0.62;
-  if(pHead){
-    pHead.rotation.x = lerp(pHead.rotation.x, -leanFwd * 0.28 - 0.02, 0.22);
-    pHead.rotation.z = lerp(pHead.rotation.z, -leanSide * 0.4, 0.18);
-  }
+  applyLegStride(rig.legL, rig.kneeL, (rig.locoPhase + lead) % 1, drive, rig.stanceCrouch);
+  applyLegStride(rig.legR, rig.kneeR, (rig.locoPhase + lead + 0.5) % 1, drive, rig.stanceCrouch);
 
-  playerGroup.position.set(playerPos.x, playerPos.y - stanceDropY, playerPos.z);
-  playerGroup.rotation.z = lerp(playerGroup.rotation.z || 0, leanSide, 0.14);
+  const { moveFwd, moveSide } = getMoveLeanRelative(facing, vel.x, vel.z, speed);
+  const baseLean = 0.05 * rig.onBallCrouch;
+  const leanFwd = baseLean + (moving ? moveFwd * (0.14 + speed * 0.02) : 0.03);
+  const leanSide = moveSide * 0.09;
+  applyBodyLean(rig, leanFwd, leanSide, 0.22);
 
   if(!skipArms){
-    const { h, falling } = dribbleHeightFromPhase(dribblePhase);
-    applyOnBallDribbleArms(h, falling, speed);
+    const { h, falling } = dribbleHeightFromPhase(dPhase != null ? dPhase : dribblePhase);
+    applyOnBallDribbleArms(rig, hand, h, falling, speed);
   }
 }
 
 /** Off-ball sprint with natural opposing arm/leg pump. */
-function applyOffBallRunLocomotion(dt, speed){
+function applyOffBallRunLocomotion(rig, ctx){
+  const { dt, speed, facing, vel } = ctx;
   const gaitRate = 3.15 + speed * 0.42;
-  locoPhase = (locoPhase + dt * gaitRate) % 1;
+  rig.locoPhase = (rig.locoPhase + dt * gaitRate) % 1;
 
   const drive = 0.72 + Math.min(speed / PLAYER_SPEED, 1) * 0.55;
-  applyLegStride(pLegL, pKneeL, locoPhase, drive);
-  applyLegStride(pLegR, pKneeR, (locoPhase + 0.5) % 1, drive);
+  rig.offBallCrouch = lerp(rig.offBallCrouch, 0.55 + Math.min(speed / PLAYER_SPEED, 1) * 0.45, clamp(dt * 8, 0, 1));
+  rig.onBallCrouch = lerp(rig.onBallCrouch, 0, clamp(dt * 10, 0, 1));
+  const drop = lerp(OFF_BALL_CROUCH, OFF_BALL_RUN_CROUCH + 0.08, Math.min(speed / PLAYER_SPEED, 1));
+  rig.stanceCrouch = lerp(rig.stanceCrouch, drop * rig.offBallCrouch, clamp(dt * 11, 0, 1));
 
-  const ang = locoPhase * Math.PI * 2;
+  applyLegStride(rig.legL, rig.kneeL, rig.locoPhase, drive, rig.stanceCrouch);
+  applyLegStride(rig.legR, rig.kneeR, (rig.locoPhase + 0.5) % 1, drive, rig.stanceCrouch);
+
+  const ang = rig.locoPhase * Math.PI * 2;
   const pump = 0.55 + speed * 0.035;
   const armL = Math.sin(ang + Math.PI) * pump;
   const armR = Math.sin(ang) * pump;
 
-  if(pArmL){
-    pArmL.rotation.x = armL;
-    pArmL.rotation.z = 0.18 + Math.max(0, armL) * 0.08;
-    pArmL.rotation.y = 0;
+  if(rig.armL){
+    rig.armL.rotation.x = armL;
+    rig.armL.rotation.z = 0.18 + Math.max(0, armL) * 0.08;
+    rig.armL.rotation.y = 0;
   }
-  if(pArmR){
-    pArmR.rotation.x = armR;
-    pArmR.rotation.z = -0.18 - Math.max(0, armR) * 0.08;
+  if(rig.armR){
+    rig.armR.rotation.x = armR;
+    rig.armR.rotation.z = -0.18 - Math.max(0, armR) * 0.08;
   }
-  if(pElbowL) pElbowL.rotation.x = armL > 0 ? -0.55 : -0.16;
-  if(pElbowR) pElbowR.rotation.x = armR > 0 ? -0.55 : -0.16;
+  if(rig.elbowL) rig.elbowL.rotation.x = armL > 0 ? -0.55 : -0.16;
+  if(rig.elbowR) rig.elbowR.rotation.x = armR > 0 ? -0.55 : -0.16;
 
-  const leanFwd = 0.14 + speed * 0.030;
-  let leanSide = 0;
-  if(speed > 0.25){
-    leanSide = Math.sin(Math.atan2(playerVel.x, playerVel.z) - playerFacing) * 0.05;
-  }
-  if(pBody){ pBody.rotation.x = leanFwd; pBody.rotation.z = leanSide * 0.35; }
-  if(shortsRef) shortsRef.rotation.x = leanFwd * 0.48;
-  if(pHead) pHead.rotation.x = lerp(pHead.rotation.x, -leanFwd * 0.22, 0.2);
-
-  offBallCrouch = lerp(offBallCrouch, 0.55 + Math.min(speed / PLAYER_SPEED, 1) * 0.45, clamp(dt * 8, 0, 1));
-  onBallCrouch = lerp(onBallCrouch, 0, clamp(dt * 10, 0, 1));
-  const drop = lerp(OFF_BALL_CROUCH, OFF_BALL_RUN_CROUCH + 0.08, Math.min(speed / PLAYER_SPEED, 1));
-  stanceDropY = lerp(stanceDropY, drop * offBallCrouch, clamp(dt * 11, 0, 1));
-  playerGroup.position.set(playerPos.x, playerPos.y - stanceDropY, playerPos.z);
-  playerGroup.rotation.z = lerp(playerGroup.rotation.z || 0, leanSide, 0.12);
+  const { moveFwd, moveSide } = getMoveLeanRelative(facing, vel.x, vel.z, speed);
+  const leanFwd = moveFwd * (0.14 + speed * 0.030);
+  const leanSide = moveSide * 0.07;
+  if(rig.body){ rig.body.rotation.x = leanFwd; rig.body.rotation.z = leanSide * 0.35; }
+  if(rig.shorts) rig.shorts.rotation.x = leanFwd * 0.48;
+  if(rig.head) rig.head.rotation.x = lerp(rig.head.rotation.x, clamp(-leanFwd * 0.22, -0.25, 0.20), 0.2);
+  if(rig.group) rig.group.rotation.z = lerp(rig.group.rotation.z || 0, leanSide, 0.12);
 }
 
 /** Off-ball catch/defensive ready — light knee flex, hands up. */
-function applyOffBallReadyStance(dt){
-  locoPhase = (locoPhase + dt * 0.5) % 1;
-  const breathe = Math.sin(locoPhase * Math.PI * 2) * 0.018;
+function applyOffBallReadyStance(rig, dt){
+  rig.locoPhase = (rig.locoPhase + dt * 0.5) % 1;
+  const breathe = Math.sin(rig.locoPhase * Math.PI * 2) * 0.018;
 
-  if(pLegL) pLegL.rotation.x = 0.14 + breathe;
-  if(pLegR) pLegR.rotation.x = 0.14 - breathe;
-  if(pKneeL) pKneeL.rotation.x = -0.28;
-  if(pKneeR) pKneeR.rotation.x = -0.28;
+  if(rig.legL) rig.legL.rotation.x = 0.14 + breathe;
+  if(rig.legR) rig.legR.rotation.x = 0.14 - breathe;
+  if(rig.kneeL) rig.kneeL.rotation.x = -0.28 - OFF_BALL_CROUCH * 0.35;
+  if(rig.kneeR) rig.kneeR.rotation.x = -0.28 - OFF_BALL_CROUCH * 0.35;
 
   const up = -0.58;
-  if(pArmL){ pArmL.rotation.x = up; pArmL.rotation.z = 0.62; pArmL.rotation.y = 0; }
-  if(pArmR){ pArmR.rotation.x = up; pArmR.rotation.z = -0.62; }
-  if(pElbowL) pElbowL.rotation.x = -1.08;
-  if(pElbowR) pElbowR.rotation.x = -1.08;
+  if(rig.armL){ rig.armL.rotation.x = up; rig.armL.rotation.z = 0.62; rig.armL.rotation.y = 0; }
+  if(rig.armR){ rig.armR.rotation.x = up; rig.armR.rotation.z = -0.62; }
+  if(rig.elbowL) rig.elbowL.rotation.x = -1.08;
+  if(rig.elbowR) rig.elbowR.rotation.x = -1.08;
 
-  if(pBody){ pBody.rotation.x = 0.06; pBody.rotation.z = breathe * 0.4; }
-  if(shortsRef) shortsRef.rotation.x = 0.04;
-  if(pHead) pHead.rotation.x = lerp(pHead.rotation.x, -0.04, 0.15);
+  if(rig.body){ rig.body.rotation.x = 0.06; rig.body.rotation.z = breathe * 0.4; }
+  if(rig.shorts) rig.shorts.rotation.x = 0.04;
+  if(rig.head) rig.head.rotation.x = lerp(rig.head.rotation.x, -0.04, 0.15);
 
-  offBallCrouch = lerp(offBallCrouch, 1, clamp(dt * 7, 0, 1));
-  onBallCrouch = lerp(onBallCrouch, 0, clamp(dt * 10, 0, 1));
-  stanceDropY = lerp(stanceDropY, OFF_BALL_CROUCH * offBallCrouch, clamp(dt * 9, 0, 1));
-  playerGroup.position.set(playerPos.x, playerPos.y - stanceDropY, playerPos.z);
-  playerGroup.rotation.z = lerp(playerGroup.rotation.z || 0, 0, 0.1);
+  rig.offBallCrouch = lerp(rig.offBallCrouch, 1, clamp(dt * 7, 0, 1));
+  rig.onBallCrouch = lerp(rig.onBallCrouch, 0, clamp(dt * 10, 0, 1));
+  rig.stanceCrouch = lerp(rig.stanceCrouch, OFF_BALL_CROUCH * rig.offBallCrouch, clamp(dt * 9, 0, 1));
+  if(rig.group) rig.group.rotation.z = lerp(rig.group.rotation.z || 0, 0, 0.1);
+}
+
+/** AI steal wind-up — low lunge with reaching arms. */
+function applyStealWindupPose(rig, progress){
+  const t = clamp(progress, 0, 1);
+  const reach = Math.sin(t * Math.PI * 0.85);
+  if(rig.legL){ rig.legL.rotation.x = 0.42 + t * 0.35; }
+  if(rig.legR){ rig.legR.rotation.x = -0.18 - t * 0.22; }
+  if(rig.kneeL) rig.kneeL.rotation.x = -0.72 - t * 0.38;
+  if(rig.kneeR) rig.kneeR.rotation.x = -0.38 - t * 0.18;
+  if(rig.armL){ rig.armL.rotation.x = -0.35 - reach * 0.55; rig.armL.rotation.z = 0.45; }
+  if(rig.armR){ rig.armR.rotation.x = -0.30 - reach * 0.70; rig.armR.rotation.z = -0.35; }
+  if(rig.elbowL) rig.elbowL.rotation.x = -1.05 - reach * 0.35;
+  if(rig.elbowR) rig.elbowR.rotation.x = -1.10 - reach * 0.45;
+  if(rig.body){ rig.body.rotation.x = 0.22 + t * 0.18; rig.body.rotation.z = 0; }
+  if(rig.shorts) rig.shorts.rotation.x = 0.14 + t * 0.10;
+  if(rig.head) rig.head.rotation.x = lerp(rig.head.rotation.x, -0.12, 0.25);
+}
+
+/** Authoritative grounded locomotion for any humanoid rig. */
+function applyRigLocomotion(rig, ctx){
+  if(!rig || !rig.group) return;
+  const { dt, pos, vel, facing, onGround, mode, speed, moving, skipArms, dribblePhase: dPhase, stealProgress } = ctx;
+
+  syncRigPosition(rig, pos);
+
+  if(!onGround){
+    rig.onBallCrouch = lerp(rig.onBallCrouch, 0, clamp(dt * 14, 0, 1));
+    rig.offBallCrouch = lerp(rig.offBallCrouch, 0, clamp(dt * 14, 0, 1));
+    rig.stanceCrouch = lerp(rig.stanceCrouch, 0, clamp(dt * 14, 0, 1));
+    if(rig.group) rig.group.rotation.z = lerp(rig.group.rotation.z || 0, 0, 0.18);
+    return;
+  }
+
+  if(mode === 'steal_windup'){
+    applyStealWindupPose(rig, stealProgress);
+    return;
+  }
+  if(mode === 'on_ball'){
+    applyOnBallLocomotion(rig, { dt, speed, moving, facing, vel, skipArms, dribblePhase: dPhase });
+  } else if(mode === 'off_ball_run'){
+    applyOffBallRunLocomotion(rig, { dt, speed, facing, vel });
+  } else if(mode === 'off_ball_ready'){
+    applyOffBallReadyStance(rig, dt);
+  } else {
+    rig.stanceCrouch = lerp(rig.stanceCrouch, 0, clamp(dt * 10, 0, 1));
+  }
 }
 
 /** Authoritative grounded locomotion — replaces generic idle/run posing. */
 function applyPlayerLocomotion(dt){
-  if(!playerGroup) return;
-
-  if(animState === 'jump' || !playerOnGround){
-    onBallCrouch = lerp(onBallCrouch, 0, clamp(dt * 14, 0, 1));
-    offBallCrouch = lerp(offBallCrouch, 0, clamp(dt * 14, 0, 1));
-    stanceDropY = lerp(stanceDropY, 0, clamp(dt * 14, 0, 1));
-    playerGroup.position.set(playerPos.x, playerPos.y, playerPos.z);
-    playerGroup.rotation.z = lerp(playerGroup.rotation.z || 0, 0, 0.18);
-    return;
-  }
+  if(!playerRig) return;
+  playerRig.dribbleHand = dribbleHand;
+  playerRig.locoPhase = locoPhase;
+  playerRig.onBallCrouch = onBallCrouch;
+  playerRig.offBallCrouch = offBallCrouch;
+  playerRig.stanceCrouch = stanceCrouch;
 
   const speed = getMoveSpeed();
   const moving = speed > 0.35;
+  let mode = 'none';
+
+  if(animState === 'jump' || !playerOnGround){
+    applyRigLocomotion(playerRig, {
+      dt, pos: playerPos, vel: playerVel, facing: playerFacing,
+      onGround: false, mode: 'none', speed, moving
+    });
+    locoPhase = playerRig.locoPhase;
+    onBallCrouch = playerRig.onBallCrouch;
+    offBallCrouch = playerRig.offBallCrouch;
+    stanceCrouch = playerRig.stanceCrouch;
+    return;
+  }
 
   if(ballState === 'held'){
-    applyOnBallLocomotion(dt, speed, moving, crossoverActive);
+    mode = 'on_ball';
   } else if(ballState !== 'dunking'){
-    if(moving) applyOffBallRunLocomotion(dt, speed);
-    else applyOffBallReadyStance(dt);
-  } else {
-    stanceDropY = lerp(stanceDropY, 0, clamp(dt * 10, 0, 1));
-    playerGroup.position.set(playerPos.x, playerPos.y - stanceDropY, playerPos.z);
+    mode = moving ? 'off_ball_run' : 'off_ball_ready';
   }
+
+  applyRigLocomotion(playerRig, {
+    dt, pos: playerPos, vel: playerVel, facing: playerFacing,
+    onGround: true, mode, speed, moving,
+    skipArms: crossoverActive,
+    dribblePhase
+  });
+
+  locoPhase = playerRig.locoPhase;
+  onBallCrouch = playerRig.onBallCrouch;
+  offBallCrouch = playerRig.offBallCrouch;
+  stanceCrouch = playerRig.stanceCrouch;
 }
 
 function getHandAnchor(){
@@ -1083,45 +1348,31 @@ function snapBallToHand(){
 }
 
 // ─── AI Defender ────────────────────────────────────────────
+let aiPrevPos = { x: 0, z: 0 };
+
 function buildAI(){
-  if(aiGroup){ scene.remove(aiGroup); }
-  aiGroup = new THREE.Group();
+  if(aiRig && aiRig.group) scene.remove(aiRig.group);
 
-  const mat = d => new THREE.MeshStandardMaterial({ color:0x001020, emissive:d, emissiveIntensity:.55, roughness:.6 });
-
-  const aiColor = { easy:C_GREEN, medium:C_YELLOW, hard:C_PINK }[aiDifficulty];
-
-  // Body
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.28,0.9,8), mat(aiColor));
-  body.position.y = 1.2; aiGroup.add(body);
-  // Head
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.27,12,10), new THREE.MeshStandardMaterial({ color:0x0d0d2b, emissive:aiColor, emissiveIntensity:.3 }));
-  head.position.y = 1.88; aiGroup.add(head);
-  // Eyes (LED style)
-  const eyeMat = new THREE.MeshBasicMaterial({ color:aiColor });
-  [-0.09,0.09].forEach(x=>{
-    const e = new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6), eyeMat.clone());
-    e.position.set(x, 1.91, 0.25); aiGroup.add(e);
+  const aiColor = { easy: C_GREEN, medium: C_YELLOW, hard: C_PINK }[aiDifficulty];
+  aiRig = buildHumanoidRig({
+    skinCol: 0x0d0d2b,
+    jerseyCol: 0x001028,
+    shoeCol: 0x111122,
+    accentCol: aiColor,
+    buildScale: 1.0,
+    buildH: 1.0,
+    isAI: true
   });
-  // Legs
-  const legGeo = new THREE.CylinderGeometry(0.11,0.10,0.6,8);
-  const lL = new THREE.Mesh(legGeo, mat(aiColor));
-  lL.position.set(-0.18,0.28,0); aiGroup.add(lL);
-  const lR = new THREE.Mesh(legGeo.clone(), mat(aiColor));
-  lR.position.set(0.18,0.28,0); aiGroup.add(lR);
-  // Arms
-  const armGeo = new THREE.CylinderGeometry(0.09,0.08,0.7,8);
-  const aL = new THREE.Mesh(armGeo, mat(aiColor));
-  aL.position.set(-0.50,1.1,0); aL.rotation.z = 0.4; aiGroup.add(aL);
-  const aR = new THREE.Mesh(armGeo.clone(), mat(aiColor));
-  aR.position.set(0.50,1.1,0); aR.rotation.z = -0.4; aiGroup.add(aR);
-  // Glow light
-  const glow = new THREE.PointLight(aiColor, 0.8, 4);
-  glow.position.y = 1; aiGroup.add(glow);
-
+  aiGroup = aiRig.group;
+  aiFacing = Math.atan2(playerPos.x - aiPos.x, playerPos.z - aiPos.z);
+  aiGroup.rotation.y = aiFacing;
   aiGroup.position.set(aiPos.x, aiPos.y, aiPos.z);
   scene.add(aiGroup);
 
+  aiPrevPos.x = aiPos.x;
+  aiPrevPos.z = aiPos.z;
+  aiVel = { x: 0, y: 0, z: 0 };
+  aiDribblePhase = 0;
   aiState = 'defend';
   aiShootTimer = 0;
   aiStealCooldown = 1.5;
@@ -1129,8 +1380,61 @@ function buildAI(){
   aiStunnedTimer = 0;
 }
 
+function updateAIBall(dt){
+  if(!aiRig || ballState !== 'ai') return;
+  const speed = Math.hypot(aiVel.x, aiVel.z);
+  const rate = speed > 0.5 ? 2.4 + speed * 0.22 : 2.0;
+  aiDribblePhase = (aiDribblePhase + dt * rate) % 1;
+  const { h } = dribbleHeightFromPhase(aiDribblePhase);
+  const hand = aiRig.handR || aiRig.ballAnchorR;
+  if(!hand) return;
+  const wp = new THREE.Vector3();
+  hand.getWorldPosition(wp);
+  const drop = DRIBBLE_HEIGHT * (1 - h);
+  ballPos.x = wp.x;
+  ballPos.y = Math.max(FLOOR_Y + BALL_RADIUS, wp.y - drop);
+  ballPos.z = wp.z + 0.10;
+  ballMesh.position.set(ballPos.x, ballPos.y, ballPos.z);
+}
+
+function applyAILocomotion(dt){
+  if(!aiRig) return;
+
+  const speed = Math.hypot(aiVel.x, aiVel.z);
+  const moving = speed > 0.35;
+  let mode = 'off_ball_ready';
+  let stealProgress = 0;
+
+  if(aiStunnedTimer > 0){
+    aiRig.group.rotation.z = Math.sin(clock.getElapsedTime() * 18) * 0.12;
+    syncRigPosition(aiRig, aiPos);
+    return;
+  }
+  aiRig.group.rotation.z = lerp(aiRig.group.rotation.z || 0, 0, 0.15);
+
+  if(aiState === 'steal_windup'){
+    mode = 'steal_windup';
+    stealProgress = aiStealWindup / AI_STEAL_WINDUP[aiDifficulty];
+  } else if(aiState === 'shoot' && ballState === 'ai'){
+    mode = 'on_ball';
+    aiRig.dribbleHand = 'right';
+  } else if(aiState === 'defend'){
+    mode = moving ? 'off_ball_run' : 'off_ball_ready';
+  }
+
+  applyRigLocomotion(aiRig, {
+    dt, pos: aiPos, vel: aiVel, facing: aiFacing,
+    onGround: true, mode, speed, moving,
+    dribblePhase: aiDribblePhase,
+    stealProgress
+  });
+  aiGroup.rotation.y = aiFacing;
+}
+
 function removeAI(){
-  if(aiGroup){ scene.remove(aiGroup); aiGroup=null; }
+  if(aiRig && aiRig.group) scene.remove(aiRig.group);
+  aiGroup = null;
+  aiRig = null;
   aiActive = false;
   aiState = 'idle';
   aiStealWindup = 0;
@@ -1463,22 +1767,28 @@ function tryBlock(){
 
 // ─── AI Update ──────────────────────────────────────────────
 function updateAI(dt){
-  if(!aiActive || !aiGroup) return;
+  if(!aiActive || !aiGroup || !aiRig) return;
 
-  const speed = AI_SPEED[aiDifficulty];
+  const moveSpeed = AI_SPEED[aiDifficulty];
   const stealR = AI_STEAL_R[aiDifficulty];
   const reactDelay = AI_REACT[aiDifficulty];
+  const prevX = aiPos.x;
+  const prevZ = aiPos.z;
+  let targetFacing = aiFacing;
 
   aiStealCooldown = Math.max(0, aiStealCooldown - dt);
 
   if(aiStunnedTimer > 0){
     aiStunnedTimer = Math.max(0, aiStunnedTimer - dt);
-    aiGroup.rotation.z = Math.sin(clock.getElapsedTime() * 18) * 0.12;
-    aiGroup.position.set(aiPos.x, aiPos.y, aiPos.z);
     if(aiStunnedTimer <= 0){
-      aiGroup.rotation.z = 0;
+      aiRig.group.rotation.z = 0;
       aiState = 'defend';
     }
+    aiVel.x = 0;
+    aiVel.z = 0;
+    applyAILocomotion(dt);
+    aiPrevPos.x = aiPos.x;
+    aiPrevPos.z = aiPos.z;
     return;
   }
 
@@ -1488,12 +1798,10 @@ function updateAI(dt){
 
     const dx = playerPos.x - aiPos.x;
     const dz = playerPos.z - aiPos.z;
-    const d  = Math.sqrt(dx*dx + dz*dz) || 0.001;
-    aiPos.x += (dx/d) * speed * 0.35 * dt;
-    aiPos.z += (dz/d) * speed * 0.35 * dt;
-    aiGroup.position.set(aiPos.x, aiPos.y, aiPos.z);
-    aiGroup.rotation.y = Math.atan2(dx, dz);
-    aiGroup.rotation.x = -0.25 * Math.min(1, aiStealWindup / duration);
+    const d  = Math.sqrt(dx * dx + dz * dz) || 0.001;
+    aiPos.x += (dx / d) * moveSpeed * 0.35 * dt;
+    aiPos.z += (dz / d) * moveSpeed * 0.35 * dt;
+    targetFacing = Math.atan2(dx, dz);
 
     if(aiStealWarningEl){
       aiStealWarningEl.classList.toggle('hidden', aiStealWindup < duration * STEAL_PUNISH_START);
@@ -1506,7 +1814,6 @@ function updateAI(dt){
 
     if(aiStealWindup >= duration){
       aiStealWindup = 0;
-      aiGroup.rotation.x = 0;
       if(aiStealWarningEl) aiStealWarningEl.classList.add('hidden');
 
       if(ballState === 'held' && d <= stealR * 1.15){
@@ -1514,6 +1821,7 @@ function updateAI(dt){
         aiState = 'shoot';
         aiShootTimer = 0;
         aiShootChargeTime = reactDelay + Math.random() * 1.5;
+        aiDribblePhase = 0;
         showFeedback('STOLEN! 😱');
       } else {
         aiState = 'defend';
@@ -1521,63 +1829,57 @@ function updateAI(dt){
         showFeedback('STEAL WHIFF!');
       }
     }
-    return;
-  }
-
-  if(aiState === 'defend'){
+  } else if(aiState === 'defend'){
     if(ballState === 'held'){
-      // Chase player
       const dx = playerPos.x - aiPos.x;
       const dz = playerPos.z - aiPos.z;
-      const d  = Math.sqrt(dx*dx+dz*dz);
+      const d  = Math.sqrt(dx * dx + dz * dz);
       if(d > 0.5){
-        aiPos.x += (dx/d)*speed*dt;
-        aiPos.z += (dz/d)*speed*dt;
+        aiPos.x += (dx / d) * moveSpeed * dt;
+        aiPos.z += (dz / d) * moveSpeed * dt;
       }
-      aiGroup.position.set(aiPos.x, aiPos.y, aiPos.z);
-      // Face player
-      aiGroup.rotation.y = Math.atan2(dx, dz);
+      targetFacing = Math.atan2(dx, dz);
 
-      // Wind-up steal instead of instant grab
       if(d < stealR && aiStealCooldown <= 0 && ballState === 'held'){
         aiState = 'steal_windup';
         aiStealWindup = 0;
         showFeedback('WATCH THE HANDS!');
       }
     } else if(ballState === 'flying' || ballState === 'dead'){
-      // Retreat slightly
       const dz = HOOP_Z - aiPos.z;
       if(Math.abs(dz) > 3){
-        aiPos.z += Math.sign(dz)*speed*0.5*dt;
-        aiGroup.position.set(aiPos.x, aiPos.y, aiPos.z);
+        aiPos.z += Math.sign(dz) * moveSpeed * 0.5 * dt;
+        targetFacing = Math.atan2(0 - aiPos.x, HOOP_Z - aiPos.z);
       }
     }
   } else if(aiState === 'shoot'){
-    // AI has ball — move toward good shooting position
-    const targetX = HOOP_X + (Math.random()-.5)*2;
+    const targetX = HOOP_X + (Math.random() - 0.5) * 2;
     const targetZ = HOOP_Z + 5;
     const dx = targetX - aiPos.x;
     const dz = targetZ - aiPos.z;
-    const d  = Math.sqrt(dx*dx+dz*dz);
+    const d  = Math.sqrt(dx * dx + dz * dz);
     if(d > 0.8){
-      aiPos.x += (dx/d)*speed*0.7*dt;
-      aiPos.z += (dz/d)*speed*0.7*dt;
-      aiGroup.position.set(aiPos.x, aiPos.y, aiPos.z);
+      aiPos.x += (dx / d) * moveSpeed * 0.7 * dt;
+      aiPos.z += (dz / d) * moveSpeed * 0.7 * dt;
     }
-    aiGroup.rotation.y = Math.atan2(HOOP_X-aiPos.x, HOOP_Z-aiPos.z);
-
-    // Ball follows AI
-    ballPos.x = aiPos.x;
-    ballPos.y = aiPos.y + 1.1;
-    ballPos.z = aiPos.z;
-    ballMesh.position.set(ballPos.x, ballPos.y, ballPos.z);
+    targetFacing = Math.atan2(HOOP_X - aiPos.x, HOOP_Z - aiPos.z);
 
     aiShootTimer += dt;
     if(aiShootTimer >= aiShootChargeTime){
-      // AI shoots!
       aiShootFromPosition();
     }
   }
+
+  aiVel.x = (aiPos.x - prevX) / Math.max(dt, 0.001);
+  aiVel.z = (aiPos.z - prevZ) / Math.max(dt, 0.001);
+
+  const faceDiff = ((targetFacing - aiFacing + Math.PI) % (Math.PI * 2)) - Math.PI;
+  aiFacing += faceDiff * clamp(dt * 12, 0, 1);
+
+  applyAILocomotion(dt);
+  updateAIBall(dt);
+  aiPrevPos.x = aiPos.x;
+  aiPrevPos.z = aiPos.z;
 }
 
 function aiShootFromPosition(){
@@ -1794,7 +2096,7 @@ function updateCamera(dt){
   // Look at the player (slightly above feet), drifting a bit toward hoop
   camera.lookAt(
     lerp(playerPos.x, HOOP_X, 0.15),
-    playerPos.y + 1.2 - stanceDropY * 0.85,
+    playerPos.y + 1.2 - (playerRig ? playerRig.stanceCrouch * 0.12 : 0),
     lerp(playerPos.z, HOOP_Z, 0.25)
   );
 }
@@ -2218,7 +2520,13 @@ function startGame(){
   ballSpinAngle=0;
   onBallCrouch=0;
   offBallCrouch=0;
-  stanceDropY=0;
+  stanceCrouch=0;
+  if(playerRig){
+    playerRig.locoPhase = 0;
+    playerRig.onBallCrouch = 0;
+    playerRig.offBallCrouch = 0;
+    playerRig.stanceCrouch = 0;
+  }
   dribbleLblEl.textContent='▶ RIGHT';
   removeAI();
   scoreEl.textContent='00';
