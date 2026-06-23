@@ -3466,6 +3466,7 @@
             enemies.forEach(e => scene.remove(e.mesh));
             enemies = [];
             startCinematicDialogue(activeBoss.transformDialogue, true, () => {
+                hideBossDialogue();
                 playVoidTransitionScream();
                 screenShake = 2.8;
                 voidTransformPhase = 'ascend';
@@ -3502,6 +3503,7 @@
             if (voidTransformTimer <= 0) {
                 voidTransformActive = false;
                 voidTransformPhase = 'idle';
+                hideBossDialogue();
                 if (activeBoss) {
                     activeBoss.mesh.position.set(0, activeBoss.floatY, 0);
                     activeBoss.mesh.scale.setScalar(1);
