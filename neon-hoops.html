@@ -36,7 +36,7 @@
     <span class="key">W A S D</span> MOVE &nbsp;|&nbsp;
     <span class="key">SPACE</span> JUMP / DUNK &nbsp;|&nbsp;
     <span class="key">LMB</span> SHOOT &nbsp;|&nbsp;
-    <span class="key">RMB</span> STEAL &nbsp;|&nbsp;
+    <span class="key">E</span> STEAL &nbsp;|&nbsp;
     <span class="key">C</span> CROSSOVER &nbsp;|&nbsp;
     <span class="key">F</span> BLOCK &nbsp;|&nbsp;
     <span class="key">ESC</span> CUSTOMIZE
@@ -65,8 +65,14 @@
   <div id="ai-zone-prompt" class="hidden">
     <div class="zone-sign">
       🤖 AI DEFENDER ZONE<br/>
+      Pick difficulty — you jump to half court!<br/>
       <span class="key">1</span> EASY &nbsp; <span class="key">2</span> MEDIUM &nbsp; <span class="key">3</span> HARD
     </div>
+  </div>
+
+  <!-- Shown while AI is winding up a steal; crossover now to stun them -->
+  <div id="ai-steal-warning" class="hidden ai-steal-warning">
+    ⚠ STEAL ATTEMPT — press <span class="key">C</span> NOW!
   </div>
 
   <!-- Tutorial overlay -->
@@ -95,8 +101,8 @@
         <div class="tut-step" data-step="3">
           <div class="tut-icon">🤖</div>
           <div class="tut-title">AI DEFENDER</div>
-          <div class="tut-desc">Walk into the glowing <span style="color:#bf00ff;">purple zone</span> near the far end of the court to spawn an AI defender. Choose Easy, Medium, or Hard!</div>
-          <div class="tut-tip">💡 If the AI steals the ball, press <span class="key">F</span> near them to block their shot!</div>
+          <div class="tut-desc">Walk into the glowing <span style="color:#bf00ff;">purple zone</span> and press <span class="key">1</span>/<span class="key">2</span>/<span class="key">3</span> for Easy, Medium, or Hard. You'll warp to half court for a 1v1 check-up!</div>
+          <div class="tut-tip">💡 When the AI winds up a steal, press <span class="key">C</span> to crossover and stun them for 2 seconds. Press <span class="key">E</span> to steal the ball back with a wind-up.</div>
         </div>
         <div class="tut-step" data-step="4">
           <div class="tut-icon">👕</div>

@@ -2691,6 +2691,26 @@ body.neon-hoops-page .zone-sign {
     line-height: 2;
 }
 
+body.neon-hoops-page .ai-steal-warning {
+    position: fixed;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 18;
+    pointer-events: none;
+    text-align: center;
+    background: rgba(20, 0, 0, 0.88);
+    border: 2px solid var(--neon-pink);
+    border-radius: 6px;
+    padding: 10px 18px;
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: var(--neon-pink);
+    text-shadow: 0 0 8px var(--neon-pink);
+    box-shadow: 0 0 24px rgba(255, 45, 120, 0.45);
+    animation: neon-hoops-pulse-warn 0.35s ease-in-out infinite alternate;
+}
+
 body.neon-hoops-page #feedback-msg {
     position: fixed;
     top: 50%;

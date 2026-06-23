@@ -16,6 +16,12 @@ const RIM_RADIUS    = 0.9;
 const GAME_DURATION = 60;
 const DUNK_DIST     = 3.2;   // max distance from rim to attempt dunk
 const AI_ZONE_Z     = -24;   // centre of AI spawn zone
+const HALF_COURT_Z  = -4;    // mid-court check-up spot after picking AI difficulty
+const AI_DUEL_DEF_Z = HOOP_Z + 8; // defender spawns here for half-court 1v1
+const PLAYER_STEAL_DURATION = 0.55;
+const AI_STEAL_WINDUP = { easy: 0.9, medium: 0.72, hard: 0.58 };
+const STEAL_STUN_DURATION = 2.0;
+const STEAL_PUNISH_START = 0.62; // crossover during this window of AI wind-up stuns them
 
 const C_CYAN   = 0x00f5ff;
 const C_PURPLE = 0xbf00ff;
@@ -96,11 +102,13 @@ let ballRimContactTime = 0;
 let aiActive   = false;
 let aiPos      = { x:2, y:FLOOR_Y, z:AI_ZONE_Z + 4 };
 let aiVel      = { x:0, y:0, z:0 };
-let aiState    = 'idle';   // 'idle'|'defend'|'shoot'|'stolen'
+let aiState    = 'idle';   // 'idle'|'defend'|'shoot'|'steal_windup'|'stunned'
 let aiDifficulty = 'medium'; // 'easy'|'medium'|'hard'
 let aiShootTimer = 0;
 let aiStealCooldown = 0;
 let aiShootChargeTime = 0;
+let aiStealWindup = 0;
+let aiStunnedTimer = 0;
 
 const AI_SPEED    = { easy:3, medium:5.5, hard:8 };
 const AI_STEAL_R  = { easy:1.8, medium:1.3, hard:1.0 };
@@ -118,6 +126,7 @@ const jRot = {
   headX:0,  headZ:0,
   armLX:0, armLZ:0,
   armRX:0, armRZ:0,
+  elbLX:0, elbRX:0,
   legLX:0, legRX:0,
   legLZ:0, legRZ:0,
 };
@@ -125,6 +134,8 @@ const jRot = {
 // Steal
 let stealCooldown = 0;
 let stealAnimTimer = 0;
+let playerStealActive = false;
+let playerStealPhase = 0;
 
 // Score / timer
 let score = 0, timeLeft = GAME_DURATION, timerAccum = 0;
@@ -158,6 +169,7 @@ const shotNeedleEl   = document.getElementById('shot-meter-needle');
 const dribbleIndEl   = document.getElementById('dribble-indicator');
 const dribbleLblEl   = document.getElementById('dribble-label');
 const aiZonePromptEl = document.getElementById('ai-zone-prompt');
+const aiStealWarningEl = document.getElementById('ai-steal-warning');
 const tutScreenEl    = document.getElementById('tutorial-screen');
 const customScreenEl = document.getElementById('custom-screen');
 
@@ -881,13 +893,68 @@ function buildAI(){
   aiState = 'defend';
   aiShootTimer = 0;
   aiStealCooldown = 1.5;
+  aiStealWindup = 0;
+  aiStunnedTimer = 0;
 }
 
 function removeAI(){
   if(aiGroup){ scene.remove(aiGroup); aiGroup=null; }
   aiActive = false;
   aiState = 'idle';
+  aiStealWindup = 0;
+  aiStunnedTimer = 0;
+  playerStealActive = false;
+  playerStealPhase = 0;
+  if(aiStealWarningEl) aiStealWarningEl.classList.add('hidden');
   if(ballState === 'ai') ballState = 'dead';
+}
+
+/** Teleport both players to half court and begin a 1v1 check-up vs the AI. */
+function beginAIDuel(difficulty){
+  if(!gameActive) startGame();
+
+  aiDifficulty = difficulty;
+  playerPos.x = 0;
+  playerPos.y = FLOOR_Y;
+  playerPos.z = HALF_COURT_Z;
+  playerVel = { x:0, y:0, z:0 };
+  playerOnGround = true;
+  jumpCount = 0;
+  if(playerGroup) playerGroup.position.set(playerPos.x, playerPos.y, playerPos.z);
+
+  aiPos.x = 0;
+  aiPos.y = FLOOR_Y;
+  aiPos.z = AI_DUEL_DEF_Z;
+  aiActive = true;
+  buildAI();
+
+  ballState = 'held';
+  ballVel = { x:0, y:0, z:0 };
+  shotCharging = false;
+  shotWrapEl.classList.add('hidden');
+  playerStealActive = false;
+  playerStealPhase = 0;
+  snapBallToHand();
+
+  aiZonePromptEl.classList.add('hidden');
+  const labels = { easy:'EASY', medium:'MEDIUM', hard:'HARD' };
+  showFeedback(`${labels[difficulty]} DEFENDER — HALF COURT!`);
+}
+
+function punishAISteal(){
+  aiStunnedTimer = STEAL_STUN_DURATION;
+  aiState = 'defend';
+  aiStealWindup = 0;
+  aiStealCooldown = 2.5;
+  if(aiStealWarningEl) aiStealWarningEl.classList.add('hidden');
+  if(aiGroup) aiGroup.rotation.z = 0;
+  showFeedback('ANKLE BREAKER! 🔥');
+}
+
+function isAIStealPunishWindow(){
+  if(aiState !== 'steal_windup') return false;
+  const duration = AI_STEAL_WINDUP[aiDifficulty];
+  return aiStealWindup >= duration * STEAL_PUNISH_START;
 }
 
 // ─── Starfield ──────────────────────────────────────────────
@@ -932,16 +999,12 @@ function initInput(){
 
     if(e.code==='KeyF'){ tryBlock(); }
 
-    // AI difficulty spawn
-    if(aiActive && aiState==='idle'){
-      if(e.code==='Digit1'){ aiDifficulty='easy'; buildAI(); }
-      if(e.code==='Digit2'){ aiDifficulty='medium'; buildAI(); }
-      if(e.code==='Digit3'){ aiDifficulty='hard'; buildAI(); }
-    }
-    if(!aiActive && inAIZone()){
-      if(e.code==='Digit1'){ aiDifficulty='easy'; aiActive=true; buildAI(); }
-      if(e.code==='Digit2'){ aiDifficulty='medium'; aiActive=true; buildAI(); }
-      if(e.code==='Digit3'){ aiDifficulty='hard'; aiActive=true; buildAI(); }
+    if(e.code==='KeyE'){ startPlayerSteal(); }
+
+    if(inAIZone()){
+      if(e.code==='Digit1') beginAIDuel('easy');
+      if(e.code==='Digit2') beginAIDuel('medium');
+      if(e.code==='Digit3') beginAIDuel('hard');
     }
   });
 
@@ -952,8 +1015,7 @@ function initInput(){
     if(isCustomizeOpen()) return;
     if(e.target !== renderer.domElement) return;
     if(!gameActive) return;
-    if(e.button === 0 && ballState==='held' && !shotCharging) startShotCharge();
-    if(e.button === 2) trySteal();
+    if(e.button === 0 && ballState==='held' && !shotCharging && !playerStealActive) startShotCharge();
   });
 
   window.addEventListener('mouseup', e=>{
@@ -981,11 +1043,13 @@ function handleJumpOrDunk(){
 
 function switchDribbleHand(){
   if(crossoverActive) return;
+  if(isAIStealPunishWindow()){
+    punishAISteal();
+  }
   crossoverActive = true;
   crossoverPhase  = 0;
   crossoverFrom   = dribbleHand;
   crossoverTo     = dribbleHand === 'right' ? 'left' : 'right';
-  // no feedback popup — just do the animation
 }
 
 // ─── Shot Meter ─────────────────────────────────────────────
@@ -1100,25 +1164,53 @@ function updateDunk(dt){
 }
 
 // ─── Steal ──────────────────────────────────────────────────
-function trySteal(){
-  if(!aiActive) return;
-  if(aiState !== 'shoot') return;  // AI must have the ball
-  if(stealCooldown > 0) return;
+function getPlayerStealRange(){
+  return { easy:2.6, medium:2.0, hard:1.5 }[aiDifficulty];
+}
+
+function startPlayerSteal(){
+  if(!aiActive || playerStealActive || stealCooldown > 0) return;
+  if(aiState !== 'shoot' || ballState !== 'ai') return;
   const d = dist2D(playerPos.x, playerPos.z, aiPos.x, aiPos.z);
-  const stealRange = { easy:2.8, medium:2.0, hard:1.4 }[aiDifficulty];
-  if(d <= stealRange){
-    aiState   = 'defend';
+  if(d > getPlayerStealRange()){
+    showFeedback('TOO FAR!');
+    return;
+  }
+  playerStealActive = true;
+  playerStealPhase = 0;
+  stealAnimTimer = PLAYER_STEAL_DURATION;
+}
+
+function updatePlayerSteal(dt){
+  if(!playerStealActive) return;
+  playerStealPhase += dt / PLAYER_STEAL_DURATION;
+  stealAnimTimer = Math.max(0, (1 - playerStealPhase) * PLAYER_STEAL_DURATION);
+  if(playerStealPhase < 1) return;
+
+  playerStealActive = false;
+  playerStealPhase = 0;
+
+  if(!aiActive || aiState !== 'shoot' || ballState !== 'ai'){
+    showFeedback('TOO LATE!');
+    stealCooldown = 0.8;
+    return;
+  }
+
+  const d = dist2D(playerPos.x, playerPos.z, aiPos.x, aiPos.z);
+  if(d <= getPlayerStealRange()){
+    aiState = 'defend';
     ballState = 'held';
     aiShootTimer = 0;
     stealCooldown = 1.5;
-    stealAnimTimer = 0.4;
-    animState = 'steal';
-    animTimer = 0;
+    stealAnimTimer = 0.45;
+    snapBallToHand();
     showFeedback('STEAL! 🔥');
   } else {
-    showFeedback('TOO FAR!');
+    showFeedback('MISSED STEAL!');
+    stealCooldown = 1.0;
   }
 }
+
 function tryBlock(){
   if(!aiActive || ballState !== 'ai') return;
   const d = dist2D(playerPos.x, playerPos.z, aiPos.x, aiPos.z);
@@ -1147,6 +1239,59 @@ function updateAI(dt){
 
   aiStealCooldown = Math.max(0, aiStealCooldown - dt);
 
+  if(aiStunnedTimer > 0){
+    aiStunnedTimer = Math.max(0, aiStunnedTimer - dt);
+    aiGroup.rotation.z = Math.sin(clock.getElapsedTime() * 18) * 0.12;
+    aiGroup.position.set(aiPos.x, aiPos.y, aiPos.z);
+    if(aiStunnedTimer <= 0){
+      aiGroup.rotation.z = 0;
+      aiState = 'defend';
+    }
+    return;
+  }
+
+  if(aiState === 'steal_windup'){
+    const duration = AI_STEAL_WINDUP[aiDifficulty];
+    aiStealWindup += dt;
+
+    const dx = playerPos.x - aiPos.x;
+    const dz = playerPos.z - aiPos.z;
+    const d  = Math.sqrt(dx*dx + dz*dz) || 0.001;
+    aiPos.x += (dx/d) * speed * 0.35 * dt;
+    aiPos.z += (dz/d) * speed * 0.35 * dt;
+    aiGroup.position.set(aiPos.x, aiPos.y, aiPos.z);
+    aiGroup.rotation.y = Math.atan2(dx, dz);
+    aiGroup.rotation.x = -0.25 * Math.min(1, aiStealWindup / duration);
+
+    if(aiStealWarningEl){
+      aiStealWarningEl.classList.toggle('hidden', aiStealWindup < duration * STEAL_PUNISH_START);
+    }
+
+    if(isAIStealPunishWindow() && crossoverActive){
+      punishAISteal();
+      return;
+    }
+
+    if(aiStealWindup >= duration){
+      aiStealWindup = 0;
+      aiGroup.rotation.x = 0;
+      if(aiStealWarningEl) aiStealWarningEl.classList.add('hidden');
+
+      if(ballState === 'held' && d <= stealR * 1.15){
+        ballState = 'ai';
+        aiState = 'shoot';
+        aiShootTimer = 0;
+        aiShootChargeTime = reactDelay + Math.random() * 1.5;
+        showFeedback('STOLEN! 😱');
+      } else {
+        aiState = 'defend';
+        aiStealCooldown = 1.2;
+        showFeedback('STEAL WHIFF!');
+      }
+    }
+    return;
+  }
+
   if(aiState === 'defend'){
     if(ballState === 'held'){
       // Chase player
@@ -1161,14 +1306,11 @@ function updateAI(dt){
       // Face player
       aiGroup.rotation.y = Math.atan2(dx, dz);
 
-      // Try steal
-      if(d < stealR && aiStealCooldown <= 0){
-        // Steal!
-        ballState = 'ai';
-        aiState   = 'shoot';
-        aiShootTimer = 0;
-        aiShootChargeTime = reactDelay + Math.random()*1.5;
-        showFeedback('STOLEN! 😱');
+      // Wind-up steal instead of instant grab
+      if(d < stealR && aiStealCooldown <= 0 && ballState === 'held'){
+        aiState = 'steal_windup';
+        aiStealWindup = 0;
+        showFeedback('WATCH THE HANDS!');
       }
     } else if(ballState === 'flying' || ballState === 'dead'){
       // Retreat slightly
@@ -1341,6 +1483,7 @@ function updateDribble(dt){
     // Both arms swing during crossover
     if(pArmR) pArmR.rotation.x = lerp(0.4, -0.1, t);
     if(pArmL) pArmL.rotation.x = lerp(-0.1, 0.4, t);
+    if(pBody) pBody.rotation.z = lerp(pBody.rotation.z, (crossoverFrom === 'right' ? 1 : -1) * 0.12 * Math.sin(t * Math.PI), 0.25);
     return;
   }
 
@@ -1417,10 +1560,15 @@ function physicsStep(dt){
   if(keys['KeyA']||keys['ArrowLeft'])  mx=-1;
   if(keys['KeyD']||keys['ArrowRight']) mx= 1;
   const mLen = Math.sqrt(mx*mx+mz*mz);
-  if(mLen>0){ mx/=mLen; mz/=mLen; }
+  if(mLen > 0 && !playerStealActive){ mx /= mLen; mz /= mLen; }
 
-  playerVel.x = mx*PLAYER_SPEED;
-  playerVel.z = mz*PLAYER_SPEED;
+  if(playerStealActive){
+    playerVel.x = 0;
+    playerVel.z = 0;
+  } else {
+    playerVel.x = mx * PLAYER_SPEED;
+    playerVel.z = mz * PLAYER_SPEED;
+  }
 
   if(!playerOnGround) playerVel.y += GRAVITY*dt;
 
@@ -1455,9 +1603,9 @@ function physicsStep(dt){
     animState = 'dunk';
   } else if(shotCharging){
     animState = 'shoot';
-  } else if(stealAnimTimer > 0){
+  } else if(playerStealActive || stealAnimTimer > 0){
     animState = 'steal';
-    stealAnimTimer = Math.max(0, stealAnimTimer - dt);
+    if(!playerStealActive) stealAnimTimer = Math.max(0, stealAnimTimer - dt);
   } else if(!playerOnGround){
     animState = 'jump';
   } else if(moving){
@@ -1474,30 +1622,37 @@ function physicsStep(dt){
   const T = animTimer;
 
   if(animState === 'idle'){
-    // Subtle breathing — gentle torso bob, arms slightly out
-    const breathe = Math.sin(T*1.4)*0.018;
+    const breathe = Math.sin(T * 1.2) * 0.022;
+    const sway = Math.sin(T * 0.75) * 0.035;
     tgt.torsoX  = breathe;
-    tgt.armLZ   =  0.30 + Math.sin(T*1.4)*0.04;
-    tgt.armRZ   = -0.30 - Math.sin(T*1.4)*0.04;
-    tgt.elbLX   = -0.12;
-    tgt.elbRX   = -0.12;
-    // Dribble arm bobs (set in updateDribble — don't override here, leave at 0)
+    tgt.torsoZ  = sway;
+    tgt.headZ   = -sway * 0.45;
+    tgt.armLZ   =  0.32 + Math.sin(T * 1.2) * 0.05;
+    tgt.armRZ   = -0.32 - Math.sin(T * 1.2) * 0.05;
+    tgt.elbLX   = -0.18;
+    tgt.elbRX   = -0.18;
+    tgt.kneeLX  = -0.06;
+    tgt.kneeRX  = -0.06;
   }
 
   if(animState === 'run'){
-    // Classic running cycle: arms pump opposite to legs, knees bend
-    const cycle = T * 9;
-    const legSwing = 0.52, kneeSwing = 0.40;
-    tgt.legLX  =  Math.sin(cycle)       * legSwing;
-    tgt.legRX  =  Math.sin(cycle+Math.PI) * legSwing;
-    tgt.kneeLX = -Math.abs(Math.sin(cycle))       * kneeSwing;
-    tgt.kneeRX = -Math.abs(Math.sin(cycle+Math.PI)) * kneeSwing;
-    // Arms pump in opposition — dribble arm handled in updateDribble
-    if(dribbleHand !== 'left')  tgt.armLX = Math.sin(cycle+Math.PI)*0.40;
-    if(dribbleHand !== 'right') tgt.armRX = Math.sin(cycle)*0.40;
-    // Slight torso lean forward and side rock
-    tgt.torsoX  = -0.08;
-    tgt.torsoZ  = Math.sin(cycle)*0.04;
+    const speed = Math.sqrt(playerVel.x * playerVel.x + playerVel.z * playerVel.z);
+    const cycle = T * (5.5 + speed * 0.45);
+    const legSwing = 0.62, kneeSwing = 0.52;
+    const contactL = Math.max(0, Math.sin(cycle));
+    const contactR = Math.max(0, Math.sin(cycle + Math.PI));
+    tgt.legLX  =  Math.sin(cycle) * legSwing;
+    tgt.legRX  =  Math.sin(cycle + Math.PI) * legSwing;
+    tgt.kneeLX = -Math.abs(Math.sin(cycle)) * kneeSwing - contactL * 0.08;
+    tgt.kneeRX = -Math.abs(Math.sin(cycle + Math.PI)) * kneeSwing - contactR * 0.08;
+    if(dribbleHand !== 'left')  tgt.armLX = Math.sin(cycle + Math.PI) * 0.48;
+    if(dribbleHand !== 'right') tgt.armRX = Math.sin(cycle) * 0.48;
+    tgt.elbLX = -0.22 - contactL * 0.12;
+    tgt.elbRX = -0.22 - contactR * 0.12;
+    tgt.torsoX  = -0.14 - Math.max(contactL, contactR) * 0.05;
+    tgt.torsoZ  = Math.sin(cycle) * 0.06;
+    tgt.headX   = Math.sin(cycle * 2) * 0.04;
+    tgt.headZ   = -tgt.torsoZ * 0.35;
   }
 
   if(animState === 'jump'){
@@ -1569,40 +1724,52 @@ function physicsStep(dt){
   }
 
   if(animState === 'steal'){
-    // Swipe hand forward-out
-    const swipeT = 1 - stealAnimTimer/0.4;
-    const swipe = Math.sin(swipeT*Math.PI);
-    tgt.armRX  = -0.6 * swipe;
-    tgt.elbRX  = -0.5 * swipe;
-    tgt.armRZ  = -0.6 * swipe;
-    tgt.torsoZ = -0.15 * swipe;
+    if(playerStealActive){
+      const t = clamp(playerStealPhase, 0, 1);
+      const reach = Math.sin(t * Math.PI * 0.95);
+      tgt.torsoX = 0.18 + t * 0.14;
+      tgt.torsoZ = -0.08;
+      tgt.kneeLX = -0.42 - t * 0.28;
+      tgt.kneeRX = -0.38 - t * 0.22;
+      tgt.armRX  = -0.15 - reach * 1.05;
+      tgt.elbRX  = -0.08 - reach * 0.85;
+      tgt.armRZ  = -0.35 - reach * 0.55;
+      tgt.armLX  = 0.25;
+      tgt.elbLX  = -0.35;
+    } else {
+      const swipeT = stealAnimTimer > 0 ? 1 - stealAnimTimer / 0.45 : 1;
+      const swipe = Math.sin(clamp(swipeT, 0, 1) * Math.PI);
+      tgt.armRX  = -0.6 * swipe;
+      tgt.elbRX  = -0.55 * swipe;
+      tgt.armRZ  = -0.65 * swipe;
+      tgt.torsoZ = -0.18 * swipe;
+      tgt.kneeLX = -0.25 * swipe;
+      tgt.kneeRX = -0.22 * swipe;
+    }
   }
 
   // ── Smooth joint rotations toward target (spring-like lerp)
-  const spd = 12 * dt;
+  const spd = 14 * dt;
 
-  function jLerp(key, val){ jRot[key] = lerp(jRot[key], val, clamp(spd,0,1)); }
+  function jLerp(key, val){ jRot[key] = lerp(jRot[key], val, clamp(spd, 0, 1)); }
   jLerp('torsoX', tgt.torsoX); jLerp('torsoZ', tgt.torsoZ);
+  jLerp('headX',  tgt.headX);  jLerp('headZ',  tgt.headZ);
   jLerp('armLX',  tgt.armLX);  jLerp('armLZ',  tgt.armLZ);
   jLerp('armRX',  tgt.armRX);  jLerp('armRZ',  tgt.armRZ);
+  jLerp('elbLX',  tgt.elbLX);  jLerp('elbRX',  tgt.elbRX);
   jLerp('legLX',  tgt.legLX);  jLerp('legRX',  tgt.legRX);
 
-  // Knee targets blend separately — faster response
-  const kSpd = clamp(16*dt, 0, 1);
-  jRot.legLZ = lerp(jRot.legLZ||0, tgt.kneeLX, kSpd);
-  jRot.legRZ = lerp(jRot.legRZ||0, tgt.kneeRX, kSpd);
-  const elbowSpd = clamp(14*dt, 0, 1);
-  jRot.headX = lerp(jRot.headX||0, tgt.elbLX, elbowSpd);
-  jRot.headZ = lerp(jRot.headZ||0, tgt.elbRX, elbowSpd);
+  const kSpd = clamp(18 * dt, 0, 1);
+  jRot.legLZ = lerp(jRot.legLZ, tgt.kneeLX, kSpd);
+  jRot.legRZ = lerp(jRot.legRZ, tgt.kneeRX, kSpd);
 
-  // Apply to meshes
   if(pBody){
     pBody.rotation.x = jRot.torsoX;
     pBody.rotation.z = jRot.torsoZ;
   }
   if(pHead){
-    // Head stays roughly level (slight look-up toward hoop)
-    pHead.rotation.x = lerp(pHead.rotation.x, -jRot.torsoX*0.4 - 0.04, clamp(8*dt,0,1));
+    pHead.rotation.x = lerp(pHead.rotation.x, -jRot.torsoX * 0.35 - 0.04 + jRot.headX, clamp(10 * dt, 0, 1));
+    pHead.rotation.z = lerp(pHead.rotation.z, jRot.headZ, clamp(10 * dt, 0, 1));
   }
   if(pArmL){
     pArmL.rotation.x = jRot.armLX;
@@ -1612,8 +1779,8 @@ function physicsStep(dt){
     pArmR.rotation.x = jRot.armRX;
     pArmR.rotation.z = jRot.armRZ;
   }
-  if(pElbowL) pElbowL.rotation.x = jRot.headX;
-  if(pElbowR) pElbowR.rotation.x = jRot.headZ;
+  if(pElbowL) pElbowL.rotation.x = jRot.elbLX;
+  if(pElbowR) pElbowR.rotation.x = jRot.elbRX;
   if(pLegL){ pLegL.rotation.x = jRot.legLX; }
   if(pLegR){ pLegR.rotation.x = jRot.legRX; }
   if(pKneeL) pKneeL.rotation.x = jRot.legLZ;
@@ -1621,7 +1788,7 @@ function physicsStep(dt){
 
   stealCooldown = Math.max(0, stealCooldown - dt);
 
-  // Dribble
+  updatePlayerSteal(dt);
   updateDribble(dt);
   updateDunk(dt);
   updateAI(dt);
@@ -1789,6 +1956,9 @@ function startGame(){
   dunkActive=false; dunkPhase=0;
   shotCharging=false;
   shotWrapEl.classList.add('hidden');
+  playerStealActive=false;
+  playerStealPhase=0;
+  stealAnimTimer=0;
   dribbleHand='right';
   dribbleLblEl.textContent='▶ RIGHT';
   removeAI();
